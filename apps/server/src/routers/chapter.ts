@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
 import { createChapterSchema, updateChapterSchema, objectIdSchema } from "@ai-novel/types";
-import { router, publicProcedure } from "../trpc.js";
+import { router, protectedProcedure } from "../trpc.js";
+import { getEmbeddingService } from "../services/embeddingService.js";
 
 function serializeDoc(doc: any) {
   if (!doc) return null;
@@ -19,27 +20,27 @@ function countWords(text: string): number {
 }
 
 export const chapterRouter = router({
-  list: publicProcedure
+  list: protectedProcedure
     .input(z.object({ projectId: objectIdSchema }))
     .query(async ({ ctx, input }) => {
       const docs = await ctx.db
         .collection("chapters")
-        .find({ projectId: { $in: [input.projectId, new ObjectId(input.projectId)] } })
+        .find({ projectId: { $in: [input.projectId, new ObjectId(input.projectId)] }, userId: ctx.user.userId })
         .sort({ order: 1 })
         .toArray();
       return docs.map(serializeDoc);
     }),
 
-  getById: publicProcedure
+  getById: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .query(async ({ ctx, input }) => {
       const doc = await ctx.db
         .collection("chapters")
-        .findOne({ _id: new ObjectId(input.id) });
+        .findOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
       return serializeDoc(doc);
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(createChapterSchema)
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
@@ -48,7 +49,6 @@ export const chapterRouter = router({
 
       let order = input.order;
       if (order === undefined || order === null) {
-        // Auto-assign order: find the max order in the project and add 1
         const lastChapter = await ctx.db
           .collection("chapters")
           .find({ projectId: { $in: [input.projectId, new ObjectId(input.projectId)] } })
@@ -59,6 +59,7 @@ export const chapterRouter = router({
       }
 
       const doc = {
+        userId: ctx.user.userId,
         projectId: new ObjectId(input.projectId),
         order,
         title: input.title,
@@ -70,10 +71,11 @@ export const chapterRouter = router({
         updatedAt: now,
       };
       const result = await ctx.db.collection("chapters").insertOne(doc);
+      getEmbeddingService()?.enqueue("chapters", result.insertedId.toHexString());
       return serializeDoc({ _id: result.insertedId, ...doc });
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(z.object({ id: objectIdSchema, data: updateChapterSchema }))
     .mutation(async ({ ctx, input }) => {
       const updateFields: Record<string, any> = {
@@ -91,23 +93,24 @@ export const chapterRouter = router({
       const result = await ctx.db
         .collection("chapters")
         .findOneAndUpdate(
-          { _id: new ObjectId(input.id) },
+          { _id: new ObjectId(input.id), userId: ctx.user.userId },
           { $set: updateFields },
           { returnDocument: "after" }
         );
+      if (result) getEmbeddingService()?.enqueue("chapters", input.id);
       return serializeDoc(result);
     }),
 
-  delete: publicProcedure
+  delete: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .collection("chapters")
-        .deleteOne({ _id: new ObjectId(input.id) });
+        .deleteOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
       return { success: true };
     }),
 
-  reorder: publicProcedure
+  reorder: protectedProcedure
     .input(z.object({
       projectId: objectIdSchema,
       orders: z.array(z.object({
@@ -119,7 +122,11 @@ export const chapterRouter = router({
       const now = new Date();
       const bulkOps = input.orders.map((item) => ({
         updateOne: {
-          filter: { _id: new ObjectId(item.id), projectId: { $in: [input.projectId, new ObjectId(input.projectId)] } },
+          filter: {
+            _id: new ObjectId(item.id),
+            projectId: { $in: [input.projectId, new ObjectId(input.projectId)] },
+            userId: ctx.user.userId,
+          },
           update: { $set: { order: item.order, updatedAt: now } },
         },
       }));
@@ -128,10 +135,9 @@ export const chapterRouter = router({
         await ctx.db.collection("chapters").bulkWrite(bulkOps);
       }
 
-      // Return updated list sorted by order
       const docs = await ctx.db
         .collection("chapters")
-        .find({ projectId: { $in: [input.projectId, new ObjectId(input.projectId)] } })
+        .find({ projectId: { $in: [input.projectId, new ObjectId(input.projectId)] }, userId: ctx.user.userId })
         .sort({ order: 1 })
         .toArray();
       return docs.map(serializeDoc);

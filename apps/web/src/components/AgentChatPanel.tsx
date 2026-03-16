@@ -4,6 +4,7 @@ import { BotMessageSquare, Check, ChevronRight, History, Loader2, Plus, X } from
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { trpc } from "../lib/trpc.js";
+import { getToken } from "../lib/auth.js";
 
 const API_BASE = "http://localhost:3001";
 
@@ -279,10 +280,14 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
     try {
       const history = await queryClient.fetchQuery({
         queryKey: ["agent", "getHistory", { sessionId: sid }],
-        queryFn: () =>
-          fetch(`${API_BASE}/trpc/agent.getHistory?input=${encodeURIComponent(JSON.stringify({ sessionId: sid }))}`)
+        queryFn: () => {
+          const token = getToken();
+          return fetch(`${API_BASE}/trpc/agent.getHistory?input=${encodeURIComponent(JSON.stringify({ sessionId: sid }))}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          })
             .then((r) => r.json())
-            .then((r) => r.result?.data),
+            .then((r) => r.result?.data);
+        },
       });
       if (history) {
         const loaded: ChatMessage[] = history.map((doc: any) => ({
@@ -314,9 +319,13 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
     setMessages((prev) => [...prev, { role: "assistant", content: "", events: [] }]);
 
     try {
+      const token = getToken();
       const response = await fetch(`${API_BASE}/api/agent/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ projectId, worldId, message: text, sessionId }),
       });
 

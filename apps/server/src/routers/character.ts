@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
 import { createCharacterSchema, updateCharacterSchema, objectIdSchema } from "@ai-novel/types";
-import { router, publicProcedure } from "../trpc.js";
+import { router, protectedProcedure } from "../trpc.js";
+import { getEmbeddingService } from "../services/embeddingService.js";
 
 function serializeDoc(doc: any) {
   if (!doc) return null;
@@ -11,7 +12,6 @@ function serializeDoc(doc: any) {
 
 function countWords(text: string): number {
   if (!text) return 0;
-  // Count both CJK characters and whitespace-separated words
   const cjk = text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g);
   const cjkCount = cjk ? cjk.length : 0;
   const stripped = text.replace(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g, " ");
@@ -34,27 +34,27 @@ function computeCharacterWordCount(profile: any): number {
 }
 
 export const characterRouter = router({
-  list: publicProcedure
+  list: protectedProcedure
     .input(z.object({ worldId: objectIdSchema }))
     .query(async ({ ctx, input }) => {
       const docs = await ctx.db
         .collection("characters")
-        .find({ worldId: { $in: [input.worldId, new ObjectId(input.worldId)] } })
+        .find({ worldId: { $in: [input.worldId, new ObjectId(input.worldId)] }, userId: ctx.user.userId })
         .sort({ updatedAt: -1 })
         .toArray();
       return docs.map(serializeDoc);
     }),
 
-  getById: publicProcedure
+  getById: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .query(async ({ ctx, input }) => {
       const doc = await ctx.db
         .collection("characters")
-        .findOne({ _id: new ObjectId(input.id) });
+        .findOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
       return serializeDoc(doc);
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(createCharacterSchema)
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
@@ -67,6 +67,7 @@ export const characterRouter = router({
         customFields: input.profile?.customFields ?? {},
       };
       const doc = {
+        userId: ctx.user.userId,
         worldId: new ObjectId(input.worldId),
         name: input.name,
         aliases: input.aliases ?? [],
@@ -77,10 +78,11 @@ export const characterRouter = router({
         updatedAt: now,
       };
       const result = await ctx.db.collection("characters").insertOne(doc);
+      getEmbeddingService()?.enqueue("characters", result.insertedId.toHexString());
       return serializeDoc({ _id: result.insertedId, ...doc });
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(z.object({ id: objectIdSchema, data: updateCharacterSchema }))
     .mutation(async ({ ctx, input }) => {
       const updateFields: Record<string, any> = {
@@ -97,12 +99,11 @@ export const characterRouter = router({
       const result = await ctx.db
         .collection("characters")
         .findOneAndUpdate(
-          { _id: new ObjectId(input.id) },
+          { _id: new ObjectId(input.id), userId: ctx.user.userId },
           { $set: updateFields },
           { returnDocument: "after" }
         );
 
-      // If profile was partially updated, recalculate wordCount from full doc
       if (result && input.data.profile !== undefined) {
         const wordCount = computeCharacterWordCount(result.profile);
         if (wordCount !== result.wordCount) {
@@ -113,15 +114,16 @@ export const characterRouter = router({
         }
       }
 
+      if (result) getEmbeddingService()?.enqueue("characters", input.id);
       return serializeDoc(result);
     }),
 
-  delete: publicProcedure
+  delete: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .collection("characters")
-        .deleteOne({ _id: new ObjectId(input.id) });
+        .deleteOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
       return { success: true };
     }),
 });

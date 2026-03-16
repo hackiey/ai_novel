@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { ObjectId, Filter } from "mongodb";
 import { createWorldSettingSchema, updateWorldSettingSchema, objectIdSchema } from "@ai-novel/types";
-import { router, publicProcedure } from "../trpc.js";
+import { router, protectedProcedure } from "../trpc.js";
+import { getEmbeddingService } from "../services/embeddingService.js";
 
 function serializeDoc(doc: any) {
   if (!doc) return null;
@@ -10,13 +11,16 @@ function serializeDoc(doc: any) {
 }
 
 export const worldSettingRouter = router({
-  list: publicProcedure
+  list: protectedProcedure
     .input(z.object({
       worldId: objectIdSchema,
       category: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const filter: Filter<any> = { worldId: { $in: [input.worldId, new ObjectId(input.worldId)] } };
+      const filter: Filter<any> = {
+        worldId: { $in: [input.worldId, new ObjectId(input.worldId)] },
+        userId: ctx.user.userId,
+      };
       if (input.category) {
         filter.category = input.category;
       }
@@ -28,20 +32,21 @@ export const worldSettingRouter = router({
       return docs.map(serializeDoc);
     }),
 
-  getById: publicProcedure
+  getById: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .query(async ({ ctx, input }) => {
       const doc = await ctx.db
         .collection("world_settings")
-        .findOne({ _id: new ObjectId(input.id) });
+        .findOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
       return serializeDoc(doc);
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(createWorldSettingSchema)
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
       const doc = {
+        userId: ctx.user.userId,
         worldId: new ObjectId(input.worldId),
         category: input.category,
         title: input.title,
@@ -51,10 +56,11 @@ export const worldSettingRouter = router({
         updatedAt: now,
       };
       const result = await ctx.db.collection("world_settings").insertOne(doc);
+      getEmbeddingService()?.enqueue("world_settings", result.insertedId.toHexString());
       return serializeDoc({ _id: result.insertedId, ...doc });
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(z.object({ id: objectIdSchema, data: updateWorldSettingSchema }))
     .mutation(async ({ ctx, input }) => {
       const updateFields: Record<string, any> = {
@@ -68,19 +74,20 @@ export const worldSettingRouter = router({
       const result = await ctx.db
         .collection("world_settings")
         .findOneAndUpdate(
-          { _id: new ObjectId(input.id) },
+          { _id: new ObjectId(input.id), userId: ctx.user.userId },
           { $set: updateFields },
           { returnDocument: "after" }
         );
+      if (result) getEmbeddingService()?.enqueue("world_settings", input.id);
       return serializeDoc(result);
     }),
 
-  delete: publicProcedure
+  delete: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .collection("world_settings")
-        .deleteOne({ _id: new ObjectId(input.id) });
+        .deleteOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
       return { success: true };
     }),
 });

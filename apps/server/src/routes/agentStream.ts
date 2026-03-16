@@ -4,14 +4,31 @@ import { NovelAgentSession } from "@ai-novel/agent";
 import type { HistoryMessage, HistoryToolCall, VectorSearchFn } from "@ai-novel/agent";
 import { getDb } from "../db.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
+import { verifyToken, type JwtPayload } from "../auth/jwt.js";
 
 // Store active sessions in memory (shared with router)
 export const sessions = new Map<string, NovelAgentSession>();
 
 const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "claude-sonnet-4-6-20250514";
 
+function extractUser(request: { headers: { authorization?: string } }): JwtPayload | null {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) return null;
+  try {
+    return verifyToken(auth.slice(7));
+  } catch {
+    return null;
+  }
+}
+
 export function registerAgentRoutes(fastify: FastifyInstance) {
   fastify.post("/api/agent/chat", async (request, reply) => {
+    // Authenticate
+    const user = extractUser(request);
+    if (!user) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+
     const { projectId, worldId, message, sessionId: inputSessionId, model } =
       request.body as {
         projectId: string;
@@ -31,6 +48,21 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     const db = getDb();
     const sessionId = inputSessionId || crypto.randomUUID();
 
+    // Validate model against user's permission group
+    if (model) {
+      const userDoc = await db.collection("users").findOne({ _id: new ObjectId(user.userId) });
+      if (userDoc?.permissionGroupId) {
+        const group = await db.collection("permission_groups").findOne({
+          _id: new ObjectId(userDoc.permissionGroupId as string),
+        });
+        if (group?.allowedModels && (group.allowedModels as string[]).length > 0) {
+          if (!(group.allowedModels as string[]).includes(model)) {
+            return reply.status(403).send({ error: "Model not allowed for your permission group" });
+          }
+        }
+      }
+    }
+
     // Build vector search function if embedding service is available
     const embeddingService = getEmbeddingService();
     let vectorSearchFn: VectorSearchFn | undefined;
@@ -48,6 +80,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     // Get or create agent session
     let session = sessions.get(sessionId);
     if (!session) {
+      const embeddingSvc = getEmbeddingService();
       session = new NovelAgentSession({
         apiKey: process.env.ANTHROPIC_API_KEY || "",
         baseURL: process.env.ANTHROPIC_BASE_URL || undefined,
@@ -56,6 +89,9 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
         projectId,
         worldId,
         vectorSearchFn,
+        onDocumentChanged: embeddingSvc
+          ? (collection, id) => embeddingSvc.enqueue(collection, id)
+          : undefined,
       });
       sessions.set(sessionId, session);
     }
@@ -75,6 +111,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     const now = new Date();
     await db.collection("agent_messages").insertOne({
       sessionId,
+      userId: user.userId,
       role: "user",
       content: message,
       createdAt: now,
@@ -92,7 +129,6 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
         role: doc.role as "user" | "assistant",
         content: (doc.content as string) || "",
       };
-      // Extract tool calls from stored events for assistant messages
       if (doc.role === "assistant" && Array.isArray(doc.events)) {
         const toolCalls: HistoryToolCall[] = doc.events
           .filter((e: any) => e.type === "tool_use" && e.toolName)
@@ -134,6 +170,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     // Save assistant message to DB
     await db.collection("agent_messages").insertOne({
       sessionId,
+      userId: user.userId,
       role: "assistant",
       content: fullText,
       events: allEvents,
@@ -152,6 +189,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
         },
         $setOnInsert: {
           sessionId,
+          userId: user.userId,
           title,
           createdAt: now,
         },

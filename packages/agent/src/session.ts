@@ -3,7 +3,7 @@ import type { Db } from "mongodb";
 import { buildSystemPromptWithHistory } from "./systemPrompt.js";
 import type { HistoryMessage } from "./systemPrompt.js";
 import { createNovelToolsServer } from "./tools/index.js";
-import type { VectorSearchFn } from "./tools/index.js";
+import type { VectorSearchFn, OnDocumentChangedFn } from "./tools/index.js";
 
 const DEFAULT_MODEL = "claude-sonnet-4-6-20250514";
 
@@ -23,6 +23,7 @@ export class NovelAgentSession {
   private baseURL?: string;
   private abortController?: AbortController;
   private vectorSearchFn?: VectorSearchFn;
+  private onDocumentChanged?: OnDocumentChangedFn;
 
   constructor(options: {
     apiKey: string;
@@ -32,6 +33,7 @@ export class NovelAgentSession {
     projectId: string;
     worldId?: string;
     vectorSearchFn?: VectorSearchFn;
+    onDocumentChanged?: OnDocumentChangedFn;
   }) {
     this.apiKey = options.apiKey;
     this.baseURL = options.baseURL;
@@ -40,6 +42,7 @@ export class NovelAgentSession {
     this.projectId = options.projectId;
     this.worldId = options.worldId;
     this.vectorSearchFn = options.vectorSearchFn;
+    this.onDocumentChanged = options.onDocumentChanged;
   }
 
   async *chat(userMessage: string, history?: HistoryMessage[], memory?: string): AsyncGenerator<AgentEvent> {
@@ -58,7 +61,7 @@ export class NovelAgentSession {
       memory,
     );
 
-    const novelToolsServer = createNovelToolsServer(this.db, this.vectorSearchFn);
+    const novelToolsServer = createNovelToolsServer(this.db, this.vectorSearchFn, this.onDocumentChanged);
     const abortController = new AbortController();
     this.abortController = abortController;
 

@@ -1,4 +1,6 @@
 import { router } from "../trpc.js";
+import { authRouter } from "./auth.js";
+import { permissionGroupRouter } from "./permissionGroup.js";
 import { projectRouter } from "./project.js";
 import { characterRouter } from "./character.js";
 import { worldRouter } from "./world.js";
@@ -9,6 +11,8 @@ import { agentRouter } from "./agent.js";
 import { searchRouter } from "./search.js";
 
 export const appRouter = router({
+  auth: authRouter,
+  permissionGroup: permissionGroupRouter,
   project: projectRouter,
   character: characterRouter,
   world: worldRouter,

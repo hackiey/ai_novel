@@ -51,7 +51,10 @@
       "Bash(wc:*)",
       "Bash(git log:*)",
       "Bash(find:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(node:*)",
+      "Bash(npx tsx:*)",
+      "Bash(cd:*)"
     ]
   }
 }

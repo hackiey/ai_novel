@@ -9,10 +9,63 @@ export const timestampsSchema = z.object({
   updatedAt: z.date(),
 });
 
+// ============ User Role ============
+
+export const userRoleSchema = z.enum(["admin", "user"]);
+export type UserRole = z.infer<typeof userRoleSchema>;
+
+// ============ Permission Group (权限组) ============
+
+export const permissionGroupSchema = z.object({
+  _id: objectIdSchema,
+  name: z.string().min(1).max(100),
+  allowedModels: z.array(z.string()).default([]),
+  ...timestampsSchema.shape,
+});
+
+export const createPermissionGroupSchema = z.object({
+  name: z.string().min(1).max(100),
+  allowedModels: z.array(z.string()).optional(),
+});
+
+export const updatePermissionGroupSchema = createPermissionGroupSchema.partial();
+
+export type PermissionGroup = z.infer<typeof permissionGroupSchema>;
+export type CreatePermissionGroup = z.infer<typeof createPermissionGroupSchema>;
+export type UpdatePermissionGroup = z.infer<typeof updatePermissionGroupSchema>;
+
+// ============ User (用户) ============
+
+export const userSchema = z.object({
+  _id: objectIdSchema,
+  email: z.string().email(),
+  passwordHash: z.string(),
+  displayName: z.string().min(1).max(100),
+  role: userRoleSchema.default("user"),
+  permissionGroupId: objectIdSchema.optional(),
+  ...timestampsSchema.shape,
+});
+
+export const registerSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6).max(100),
+  displayName: z.string().min(1).max(100),
+});
+
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+});
+
+export type User = z.infer<typeof userSchema>;
+export type RegisterInput = z.infer<typeof registerSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;
+
 // ============ World (世界观) ============
 
 export const worldSchema = z.object({
   _id: objectIdSchema,
+  userId: objectIdSchema,
   name: z.string().min(1).max(200),
   description: z.string().max(2000).default(""),
   ...timestampsSchema.shape,
@@ -33,6 +86,7 @@ export type UpdateWorld = z.infer<typeof updateWorldSchema>;
 
 export const projectSchema = z.object({
   _id: objectIdSchema,
+  userId: objectIdSchema,
   name: z.string().min(1).max(200),
   description: z.string().max(2000).default(""),
   worldId: objectIdSchema.optional(),
@@ -78,6 +132,7 @@ export const characterProfileSchema = z.object({
 
 export const characterSchema = z.object({
   _id: objectIdSchema,
+  userId: objectIdSchema,
   worldId: objectIdSchema,
   name: z.string().min(1).max(200),
   aliases: z.array(z.string().max(200)).default([]),
@@ -106,6 +161,7 @@ export type UpdateCharacter = z.infer<typeof updateCharacterSchema>;
 
 export const worldSettingSchema = z.object({
   _id: objectIdSchema,
+  userId: objectIdSchema,
   worldId: objectIdSchema,
   category: z.string().min(1).max(100),
   title: z.string().min(1).max(200),
@@ -134,6 +190,7 @@ export type UpdateWorldSetting = z.infer<typeof updateWorldSettingSchema>;
 
 export const draftSchema = z.object({
   _id: objectIdSchema,
+  userId: objectIdSchema,
   projectId: objectIdSchema.optional(),
   worldId: objectIdSchema.optional(),
   title: z.string().min(1).max(200),
@@ -168,6 +225,7 @@ export const chapterStatusSchema = z.enum(["draft", "revision", "final"]);
 
 export const chapterSchema = z.object({
   _id: objectIdSchema,
+  userId: objectIdSchema,
   projectId: objectIdSchema,
   order: z.number().int().nonnegative(),
   title: z.string().min(1).max(200),
@@ -214,6 +272,7 @@ export type EmbeddingChunk = z.infer<typeof embeddingChunkSchema>;
 
 export const agentSessionSchema = z.object({
   _id: objectIdSchema,
+  userId: objectIdSchema,
   projectId: objectIdSchema,
   sessionId: z.string(),
   title: z.string().max(200).default(""),

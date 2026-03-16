@@ -39,6 +39,14 @@ async function main() {
     console.log("EMBEDDING_API_KEY not set — embedding service disabled, search will use regex fallback");
   }
 
+  // Ensure indexes
+  await db.collection("users").createIndex({ email: 1 }, { unique: true });
+  await db.collection("permission_groups").createIndex({ name: 1 }, { unique: true });
+  for (const col of ["worlds", "projects", "characters", "world_settings",
+    "drafts", "chapters", "agent_sessions", "agent_messages"]) {
+    await db.collection(col).createIndex({ userId: 1 });
+  }
+
   // Register tRPC
   await fastify.register(fastifyTRPCPlugin, {
     prefix: "/trpc",

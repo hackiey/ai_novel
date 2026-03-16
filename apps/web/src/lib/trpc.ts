@@ -2,6 +2,7 @@ import { createTRPCReact } from "@trpc/react-query";
 import { httpBatchLink } from "@trpc/client";
 import { QueryClient } from "@tanstack/react-query";
 import type { AppRouter } from "../../../server/src/routers/index.js";
+import { getToken } from "./auth.js";
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
 export const trpc = createTRPCReact<AppRouter>() as ReturnType<typeof createTRPCReact<AppRouter>>;
@@ -19,6 +20,10 @@ export const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       url: "http://localhost:3001/trpc",
+      headers() {
+        const token = getToken();
+        return token ? { Authorization: `Bearer ${token}` } : {};
+      },
     }),
   ],
 });

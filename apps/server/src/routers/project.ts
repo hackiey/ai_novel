@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
 import { createProjectSchema, updateProjectSchema, objectIdSchema } from "@ai-novel/types";
-import { router, publicProcedure } from "../trpc.js";
+import { router, protectedProcedure } from "../trpc.js";
 
 function serializeDoc(doc: any) {
   if (!doc) return null;
@@ -10,29 +10,30 @@ function serializeDoc(doc: any) {
 }
 
 export const projectRouter = router({
-  list: publicProcedure.query(async ({ ctx }) => {
+  list: protectedProcedure.query(async ({ ctx }) => {
     const docs = await ctx.db
       .collection("projects")
-      .find()
+      .find({ userId: ctx.user.userId })
       .sort({ updatedAt: -1 })
       .toArray();
     return docs.map(serializeDoc);
   }),
 
-  getById: publicProcedure
+  getById: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .query(async ({ ctx, input }) => {
       const doc = await ctx.db
         .collection("projects")
-        .findOne({ _id: new ObjectId(input.id) });
+        .findOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
       return serializeDoc(doc);
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(createProjectSchema)
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
       const doc: Record<string, any> = {
+        userId: ctx.user.userId,
         name: input.name,
         description: input.description ?? "",
         settings: {
@@ -47,7 +48,7 @@ export const projectRouter = router({
       return serializeDoc({ _id: result.insertedId, ...doc });
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(z.object({ id: objectIdSchema, data: updateProjectSchema }))
     .mutation(async ({ ctx, input }) => {
       const updateFields: Record<string, any> = {
@@ -61,30 +62,30 @@ export const projectRouter = router({
       const result = await ctx.db
         .collection("projects")
         .findOneAndUpdate(
-          { _id: new ObjectId(input.id) },
+          { _id: new ObjectId(input.id), userId: ctx.user.userId },
           { $set: updateFields },
           { returnDocument: "after" }
         );
       return serializeDoc(result);
     }),
 
-  listByWorld: publicProcedure
+  listByWorld: protectedProcedure
     .input(z.object({ worldId: objectIdSchema }))
     .query(async ({ ctx, input }) => {
       const docs = await ctx.db
         .collection("projects")
-        .find({ worldId: input.worldId })
+        .find({ worldId: input.worldId, userId: ctx.user.userId })
         .sort({ updatedAt: -1 })
         .toArray();
       return docs.map(serializeDoc);
     }),
 
-  delete: publicProcedure
+  delete: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .collection("projects")
-        .deleteOne({ _id: new ObjectId(input.id) });
+        .deleteOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
       return { success: true };
     }),
 });

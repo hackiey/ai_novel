@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
 import { createWorldSchema, updateWorldSchema, objectIdSchema } from "@ai-novel/types";
-import { router, publicProcedure } from "../trpc.js";
+import { router, protectedProcedure } from "../trpc.js";
 
 function serializeDoc(doc: any) {
   if (!doc) return null;
@@ -10,29 +10,30 @@ function serializeDoc(doc: any) {
 }
 
 export const worldRouter = router({
-  list: publicProcedure.query(async ({ ctx }) => {
+  list: protectedProcedure.query(async ({ ctx }) => {
     const docs = await ctx.db
       .collection("worlds")
-      .find()
+      .find({ userId: ctx.user.userId })
       .sort({ updatedAt: -1 })
       .toArray();
     return docs.map(serializeDoc);
   }),
 
-  getById: publicProcedure
+  getById: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .query(async ({ ctx, input }) => {
       const doc = await ctx.db
         .collection("worlds")
-        .findOne({ _id: new ObjectId(input.id) });
+        .findOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
       return serializeDoc(doc);
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(createWorldSchema)
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
       const doc = {
+        userId: ctx.user.userId,
         name: input.name,
         description: input.description ?? "",
         createdAt: now,
@@ -42,7 +43,7 @@ export const worldRouter = router({
       return serializeDoc({ _id: result.insertedId, ...doc });
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(z.object({ id: objectIdSchema, data: updateWorldSchema }))
     .mutation(async ({ ctx, input }) => {
       const updateFields: Record<string, any> = {
@@ -54,19 +55,19 @@ export const worldRouter = router({
       const result = await ctx.db
         .collection("worlds")
         .findOneAndUpdate(
-          { _id: new ObjectId(input.id) },
+          { _id: new ObjectId(input.id), userId: ctx.user.userId },
           { $set: updateFields },
           { returnDocument: "after" }
         );
       return serializeDoc(result);
     }),
 
-  delete: publicProcedure
+  delete: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .collection("worlds")
-        .deleteOne({ _id: new ObjectId(input.id) });
+        .deleteOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
       return { success: true };
     }),
 });

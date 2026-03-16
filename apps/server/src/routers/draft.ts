@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { ObjectId, Filter } from "mongodb";
 import { createDraftSchema, updateDraftSchema, objectIdSchema } from "@ai-novel/types";
-import { router, publicProcedure } from "../trpc.js";
+import { router, protectedProcedure } from "../trpc.js";
+import { getEmbeddingService } from "../services/embeddingService.js";
 
 function serializeDoc(doc: any) {
   if (!doc) return null;
@@ -10,13 +11,13 @@ function serializeDoc(doc: any) {
 }
 
 export const draftRouter = router({
-  list: publicProcedure
+  list: protectedProcedure
     .input(z.object({
       projectId: objectIdSchema.optional(),
       worldId: objectIdSchema.optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const filter: Filter<any> = {};
+      const filter: Filter<any> = { userId: ctx.user.userId };
       if (input.projectId) filter.projectId = { $in: [input.projectId, new ObjectId(input.projectId)] };
       if (input.worldId) filter.worldId = { $in: [input.worldId, new ObjectId(input.worldId)] };
       const docs = await ctx.db
@@ -27,20 +28,21 @@ export const draftRouter = router({
       return docs.map(serializeDoc);
     }),
 
-  getById: publicProcedure
+  getById: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .query(async ({ ctx, input }) => {
       const doc = await ctx.db
         .collection("drafts")
-        .findOne({ _id: new ObjectId(input.id) });
+        .findOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
       return serializeDoc(doc);
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(createDraftSchema)
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
       const doc: Record<string, any> = {
+        userId: ctx.user.userId,
         title: input.title,
         content: input.content ?? "",
         tags: input.tags ?? [],
@@ -52,10 +54,11 @@ export const draftRouter = router({
       if (input.projectId) doc.projectId = new ObjectId(input.projectId);
       if (input.worldId) doc.worldId = new ObjectId(input.worldId);
       const result = await ctx.db.collection("drafts").insertOne(doc);
+      getEmbeddingService()?.enqueue("drafts", result.insertedId.toHexString());
       return serializeDoc({ _id: result.insertedId, ...doc });
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(z.object({ id: objectIdSchema, data: updateDraftSchema }))
     .mutation(async ({ ctx, input }) => {
       const updateFields: Record<string, any> = {
@@ -70,19 +73,20 @@ export const draftRouter = router({
       const result = await ctx.db
         .collection("drafts")
         .findOneAndUpdate(
-          { _id: new ObjectId(input.id) },
+          { _id: new ObjectId(input.id), userId: ctx.user.userId },
           { $set: updateFields },
           { returnDocument: "after" }
         );
+      if (result) getEmbeddingService()?.enqueue("drafts", input.id);
       return serializeDoc(result);
     }),
 
-  delete: publicProcedure
+  delete: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .collection("drafts")
-        .deleteOne({ _id: new ObjectId(input.id) });
+        .deleteOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
       return { success: true };
     }),
 });

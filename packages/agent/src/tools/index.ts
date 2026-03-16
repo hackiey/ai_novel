@@ -11,7 +11,9 @@ export type VectorSearchFn = (args: {
   limit?: number;
 }) => Promise<{ results: Array<{ collection: string; id: string; title: string; excerpt: string; score: number }>; total: number }>;
 
-export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn) {
+export type OnDocumentChangedFn = (collection: string, id: string) => void;
+
+export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, onDocumentChanged?: OnDocumentChangedFn) {
   return createSdkMcpServer({
     name: "novel-tools",
     version: "1.0.0",
@@ -96,6 +98,7 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn) 
         },
         async (args) => {
           const result = await handlers.updateCharacter(args, db);
+          onDocumentChanged?.("characters", args.id);
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
@@ -124,6 +127,7 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn) 
         },
         async (args) => {
           const result = await handlers.createCharacter(args, db);
+          if ((result as any)?._id) onDocumentChanged?.("characters", String((result as any)._id));
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
@@ -178,6 +182,7 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn) 
         },
         async (args) => {
           const result = await handlers.updateWorldSetting(args, db);
+          onDocumentChanged?.("world_settings", args.id);
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
@@ -195,6 +200,7 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn) 
         },
         async (args) => {
           const result = await handlers.createWorldSetting(args, db);
+          if ((result as any)?._id) onDocumentChanged?.("world_settings", String((result as any)._id));
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
@@ -223,6 +229,7 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn) 
         },
         async (args) => {
           const result = await handlers.createChapter(args, db);
+          if ((result as any)?._id) onDocumentChanged?.("chapters", String((result as any)._id));
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
@@ -278,6 +285,7 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn) 
         },
         async (args) => {
           const result = await handlers.updateChapter(args, db);
+          onDocumentChanged?.("chapters", args.id);
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
@@ -320,6 +328,7 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn) 
         },
         async (args) => {
           const result = await handlers.createDraft(args, db);
+          if ((result as any)?._id) onDocumentChanged?.("drafts", String((result as any)._id));
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
