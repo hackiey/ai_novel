@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { trpc } from "../lib/trpc.js";
 
 function useAutoResizeTextarea(value: string) {
@@ -25,6 +27,7 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
   const [worldTitle, setWorldTitle] = useState("");
   const [worldContent, setWorldContent] = useState("");
 
+  const [expandedWorldSettingId, setExpandedWorldSettingId] = useState<string | null>(null);
   const [editingWorldSettingId, setEditingWorldSettingId] = useState<string | null>(null);
   const [editWorldCategory, setEditWorldCategory] = useState("");
   const [editWorldTitle, setEditWorldTitle] = useState("");
@@ -44,6 +47,14 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
   });
 
   const worldSettings = (worldSettingsQuery.data ?? []) as any[];
+
+  const openEditMode = useCallback((ws: any) => {
+    setExpandedWorldSettingId(ws._id);
+    setEditingWorldSettingId(ws._id);
+    setEditWorldCategory(ws.category || "");
+    setEditWorldTitle(ws.title || "");
+    setEditWorldContent(ws.content || "");
+  }, []);
 
   return (
     <div>
@@ -128,25 +139,25 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
       ) : (
         <div className="space-y-2">
           {worldSettings.map((ws: any) => {
-            const isExpanded = editingWorldSettingId === ws._id;
+            const isExpanded = expandedWorldSettingId === ws._id;
+            const isEditing = editingWorldSettingId === ws._id;
             return (
               <div
                 key={ws._id}
                 className={`rounded-lg border bg-white transition-all ${isExpanded ? "border-indigo-300 shadow-md" : "border-gray-200 hover:border-gray-300 hover:shadow-sm"}`}
               >
-                {/* Header - always visible, click to toggle */}
                 <div
                   className="flex items-start justify-between gap-3 p-4 cursor-pointer group"
                   onClick={() => {
+                    if (isEditing) return;
                     if (isExpanded) {
-                      setEditingWorldSettingId(null);
+                      setExpandedWorldSettingId(null);
                     } else {
-                      setEditingWorldSettingId(ws._id);
-                      setEditWorldCategory(ws.category || "");
-                      setEditWorldTitle(ws.title || "");
-                      setEditWorldContent(ws.content || "");
+                      setExpandedWorldSettingId(ws._id);
                     }
                   }}
+                  onDoubleClick={() => openEditMode(ws)}
+                  title={isExpanded ? "双击进入编辑" : "单击展开，双击编辑"}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -184,85 +195,127 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
                   </div>
                 </div>
 
-                {/* Expanded edit area */}
                 {isExpanded && (
                   <div className="px-4 pb-4 border-t border-gray-100">
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (!editWorldCategory.trim() || !editWorldTitle.trim()) return;
-                        updateWorldSettingMut.mutate({
-                          id: ws._id,
-                          data: {
-                            category: editWorldCategory.trim(),
-                            title: editWorldTitle.trim(),
-                            content: editWorldContent.trim(),
-                          },
-                        });
-                      }}
-                      className="space-y-4 pt-4"
-                    >
-                      <div className="flex gap-3">
-                        <div className="flex-1">
-                          <label className="block text-xs font-medium text-gray-500 mb-1.5">Category</label>
-                          <input
-                            value={editWorldCategory}
-                            onChange={(e) => setEditWorldCategory(e.target.value)}
-                            placeholder="e.g., Geography, Magic System"
+                    {isEditing ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (!editWorldCategory.trim() || !editWorldTitle.trim()) return;
+                          updateWorldSettingMut.mutate({
+                            id: ws._id,
+                            data: {
+                              category: editWorldCategory.trim(),
+                              title: editWorldTitle.trim(),
+                              content: editWorldContent.trim(),
+                            },
+                          });
+                        }}
+                        className="space-y-4 pt-4"
+                      >
+                        <div className="flex gap-3">
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">Category</label>
+                            <input
+                              value={editWorldCategory}
+                              onChange={(e) => setEditWorldCategory(e.target.value)}
+                              placeholder="e.g., Geography, Magic System"
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">Title</label>
+                            <input
+                              value={editWorldTitle}
+                              onChange={(e) => setEditWorldTitle(e.target.value)}
+                              placeholder="Title"
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex items-center justify-between gap-3 mb-1.5">
+                            <label className="block text-xs font-medium text-gray-500">Content</label>
+                            <span className="text-[11px] text-gray-400">Supports Markdown</span>
+                          </div>
+                          <textarea
+                            ref={editContentTextarea.ref}
+                            value={editWorldContent}
+                            onChange={(e) => setEditWorldContent(e.target.value)}
+                            onInput={editContentTextarea.onInput}
                             onClick={(e) => e.stopPropagation()}
-                            className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            placeholder="Detailed description of this world setting..."
+                            className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y leading-relaxed"
+                            style={{ minHeight: "160px" }}
                           />
                         </div>
-                        <div className="flex-1">
-                          <label className="block text-xs font-medium text-gray-500 mb-1.5">Title</label>
-                          <input
-                            value={editWorldTitle}
-                            onChange={(e) => setEditWorldTitle(e.target.value)}
-                            placeholder="Title"
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                          />
+                        {ws.tags && ws.tags.length > 0 && (
+                          <div className="flex gap-1">
+                            {ws.tags.map((tag: string) => (
+                              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setEditingWorldSettingId(null)}
+                            className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={updateWorldSettingMut.isPending}
+                            className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+                          >
+                            {updateWorldSettingMut.isPending ? "Saving..." : "Save"}
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div
+                        className="space-y-4 pt-4"
+                        onDoubleClick={() => openEditMode(ws)}
+                        title="双击进入编辑"
+                      >
+                        <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
+                          {ws.content ? (
+                            <div className="world-setting-markdown text-sm text-gray-700 leading-relaxed break-words">
+                              <Markdown remarkPlugins={[remarkGfm]}>{ws.content}</Markdown>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-400 italic">No content yet. Double-click to add details.</p>
+                          )}
+                        </div>
+                        {ws.tags && ws.tags.length > 0 && (
+                          <div className="flex gap-1">
+                            {ws.tags.map((tag: string) => (
+                              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between gap-3 text-[11px] text-gray-400">
+                          <span>Single click expands, double-click opens editor.</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditMode(ws);
+                            }}
+                            className="px-2.5 py-1 rounded-md border border-gray-200 text-gray-500 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+                          >
+                            Edit
+                          </button>
                         </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Content</label>
-                        <textarea
-                          ref={editContentTextarea.ref}
-                          value={editWorldContent}
-                          onChange={(e) => setEditWorldContent(e.target.value)}
-                          onInput={editContentTextarea.onInput}
-                          onClick={(e) => e.stopPropagation()}
-                          placeholder="Detailed description of this world setting..."
-                          className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y leading-relaxed"
-                          style={{ minHeight: "160px" }}
-                        />
-                      </div>
-                      {ws.tags && ws.tags.length > 0 && (
-                        <div className="flex gap-1">
-                          {ws.tags.map((tag: string) => (
-                            <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <div className="flex gap-2 justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setEditingWorldSettingId(null)}
-                          className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={updateWorldSettingMut.isPending}
-                          className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
-                        >
-                          {updateWorldSettingMut.isPending ? "Saving..." : "Save"}
-                        </button>
-                      </div>
-                    </form>
+                    )}
                   </div>
                 )}
               </div>
