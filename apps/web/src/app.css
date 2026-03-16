@@ -1,0 +1,236 @@
+@import "tailwindcss";
+
+body {
+  background-color: #f8fafc;
+  color: #1e293b;
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* TipTap editor typography — restore heading/block styles reset by Tailwind preflight */
+.tiptap h1 {
+  font-size: 2em;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+.tiptap h2 {
+  font-size: 1.5em;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 1em;
+  margin-bottom: 0.4em;
+}
+
+.tiptap h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 0.8em;
+  margin-bottom: 0.4em;
+}
+
+.tiptap p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.tiptap ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.tiptap ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.tiptap li {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.tiptap blockquote {
+  border-left: 3px solid #d1d5db;
+  padding-left: 1em;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.tiptap hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+
+.tiptap code {
+  background-color: #f3f4f6;
+  padding: 0.15em 0.3em;
+  border-radius: 0.25em;
+  font-size: 0.875em;
+}
+
+.tiptap pre {
+  background-color: #f3f4f6;
+  padding: 0.75em 1em;
+  border-radius: 0.375em;
+  overflow-x: auto;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.tiptap strong {
+  font-weight: 700;
+}
+
+.tiptap em {
+  font-style: italic;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}
+
+/* Agent chat markdown — compact headings for narrow panel */
+.agent-markdown h1 {
+  font-size: 1.1em;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 0.6em;
+  margin-bottom: 0.3em;
+}
+
+.agent-markdown h2 {
+  font-size: 1.05em;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 0.5em;
+  margin-bottom: 0.25em;
+}
+
+.agent-markdown h3 {
+  font-size: 1em;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 0.5em;
+  margin-bottom: 0.25em;
+}
+
+.agent-markdown p {
+  margin-top: 0.35em;
+  margin-bottom: 0.35em;
+}
+
+.agent-markdown p:first-child {
+  margin-top: 0;
+}
+
+.agent-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.agent-markdown ul {
+  list-style-type: disc;
+  padding-left: 1.25em;
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+}
+
+.agent-markdown ol {
+  list-style-type: decimal;
+  padding-left: 1.25em;
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+}
+
+.agent-markdown li {
+  margin-top: 0.15em;
+  margin-bottom: 0.15em;
+}
+
+.agent-markdown blockquote {
+  border-left: 2px solid #d1d5db;
+  padding-left: 0.75em;
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.agent-markdown hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+.agent-markdown code {
+  background-color: #f3f4f6;
+  padding: 0.1em 0.25em;
+  border-radius: 0.2em;
+  font-size: 0.85em;
+}
+
+.agent-markdown pre {
+  background-color: #f3f4f6;
+  padding: 0.5em 0.75em;
+  border-radius: 0.3em;
+  overflow-x: auto;
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+}
+
+.agent-markdown pre code {
+  background: none;
+  padding: 0;
+}
+
+.agent-markdown strong {
+  font-weight: 700;
+}
+
+.agent-markdown em {
+  font-style: italic;
+}
+
+.agent-markdown a {
+  color: #4f46e5;
+  text-decoration: underline;
+}
+
+.agent-markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+  font-size: 0.85em;
+}
+
+.agent-markdown th,
+.agent-markdown td {
+  border: 1px solid #e5e7eb;
+  padding: 0.25em 0.5em;
+  text-align: left;
+}
+
+.agent-markdown th {
+  background-color: #f9fafb;
+  font-weight: 600;
+}

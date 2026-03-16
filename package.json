@@ -1,0 +1,20 @@
+{
+  "name": "ai-novel",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "dev:server": "turbo dev --filter=@ai-novel/server",
+    "dev:web": "turbo dev --filter=@ai-novel/web",
+    "dev:all": "turbo dev --filter=@ai-novel/server --filter=@ai-novel/web"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

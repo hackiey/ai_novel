@@ -1,0 +1,252 @@
+import { z } from "zod";
+
+// ============ Common ============
+
+export const objectIdSchema = z.string().regex(/^[a-f\d]{24}$/i, "Invalid ObjectId");
+
+export const timestampsSchema = z.object({
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+// ============ World (世界观) ============
+
+export const worldSchema = z.object({
+  _id: objectIdSchema,
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).default(""),
+  ...timestampsSchema.shape,
+});
+
+export const createWorldSchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+});
+
+export const updateWorldSchema = createWorldSchema.partial();
+
+export type World = z.infer<typeof worldSchema>;
+export type CreateWorld = z.infer<typeof createWorldSchema>;
+export type UpdateWorld = z.infer<typeof updateWorldSchema>;
+
+// ============ Project ============
+
+export const projectSchema = z.object({
+  _id: objectIdSchema,
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).default(""),
+  worldId: objectIdSchema.optional(),
+  settings: z.object({
+    genre: z.string().max(100).default(""),
+    targetLength: z.number().int().positive().optional(),
+  }).default({}),
+  ...timestampsSchema.shape,
+});
+
+export const createProjectSchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  worldId: objectIdSchema.optional(),
+  settings: z.object({
+    genre: z.string().max(100).optional(),
+    targetLength: z.number().int().positive().optional(),
+  }).optional(),
+});
+
+export const updateProjectSchema = createProjectSchema.partial();
+
+export type Project = z.infer<typeof projectSchema>;
+export type CreateProject = z.infer<typeof createProjectSchema>;
+export type UpdateProject = z.infer<typeof updateProjectSchema>;
+
+// ============ Character (角色人设) ============
+
+export const characterRelationshipSchema = z.object({
+  characterId: objectIdSchema,
+  characterName: z.string(),
+  relationship: z.string().max(500),
+});
+
+export const characterProfileSchema = z.object({
+  appearance: z.string().max(5000).default(""),
+  personality: z.string().max(5000).default(""),
+  background: z.string().max(10000).default(""),
+  goals: z.string().max(5000).default(""),
+  relationships: z.array(characterRelationshipSchema).default([]),
+  customFields: z.record(z.string(), z.string()).default({}),
+});
+
+export const characterSchema = z.object({
+  _id: objectIdSchema,
+  worldId: objectIdSchema,
+  name: z.string().min(1).max(200),
+  aliases: z.array(z.string().max(200)).default([]),
+  role: z.enum(["protagonist", "antagonist", "supporting", "minor", "other"]).default("other"),
+  profile: characterProfileSchema.default({}),
+  embedding: z.array(z.number()).optional(),
+  embeddingText: z.string().optional(),
+  ...timestampsSchema.shape,
+});
+
+export const createCharacterSchema = z.object({
+  worldId: objectIdSchema,
+  name: z.string().min(1).max(200),
+  aliases: z.array(z.string().max(200)).optional(),
+  role: z.enum(["protagonist", "antagonist", "supporting", "minor", "other"]).optional(),
+  profile: characterProfileSchema.partial().optional(),
+});
+
+export const updateCharacterSchema = createCharacterSchema.omit({ worldId: true }).partial();
+
+export type Character = z.infer<typeof characterSchema>;
+export type CreateCharacter = z.infer<typeof createCharacterSchema>;
+export type UpdateCharacter = z.infer<typeof updateCharacterSchema>;
+
+// ============ World Setting (世界观) ============
+
+export const worldSettingSchema = z.object({
+  _id: objectIdSchema,
+  worldId: objectIdSchema,
+  category: z.string().min(1).max(100),
+  title: z.string().min(1).max(200),
+  content: z.string().max(50000).default(""),
+  tags: z.array(z.string().max(100)).default([]),
+  embedding: z.array(z.number()).optional(),
+  embeddingText: z.string().optional(),
+  ...timestampsSchema.shape,
+});
+
+export const createWorldSettingSchema = z.object({
+  worldId: objectIdSchema,
+  category: z.string().min(1).max(100),
+  title: z.string().min(1).max(200),
+  content: z.string().max(50000).optional(),
+  tags: z.array(z.string().max(100)).optional(),
+});
+
+export const updateWorldSettingSchema = createWorldSettingSchema.omit({ worldId: true }).partial();
+
+export type WorldSetting = z.infer<typeof worldSettingSchema>;
+export type CreateWorldSetting = z.infer<typeof createWorldSettingSchema>;
+export type UpdateWorldSetting = z.infer<typeof updateWorldSettingSchema>;
+
+// ============ Draft (草稿) ============
+
+export const draftSchema = z.object({
+  _id: objectIdSchema,
+  projectId: objectIdSchema.optional(),
+  worldId: objectIdSchema.optional(),
+  title: z.string().min(1).max(200),
+  content: z.string().max(50000).default(""),
+  tags: z.array(z.string().max(100)).default([]),
+  linkedCharacters: z.array(objectIdSchema).default([]),
+  linkedWorldSettings: z.array(objectIdSchema).default([]),
+  embedding: z.array(z.number()).optional(),
+  embeddingText: z.string().optional(),
+  ...timestampsSchema.shape,
+});
+
+export const createDraftSchema = z.object({
+  projectId: objectIdSchema.optional(),
+  worldId: objectIdSchema.optional(),
+  title: z.string().min(1).max(200),
+  content: z.string().max(50000).optional(),
+  tags: z.array(z.string().max(100)).optional(),
+  linkedCharacters: z.array(objectIdSchema).optional(),
+  linkedWorldSettings: z.array(objectIdSchema).optional(),
+});
+
+export const updateDraftSchema = createDraftSchema.omit({ projectId: true }).partial();
+
+export type Draft = z.infer<typeof draftSchema>;
+export type CreateDraft = z.infer<typeof createDraftSchema>;
+export type UpdateDraft = z.infer<typeof updateDraftSchema>;
+
+// ============ Chapter (章节) ============
+
+export const chapterStatusSchema = z.enum(["draft", "revision", "final"]);
+
+export const chapterSchema = z.object({
+  _id: objectIdSchema,
+  projectId: objectIdSchema,
+  order: z.number().int().nonnegative(),
+  title: z.string().min(1).max(200),
+  content: z.string().default(""),
+  synopsis: z.string().max(5000).default(""),
+  wordCount: z.number().int().nonnegative().default(0),
+  status: chapterStatusSchema.default("draft"),
+  embedding: z.array(z.number()).optional(),
+  embeddingText: z.string().optional(),
+  ...timestampsSchema.shape,
+});
+
+export const createChapterSchema = z.object({
+  projectId: objectIdSchema,
+  order: z.number().int().nonnegative().optional(),
+  title: z.string().min(1).max(200),
+  content: z.string().optional(),
+  synopsis: z.string().max(5000).optional(),
+  status: chapterStatusSchema.optional(),
+});
+
+export const updateChapterSchema = createChapterSchema.omit({ projectId: true }).partial();
+
+export type Chapter = z.infer<typeof chapterSchema>;
+export type CreateChapter = z.infer<typeof createChapterSchema>;
+export type UpdateChapter = z.infer<typeof updateChapterSchema>;
+
+// ============ Embedding Chunks ============
+
+export const embeddingChunkSchema = z.object({
+  _id: objectIdSchema,
+  sourceId: objectIdSchema,
+  sourceCollection: z.enum(["characters", "world_settings", "drafts", "chapters"]),
+  projectId: objectIdSchema.optional(),
+  worldId: objectIdSchema.optional(),
+  chunkIndex: z.number().int().nonnegative(),
+  text: z.string(),
+  embedding: z.array(z.number()),
+});
+
+export type EmbeddingChunk = z.infer<typeof embeddingChunkSchema>;
+
+// ============ Agent Session ============
+
+export const agentSessionSchema = z.object({
+  _id: objectIdSchema,
+  projectId: objectIdSchema,
+  sessionId: z.string(),
+  title: z.string().max(200).default(""),
+  ...timestampsSchema.shape,
+});
+
+export const createAgentSessionSchema = z.object({
+  projectId: objectIdSchema,
+  title: z.string().max(200).optional(),
+});
+
+export type AgentSession = z.infer<typeof agentSessionSchema>;
+export type CreateAgentSession = z.infer<typeof createAgentSessionSchema>;
+
+// ============ Search ============
+
+export const searchScopeSchema = z.enum(["character", "world", "draft", "chapter"]);
+
+export const searchInputSchema = z.object({
+  projectId: objectIdSchema.optional(),
+  worldId: objectIdSchema.optional(),
+  query: z.string().min(1),
+  scope: z.array(searchScopeSchema).optional(),
+  limit: z.number().int().min(1).max(50).default(5),
+});
+
+export const searchResultSchema = z.object({
+  id: objectIdSchema,
+  collection: searchScopeSchema,
+  title: z.string(),
+  excerpt: z.string(),
+  score: z.number(),
+});
+
+export type SearchInput = z.infer<typeof searchInputSchema>;
+export type SearchResult = z.infer<typeof searchResultSchema>;

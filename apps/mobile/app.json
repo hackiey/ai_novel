@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "AI Novel",
+    "slug": "ai-novel",
+    "version": "0.0.1",
+    "scheme": "ai-novel",
+    "platforms": ["ios", "android"],
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "backgroundColor": "#0f172a"
+    }
+  }
+}
