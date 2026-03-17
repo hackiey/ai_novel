@@ -61,6 +61,32 @@ export const agentRouter = router({
       });
     }),
 
+  truncateMessages: protectedProcedure
+    .input(z.object({ sessionId: z.string(), afterCreatedAt: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify session belongs to user
+      const session = await ctx.db.collection("agent_sessions").findOne({
+        sessionId: input.sessionId,
+        userId: ctx.user.userId,
+      });
+      if (!session) throw new Error("Session not found");
+
+      // Delete messages with createdAt >= afterCreatedAt
+      await ctx.db.collection("agent_messages").deleteMany({
+        sessionId: input.sessionId,
+        createdAt: { $gte: new Date(input.afterCreatedAt) },
+      });
+
+      // Clear cached agent session since history changed
+      const cached = sessions.get(input.sessionId);
+      if (cached) {
+        cached.close();
+        sessions.delete(input.sessionId);
+      }
+
+      return { success: true };
+    }),
+
   deleteSession: protectedProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ ctx, input }) => {

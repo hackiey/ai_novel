@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { BotMessageSquare, Check, ChevronRight, History, Loader2, Plus, X } from "lucide-react";
+import { BotMessageSquare, Check, ChevronRight, History, Loader2, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { trpc } from "../lib/trpc.js";
@@ -38,6 +38,7 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   events?: AgentEvent[];
+  createdAt?: string;
 }
 
 interface Props {
@@ -248,9 +249,13 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
+  const truncateMessagesMutation = trpc.agent.truncateMessages.useMutation();
 
   // Auto-resize textarea
   useEffect(() => {
@@ -259,6 +264,14 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
   }, [input]);
+
+  // Auto-resize edit textarea
+  useEffect(() => {
+    if (editTextareaRef.current) {
+      editTextareaRef.current.style.height = "auto";
+      editTextareaRef.current.style.height = `${Math.min(editTextareaRef.current.scrollHeight, 200)}px`;
+    }
+  }, [editText]);
 
   // Fetch session list (bound to world only)
   const sessionsQuery = trpc.agent.listSessions.useQuery(
@@ -294,6 +307,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
           role: doc.role,
           content: doc.content || "",
           events: doc.events,
+          createdAt: doc.createdAt,
         }));
         setMessages(loaded);
       }
@@ -304,18 +318,15 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
     }
   }, [queryClient]);
 
-  async function handleSend() {
-    const text = input.trim();
+  async function sendMessage(text: string) {
     if (!text || isLoading) return;
 
-    setInput("");
     setIsLoading(true);
 
     const userMsg: ChatMessage = { role: "user", content: text };
     setMessages((prev) => [...prev, userMsg]);
 
     // Add a placeholder assistant message for streaming
-    const assistantIdx = messages.length + 1; // index after user msg
     setMessages((prev) => [...prev, { role: "assistant", content: "", events: [] }]);
 
     try {
@@ -465,6 +476,38 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
     }
   }
 
+  async function handleSend() {
+    const text = input.trim();
+    if (!text || isLoading) return;
+    setInput("");
+    sendMessage(text);
+  }
+
+  async function handleEditRetry(index: number, newContent: string) {
+    if (isLoading) return;
+
+    const msg = messages[index];
+
+    // If message has createdAt (loaded from history), truncate DB records
+    if (msg.createdAt && sessionId) {
+      try {
+        await truncateMessagesMutation.mutateAsync({
+          sessionId,
+          afterCreatedAt: msg.createdAt,
+        });
+      } catch {
+        // continue anyway — frontend will truncate
+      }
+    }
+
+    // Truncate frontend messages to before this message
+    setMessages((prev) => prev.slice(0, index));
+    setEditingIndex(null);
+
+    // Send with new content
+    sendMessage(newContent);
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -559,11 +602,71 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
         {messages.map((msg, i) => (
           <div key={i}>
             {msg.role === "user" ? (
-              <div className="flex justify-end">
-                <div className="max-w-[80%] px-3 py-2 rounded-xl bg-teal-600 text-white text-sm shadow-sm">
-                  {msg.content}
+              editingIndex === i ? (
+                <div className="flex justify-end">
+                  <div className="max-w-[80%] w-full space-y-2">
+                    <textarea
+                      ref={editTextareaRef}
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      className="w-full rounded-xl bg-white border border-teal-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none overflow-y-auto"
+                      style={{ minHeight: "38px", maxHeight: "200px" }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          const trimmed = editText.trim();
+                          if (trimmed) handleEditRetry(i, trimmed);
+                        }
+                        if (e.key === "Escape") setEditingIndex(null);
+                      }}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setEditingIndex(null)}
+                        className="px-3 py-1 rounded-lg text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        取消
+                      </button>
+                      <button
+                        onClick={() => {
+                          const trimmed = editText.trim();
+                          if (trimmed) handleEditRetry(i, trimmed);
+                        }}
+                        disabled={!editText.trim()}
+                        className="px-3 py-1 rounded-lg text-xs bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
+                      >
+                        保存并发送
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex justify-end group">
+                  <div className="flex items-end gap-1">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
+                      <button
+                        onClick={() => { setEditingIndex(i); setEditText(msg.content); }}
+                        disabled={isLoading}
+                        className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                        title="编辑"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleEditRetry(i, msg.content)}
+                        disabled={isLoading}
+                        className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                        title="重试"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="max-w-[80%] px-3 py-2 rounded-xl bg-teal-600 text-white text-sm shadow-sm">
+                      {msg.content}
+                    </div>
+                  </div>
+                </div>
+              )
             ) : (
               <div className="space-y-2">
                 <AssistantMessageContent events={msg.events} content={msg.content} isStreaming={isLoading && i === messages.length - 1} />
