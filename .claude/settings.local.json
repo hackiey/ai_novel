@@ -54,7 +54,8 @@
       "Bash(git:*)",
       "Bash(node:*)",
       "Bash(npx tsx:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(pnpm:*)"
     ]
   }
 }

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { trpc } from "../lib/trpc.js";
@@ -22,6 +23,7 @@ interface WorldSettingsTabProps {
 }
 
 export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTabProps) {
+  const { t } = useTranslation();
   const [showWorldForm, setShowWorldForm] = useState(false);
   const [worldCategory, setWorldCategory] = useState("");
   const [worldTitle, setWorldTitle] = useState("");
@@ -60,10 +62,10 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
     <div>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
-          World Settings ({worldSettings.length})
+          {t("worldSetting.count", { count: worldSettings.length })}
           {worldLink && (
             <Link to="/world/$worldId" params={{ worldId }} className="ml-2 text-[10px] text-teal-500 hover:text-teal-600 normal-case font-normal">
-              (from world)
+              {t("worldSetting.fromWorld")}
             </Link>
           )}
         </h3>
@@ -71,13 +73,13 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
           onClick={() => setShowWorldForm(true)}
           className="text-xs px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-500 transition-colors"
         >
-          + Add Setting
+          {t("worldSetting.addSetting")}
         </button>
       </div>
 
       {showWorldForm && (
         <div className="mb-4 p-4 rounded-xl border border-gray-200 bg-white shadow-sm">
-          <h4 className="text-sm font-semibold text-gray-900 mb-3">New World Setting</h4>
+          <h4 className="text-sm font-semibold text-gray-900 mb-3">{t("worldSetting.newSetting")}</h4>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -95,20 +97,20 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
               <input
                 value={worldCategory}
                 onChange={(e) => setWorldCategory(e.target.value)}
-                placeholder="Category (e.g., Geography, Magic System)"
+                placeholder={t("worldSetting.categoryPlaceholder")}
                 className="flex-1 rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
               <input
                 value={worldTitle}
                 onChange={(e) => setWorldTitle(e.target.value)}
-                placeholder="Title"
+                placeholder={t("worldSetting.titlePlaceholder")}
                 className="flex-1 rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
             <textarea
               value={worldContent}
               onChange={(e) => setWorldContent(e.target.value)}
-              placeholder="Description..."
+              placeholder={t("worldSetting.descriptionPlaceholder")}
               rows={3}
               className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
             />
@@ -118,14 +120,14 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
                 onClick={() => { setShowWorldForm(false); setWorldCategory(""); setWorldTitle(""); setWorldContent(""); }}
                 className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
               >
-                Cancel
+                {t("worldSetting.cancel")}
               </button>
               <button
                 type="submit"
                 disabled={createWorldSettingMut.isPending}
                 className="px-4 py-2 text-sm rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
               >
-                {createWorldSettingMut.isPending ? "Adding..." : "Add"}
+                {createWorldSettingMut.isPending ? t("worldSetting.adding") : t("worldSetting.add")}
               </button>
             </div>
           </form>
@@ -134,7 +136,7 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
 
       {worldSettings.length === 0 && !showWorldForm ? (
         <div className="text-center py-8 text-gray-400 text-sm">
-          No world settings yet. Define the rules and lore of your world.
+          {t("worldSetting.empty")}
         </div>
       ) : (
         <div className="space-y-2">
@@ -157,7 +159,7 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
                     }
                   }}
                   onDoubleClick={() => openEditMode(ws)}
-                  title={isExpanded ? "双击进入编辑" : "单击展开，双击编辑"}
+                  title={isExpanded ? t("worldSetting.doubleClickEdit") : t("worldSetting.clickHint")}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -184,13 +186,13 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (confirm(`Delete "${ws.title}"?`)) {
+                        if (confirm(t("worldSetting.deleteConfirm", { name: ws.title }))) {
                           deleteWorldSettingMut.mutate({ id: ws._id });
                         }
                       }}
                       className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                     >
-                      Delete
+                      {t("worldSetting.delete")}
                     </button>
                   </div>
                 </div>
@@ -215,21 +217,21 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
                       >
                         <div className="flex gap-3">
                           <div className="flex-1">
-                            <label className="block text-xs font-medium text-gray-500 mb-1.5">Category</label>
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">{t("worldSetting.category")}</label>
                             <input
                               value={editWorldCategory}
                               onChange={(e) => setEditWorldCategory(e.target.value)}
-                              placeholder="e.g., Geography, Magic System"
+                              placeholder={t("worldSetting.editCategoryPlaceholder")}
                               onClick={(e) => e.stopPropagation()}
                               className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                             />
                           </div>
                           <div className="flex-1">
-                            <label className="block text-xs font-medium text-gray-500 mb-1.5">Title</label>
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">{t("worldSetting.title")}</label>
                             <input
                               value={editWorldTitle}
                               onChange={(e) => setEditWorldTitle(e.target.value)}
-                              placeholder="Title"
+                              placeholder={t("worldSetting.titlePlaceholder")}
                               onClick={(e) => e.stopPropagation()}
                               className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                             />
@@ -237,8 +239,8 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
                         </div>
                         <div>
                           <div className="flex items-center justify-between gap-3 mb-1.5">
-                            <label className="block text-xs font-medium text-gray-500">Content</label>
-                            <span className="text-[11px] text-gray-400">Supports Markdown</span>
+                            <label className="block text-xs font-medium text-gray-500">{t("worldSetting.content")}</label>
+                            <span className="text-[11px] text-gray-400">{t("worldSetting.supportsMarkdown")}</span>
                           </div>
                           <textarea
                             ref={editContentTextarea.ref}
@@ -246,7 +248,7 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
                             onChange={(e) => setEditWorldContent(e.target.value)}
                             onInput={editContentTextarea.onInput}
                             onClick={(e) => e.stopPropagation()}
-                            placeholder="Detailed description of this world setting..."
+                            placeholder={t("worldSetting.contentPlaceholder")}
                             className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y leading-relaxed"
                             style={{ minHeight: "160px" }}
                           />
@@ -266,14 +268,14 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
                             onClick={() => setEditingWorldSettingId(null)}
                             className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
                           >
-                            Cancel
+                            {t("worldSetting.cancel")}
                           </button>
                           <button
                             type="submit"
                             disabled={updateWorldSettingMut.isPending}
                             className="px-4 py-2 text-sm rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
                           >
-                            {updateWorldSettingMut.isPending ? "Saving..." : "Save"}
+                            {updateWorldSettingMut.isPending ? t("worldSetting.saving") : t("worldSetting.save")}
                           </button>
                         </div>
                       </form>
@@ -281,7 +283,7 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
                       <div
                         className="space-y-4 pt-4"
                         onDoubleClick={() => openEditMode(ws)}
-                        title="双击进入编辑"
+                        title={t("worldSetting.doubleClickEdit")}
                       >
                         <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
                           {ws.content ? (
@@ -289,7 +291,7 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
                               <Markdown remarkPlugins={[remarkGfm]}>{ws.content}</Markdown>
                             </div>
                           ) : (
-                            <p className="text-sm text-gray-400 italic">No content yet. Double-click to add details.</p>
+                            <p className="text-sm text-gray-400 italic">{t("worldSetting.noContent")}</p>
                           )}
                         </div>
                         {ws.tags && ws.tags.length > 0 && (
@@ -302,7 +304,7 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
                           </div>
                         )}
                         <div className="flex items-center justify-between gap-3 text-[11px] text-gray-400">
-                          <span>Single click expands, double-click opens editor.</span>
+                          <span>{t("worldSetting.clickHint")}</span>
                           <button
                             type="button"
                             onClick={(e) => {
@@ -311,7 +313,7 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
                             }}
                             className="px-2.5 py-1 rounded-md border border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-600 transition-colors"
                           >
-                            Edit
+                            {t("worldSetting.edit")}
                           </button>
                         </div>
                       </div>

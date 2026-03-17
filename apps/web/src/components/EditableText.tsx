@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 
 interface EditableTextProps {
   value: string;
@@ -13,8 +14,10 @@ export default function EditableText({
   onSave,
   className = "",
   inputClassName = "",
-  placeholder = "Untitled",
+  placeholder,
 }: EditableTextProps) {
+  const { t } = useTranslation();
+  const defaultPlaceholder = placeholder ?? t("editable.untitled");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -60,7 +63,7 @@ export default function EditableText({
           }
         }}
         className={`bg-white border border-teal-300 rounded px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-teal-400 ${inputClassName}`}
-        placeholder={placeholder}
+        placeholder={defaultPlaceholder}
       />
     );
   }
@@ -72,9 +75,9 @@ export default function EditableText({
         setEditing(true);
       }}
       className={`cursor-default select-none ${className}`}
-      title="双击编辑"
+      title={t("editable.doubleClickEdit")}
     >
-      {value || placeholder}
+      {value || defaultPlaceholder}
     </span>
   );
 }

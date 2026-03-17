@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { Plus, Trash2 } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import CharactersTab from "../components/CharactersTab.js";
@@ -10,6 +11,7 @@ type Tab = "characters" | "worldSettings" | "drafts";
 
 export default function WorldPage() {
   const { worldId } = useParams({ strict: false }) as { worldId: string };
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<Tab>("characters");
 
   // Project creation form
@@ -56,7 +58,7 @@ export default function WorldPage() {
     return (
       <div className="text-center py-20">
         <div className="inline-block w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-gray-500 mt-3">Loading world...</p>
+        <p className="text-sm text-gray-500 mt-3">{t("world.loading")}</p>
       </div>
     );
   }
@@ -64,18 +66,18 @@ export default function WorldPage() {
   if (!world) {
     return (
       <div className="text-center py-20">
-        <p className="text-gray-500">World not found.</p>
+        <p className="text-gray-500">{t("world.notFound")}</p>
         <Link to="/" className="text-sm text-teal-600 hover:text-teal-500 mt-2 inline-block">
-          Back to home
+          {t("world.backToHome")}
         </Link>
       </div>
     );
   }
 
   const tabs: { key: Tab; label: string; count: number }[] = [
-    { key: "characters", label: "Characters", count: characters.length },
-    { key: "worldSettings", label: "World Settings", count: worldSettings.length },
-    { key: "drafts", label: "Drafts", count: drafts.length },
+    { key: "characters", label: t("world.characters"), count: characters.length },
+    { key: "worldSettings", label: t("world.worldSettings"), count: worldSettings.length },
+    { key: "drafts", label: t("world.drafts"), count: drafts.length },
   ];
 
   return (
@@ -85,7 +87,7 @@ export default function WorldPage() {
           {/* Header */}
           <div className="mb-6">
             <Link to="/" className="text-xs text-gray-400 hover:text-gray-600 mb-2 inline-block">
-              &larr; Back to home
+              &larr; {t("world.backToHome")}
             </Link>
             <h1 className="text-2xl font-bold text-gray-900">{world.name}</h1>
             {world.description && (
@@ -96,7 +98,7 @@ export default function WorldPage() {
           {/* Projects Bar */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Novels</h2>
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t("world.novels")}</h2>
             </div>
             <div className="flex items-center gap-3 overflow-x-auto pb-2">
               {projects.map((project: any) => (
@@ -117,7 +119,7 @@ export default function WorldPage() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      if (confirm(`Delete "${project.name}"?`)) {
+                      if (confirm(t("world.deleteConfirm", { name: project.name }))) {
                         deleteProjectMut.mutate({ id: project._id });
                       }
                     }}
@@ -144,7 +146,7 @@ export default function WorldPage() {
                   <input
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
-                    placeholder="Novel name"
+                    placeholder={t("world.novelNamePlaceholder")}
                     autoFocus
                     className="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   />
@@ -153,14 +155,14 @@ export default function WorldPage() {
                     disabled={createProjectMut.isPending || !projectName.trim()}
                     className="px-3 py-2 text-sm rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
                   >
-                    {createProjectMut.isPending ? "..." : "Add"}
+                    {createProjectMut.isPending ? "..." : t("world.add")}
                   </button>
                   <button
                     type="button"
                     onClick={() => { setShowProjectForm(false); setProjectName(""); }}
                     className="px-2 py-2 text-sm text-gray-400 hover:text-gray-600"
                   >
-                    Cancel
+                    {t("world.cancel")}
                   </button>
                 </form>
               ) : (
@@ -169,7 +171,7 @@ export default function WorldPage() {
                   className="flex-shrink-0 flex items-center gap-1.5 px-4 py-3 rounded-xl border border-dashed border-gray-300 text-sm text-gray-400 hover:text-teal-600 hover:border-teal-300 transition-colors"
                 >
                   <Plus className="w-4 h-4" />
-                  New Novel
+                  {t("world.newNovel")}
                 </button>
               )}
             </div>
@@ -206,19 +208,19 @@ export default function WorldPage() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
-                    Drafts ({drafts.length})
+                    {t("world.draftsCount", { count: drafts.length })}
                   </h3>
                   <button
                     onClick={() => setShowDraftForm(true)}
                     className="text-xs px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-500 transition-colors"
                   >
-                    + Add Draft
+                    {t("world.addDraft")}
                   </button>
                 </div>
 
                 {showDraftForm && (
                   <div className="mb-4 p-4 rounded-xl border border-gray-200 bg-white shadow-sm">
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3">New Draft</h4>
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">{t("world.newDraft")}</h4>
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
@@ -234,13 +236,13 @@ export default function WorldPage() {
                       <input
                         value={draftTitle}
                         onChange={(e) => setDraftTitle(e.target.value)}
-                        placeholder="Draft title"
+                        placeholder={t("world.draftTitlePlaceholder")}
                         className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       />
                       <textarea
                         value={draftContent}
                         onChange={(e) => setDraftContent(e.target.value)}
-                        placeholder="Notes, ideas, brainstorming..."
+                        placeholder={t("world.draftContentPlaceholder")}
                         rows={4}
                         className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
                       />
@@ -250,14 +252,14 @@ export default function WorldPage() {
                           onClick={() => { setShowDraftForm(false); setDraftTitle(""); setDraftContent(""); }}
                           className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
                         >
-                          Cancel
+                          {t("world.cancel")}
                         </button>
                         <button
                           type="submit"
                           disabled={createDraftMut.isPending}
                           className="px-4 py-2 text-sm rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
                         >
-                          {createDraftMut.isPending ? "Adding..." : "Add"}
+                          {createDraftMut.isPending ? t("world.adding") : t("world.add")}
                         </button>
                       </div>
                     </form>
@@ -266,7 +268,7 @@ export default function WorldPage() {
 
                 {drafts.length === 0 && !showDraftForm ? (
                   <div className="text-center py-8 text-gray-400 text-sm">
-                    No drafts yet. Start a draft to brainstorm ideas.
+                    {t("world.noDrafts")}
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -285,13 +287,13 @@ export default function WorldPage() {
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                             <button
                               onClick={() => {
-                                if (confirm(`Delete "${disc.title}"?`)) {
+                                if (confirm(t("world.deleteConfirm", { name: disc.title }))) {
                                   deleteDraftMut.mutate({ id: disc._id });
                                 }
                               }}
                               className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                             >
-                              Delete
+                              {t("world.delete")}
                             </button>
                           </div>
                         </div>

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { BotMessageSquare, Check, ChevronRight, History, Loader2, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -46,33 +47,6 @@ interface Props {
   worldId?: string;
   onAgentAppend?: (text: string) => void;
 }
-
-/** Tool display name mapping */
-const TOOL_LABELS: Record<string, string> = {
-  semantic_search: "搜索",
-  get_character: "查看角色",
-  list_characters: "列出角色",
-  update_character: "更新角色",
-  create_character: "创建角色",
-  delete_character: "删除角色",
-  get_world_setting: "查看设定",
-  list_world_settings: "列出设定",
-  update_world_setting: "更新设定",
-  create_world_setting: "创建设定",
-  delete_world_setting: "删除设定",
-  get_chapter: "查看章节",
-  list_chapters: "列出章节",
-  create_chapter: "创建章节",
-  update_chapter: "更新章节",
-  delete_chapter: "删除章节",
-  continue_writing: "续写",
-  get_draft: "查看草稿",
-  create_draft: "创建草稿",
-  delete_draft: "删除草稿",
-  get_memory: "读取记忆",
-  update_memory: "更新记忆",
-  generate_synopsis: "生成梗概",
-};
 
 type Segment =
   | { type: "text"; content: string }
@@ -153,7 +127,8 @@ function ToolCallBlock({ toolName, toolInput, result, pending }: {
   pending?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const label = TOOL_LABELS[toolName] || toolName;
+  const { t } = useTranslation();
+  const label = t(`tool.${toolName}`, toolName);
 
   // Try to parse result for display
   let parsedResult: any = null;
@@ -184,7 +159,7 @@ function ToolCallBlock({ toolName, toolInput, result, pending }: {
         <div className="border-t border-gray-200 px-3 py-2 space-y-2 max-h-60 overflow-y-auto">
           {toolInput && (
             <div>
-              <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">参数</div>
+              <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{t("chat.parameters")}</div>
               <pre className="text-[11px] text-gray-600 bg-white rounded p-2 border border-gray-100 overflow-x-auto whitespace-pre-wrap break-all">
                 {JSON.stringify(toolInput, null, 2)}
               </pre>
@@ -192,7 +167,7 @@ function ToolCallBlock({ toolName, toolInput, result, pending }: {
           )}
           {parsedResult !== null && (
             <div>
-              <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">结果</div>
+              <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{t("chat.results")}</div>
               <pre className="text-[11px] text-gray-600 bg-white rounded p-2 border border-gray-100 overflow-x-auto whitespace-pre-wrap break-all max-h-40 overflow-y-auto">
                 {typeof parsedResult === "string" ? parsedResult : JSON.stringify(parsedResult, null, 2)}
               </pre>
@@ -209,13 +184,14 @@ function AssistantMessageContent({ events, content, isStreaming }: {
   content: string;
   isStreaming: boolean;
 }) {
+  const { t } = useTranslation();
   const segments = buildSegments(events, content, isStreaming);
 
   if (segments.length === 0 && isStreaming) {
     return (
       <div className="flex items-center gap-2 text-xs text-teal-600">
         <Loader2 className="w-4 h-4 animate-spin" />
-        <span>思考中...</span>
+        <span>{t("chat.thinking")}</span>
       </div>
     );
   }
@@ -244,6 +220,7 @@ function AssistantMessageContent({ events, content, isStreaming }: {
 }
 
 export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Props) {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | undefined>();
@@ -520,23 +497,29 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
     setMessages([]);
   }
 
+  const suggestions = [
+    t("chat.suggestion.listCharacters"),
+    t("chat.suggestion.continueWriting"),
+    t("chat.suggestion.plotTwist"),
+  ];
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-gray-700">AI Assistant</span>
+          <span className="text-sm font-semibold text-gray-700">{t("chat.aiAssistant")}</span>
           <button
             onClick={() => setShowHistory((v) => !v)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              showHistory 
-                ? "bg-gray-100 text-gray-900 hover:bg-gray-200" 
+              showHistory
+                ? "bg-gray-100 text-gray-900 hover:bg-gray-200"
                 : "bg-white text-gray-600 border border-gray-200 shadow-sm hover:bg-gray-50"
             }`}
-            title="History"
+            title={t("chat.history")}
           >
             {showHistory ? <X className="w-3.5 h-3.5" /> : <History className="w-3.5 h-3.5" />}
-            {showHistory ? "Close" : "History"}
+            {showHistory ? t("chat.close") : t("chat.history")}
           </button>
         </div>
         <button
@@ -544,7 +527,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white shadow-sm hover:bg-teal-500 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
-          New Chat
+          {t("chat.newChat")}
         </button>
       </div>
 
@@ -552,10 +535,10 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
       {showHistory && (
         <div className="border-b border-gray-200 max-h-60 overflow-y-auto bg-gray-50">
           {sessionsQuery.isLoading && (
-            <div className="p-3 text-xs text-gray-400">Loading...</div>
+            <div className="p-3 text-xs text-gray-400">{t("chat.loading")}</div>
           )}
           {sessionsQuery.data?.length === 0 && (
-            <div className="p-3 text-xs text-gray-400">No history yet</div>
+            <div className="p-3 text-xs text-gray-400">{t("chat.noHistory")}</div>
           )}
           {sessionsQuery.data?.map((s: any) => (
             <button
@@ -565,7 +548,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
                 sessionId === s.sessionId ? "bg-gray-100 text-gray-900 font-semibold" : "text-gray-600"
               }`}
             >
-              <div className="font-medium truncate">{s.title || "Untitled"}</div>
+              <div className="font-medium truncate">{s.title || t("chat.untitled")}</div>
               <div className="text-[10px] text-gray-400 mt-0.5">
                 {s.updatedAt ? new Date(s.updatedAt).toLocaleString() : ""}
               </div>
@@ -581,12 +564,12 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
             <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gray-100 flex items-center justify-center shadow-sm border border-gray-200">
               <BotMessageSquare className="w-6 h-6 text-gray-700" strokeWidth={1.5} />
             </div>
-            <p className="text-sm text-gray-600 mb-1">AI Writing Assistant</p>
+            <p className="text-sm text-gray-600 mb-1">{t("chat.emptyTitle")}</p>
             <p className="text-xs text-gray-400 max-w-xs mx-auto">
-              Ask me to help with characters, world building, plot ideas, or continue writing your story.
+              {t("chat.emptySubtitle")}
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-1.5">
-              {["List all characters", "Continue writing", "Suggest a plot twist"].map((s) => (
+              {suggestions.map((s) => (
                 <button
                   key={s}
                   onClick={() => { setInput(s); }}
@@ -625,7 +608,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
                         onClick={() => setEditingIndex(null)}
                         className="px-3 py-1 rounded-lg text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                       >
-                        取消
+                        {t("chat.cancel")}
                       </button>
                       <button
                         onClick={() => {
@@ -635,7 +618,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
                         disabled={!editText.trim()}
                         className="px-3 py-1 rounded-lg text-xs bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
                       >
-                        保存并发送
+                        {t("chat.saveAndSend")}
                       </button>
                     </div>
                   </div>
@@ -648,7 +631,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
                         onClick={() => { setEditingIndex(i); setEditText(msg.content); }}
                         disabled={isLoading}
                         className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-30 transition-colors"
-                        title="编辑"
+                        title={t("chat.editTooltip")}
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
@@ -656,7 +639,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
                         onClick={() => handleEditRetry(i, msg.content)}
                         disabled={isLoading}
                         className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-30 transition-colors"
-                        title="重试"
+                        title={t("chat.retryTooltip")}
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                       </button>
@@ -678,7 +661,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
         {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
           <div className="flex items-center gap-2 text-xs text-teal-600">
             <Loader2 className="w-4 h-4 animate-spin" />
-            <span>思考中...</span>
+            <span>{t("chat.thinking")}</span>
           </div>
         )}
       </div>
@@ -691,7 +674,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask the AI assistant..."
+            placeholder={t("chat.inputPlaceholder")}
             rows={1}
             className="flex-1 rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none overflow-y-auto"
             style={{ minHeight: "38px", maxHeight: "200px" }}
@@ -701,7 +684,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
             disabled={isLoading || !input.trim()}
             className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm shadow-sm hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
           >
-            Send
+            {t("chat.send")}
           </button>
         </div>
       </div>

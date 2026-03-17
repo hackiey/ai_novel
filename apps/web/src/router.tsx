@@ -6,6 +6,7 @@ import {
   Link,
   redirect,
 } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import HomePage from "./pages/HomePage.js";
 import WritePage from "./pages/WritePage.js";
 import WorldPage from "./pages/WorldPage.js";
@@ -14,6 +15,7 @@ import RegisterPage from "./pages/RegisterPage.js";
 import AdminPage from "./pages/AdminPage.js";
 import { getToken } from "./lib/auth.js";
 import { useAuth } from "./contexts/AuthContext.js";
+import LanguageSwitcher from "./components/LanguageSwitcher.js";
 
 function requireAuth() {
   if (!getToken()) {
@@ -23,6 +25,7 @@ function requireAuth() {
 
 function RootComponent() {
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen">
@@ -32,24 +35,27 @@ function RootComponent() {
             to="/"
             className="text-lg font-bold text-teal-600"
           >
-            AI Novel
+            {t("header.brand")}
           </Link>
-          {user && (
-            <div className="flex items-center gap-4 text-sm">
-              {user.role === "admin" && (
-                <Link to="/admin" className="text-gray-600 hover:text-teal-600 transition-colors">
-                  管理
-                </Link>
-              )}
-              <span className="text-gray-500">{user.displayName}</span>
-              <button
-                onClick={logout}
-                className="text-gray-400 hover:text-red-500 transition-colors"
-              >
-                登出
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-4 text-sm">
+            <LanguageSwitcher />
+            {user && (
+              <>
+                {user.role === "admin" && (
+                  <Link to="/admin" className="text-gray-600 hover:text-teal-600 transition-colors">
+                    {t("header.admin")}
+                  </Link>
+                )}
+                <span className="text-gray-500">{user.displayName}</span>
+                <button
+                  onClick={logout}
+                  className="text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  {t("header.logout")}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </header>
       <main>

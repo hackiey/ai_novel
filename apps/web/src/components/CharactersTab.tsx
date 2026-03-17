@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { trpc } from "../lib/trpc.js";
 import CharacterCard from "./CharacterCard.js";
 
@@ -9,6 +10,7 @@ interface CharactersTabProps {
 }
 
 export default function CharactersTab({ worldId, worldLink }: CharactersTabProps) {
+  const { t } = useTranslation();
   const [showCharForm, setShowCharForm] = useState(false);
   const [charName, setCharName] = useState("");
   const [charRole, setCharRole] = useState("other");
@@ -27,10 +29,10 @@ export default function CharactersTab({ worldId, worldLink }: CharactersTabProps
     <div>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
-          Characters ({characters.length})
+          {t("character.count", { count: characters.length })}
           {worldLink && (
             <Link to="/world/$worldId" params={{ worldId }} className="ml-2 text-[10px] text-teal-500 hover:text-teal-600 normal-case font-normal">
-              (from world)
+              {t("character.fromWorld")}
             </Link>
           )}
         </h3>
@@ -38,13 +40,13 @@ export default function CharactersTab({ worldId, worldLink }: CharactersTabProps
           onClick={() => setShowCharForm(true)}
           className="text-xs px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-500 transition-colors"
         >
-          + Add Character
+          {t("character.addCharacter")}
         </button>
       </div>
 
       {showCharForm && (
         <div className="mb-4 p-4 rounded-xl border border-gray-200 bg-white shadow-sm">
-          <h4 className="text-sm font-semibold text-gray-900 mb-3">New Character</h4>
+          <h4 className="text-sm font-semibold text-gray-900 mb-3">{t("character.newCharacter")}</h4>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -60,7 +62,7 @@ export default function CharactersTab({ worldId, worldLink }: CharactersTabProps
             <input
               value={charName}
               onChange={(e) => setCharName(e.target.value)}
-              placeholder="Character name"
+              placeholder={t("character.namePlaceholder")}
               className="flex-1 min-w-[200px] rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
             <select
@@ -68,25 +70,25 @@ export default function CharactersTab({ worldId, worldLink }: CharactersTabProps
               onChange={(e) => setCharRole(e.target.value)}
               className="rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
-              <option value="protagonist">Protagonist</option>
-              <option value="antagonist">Antagonist</option>
-              <option value="supporting">Supporting</option>
-              <option value="minor">Minor</option>
-              <option value="other">Other</option>
+              <option value="protagonist">{t("character.protagonist")}</option>
+              <option value="antagonist">{t("character.antagonist")}</option>
+              <option value="supporting">{t("character.supporting")}</option>
+              <option value="minor">{t("character.minor")}</option>
+              <option value="other">{t("character.other")}</option>
             </select>
             <button
               type="submit"
               disabled={createCharMut.isPending}
               className="px-4 py-2 text-sm rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
             >
-              {createCharMut.isPending ? "Adding..." : "Add"}
+              {createCharMut.isPending ? t("character.adding") : t("character.add")}
             </button>
             <button
               type="button"
               onClick={() => { setShowCharForm(false); setCharName(""); setCharRole("other"); }}
               className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
             >
-              Cancel
+              {t("character.cancel")}
             </button>
           </form>
         </div>
@@ -94,7 +96,7 @@ export default function CharactersTab({ worldId, worldLink }: CharactersTabProps
 
       {characters.length === 0 && !showCharForm ? (
         <div className="text-center py-8 text-gray-400 text-sm">
-          No characters yet. Add your first character to build the cast.
+          {t("character.empty")}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -104,7 +106,7 @@ export default function CharactersTab({ worldId, worldLink }: CharactersTabProps
               character={char}
               onEdit={() => {}}
               onDelete={(id) => {
-                if (confirm(`Delete "${char.name}"?`)) {
+                if (confirm(t("character.deleteConfirm", { name: char.name }))) {
                   deleteCharMut.mutate({ id });
                 }
               }}

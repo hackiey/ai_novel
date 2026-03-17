@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 interface CharacterCardProps {
   character: {
     _id: string;
@@ -23,9 +25,10 @@ const roleBadgeColors: Record<string, string> = {
 };
 
 export default function CharacterCard({ character, onEdit, onDelete }: CharacterCardProps) {
+  const { t } = useTranslation();
   const badgeClass = roleBadgeColors[character.role] ?? roleBadgeColors.other;
   const summary =
-    character.profile?.personality || character.profile?.background || "No description yet.";
+    character.profile?.personality || character.profile?.background || t("character.noDescription");
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 hover:border-gray-300 hover:shadow-sm transition-all group">
@@ -38,7 +41,7 @@ export default function CharacterCard({ character, onEdit, onDelete }: Character
             <h4 className="text-sm font-semibold text-gray-900 truncate">{character.name}</h4>
             {character.aliases && character.aliases.length > 0 && (
               <p className="text-xs text-gray-400 truncate">
-                aka {character.aliases.join(", ")}
+                {t("character.aka", { aliases: character.aliases.join(", ") })}
               </p>
             )}
           </div>
@@ -57,13 +60,13 @@ export default function CharacterCard({ character, onEdit, onDelete }: Character
           onClick={() => onEdit(character._id)}
           className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
         >
-          Edit
+          {t("character.edit")}
         </button>
         <button
           onClick={() => onDelete(character._id)}
           className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
         >
-          Delete
+          {t("character.delete")}
         </button>
       </div>
     </div>
