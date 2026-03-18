@@ -220,7 +220,7 @@ function AssistantMessageContent({ events, content, isStreaming }: {
 }
 
 export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | undefined>();
@@ -314,7 +314,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ projectId, worldId, message: text, sessionId }),
+        body: JSON.stringify({ projectId, worldId, message: text, sessionId, locale: i18n.language }),
       });
 
       if (!response.ok || !response.body) {

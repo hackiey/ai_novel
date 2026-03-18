@@ -1,5 +1,6 @@
 import type { Db } from "mongodb";
 import { ObjectId } from "mongodb";
+import { t, type Locale } from "./i18n.js";
 
 interface SummaryItem {
   name: string;
@@ -20,11 +21,13 @@ interface SummaryConfig {
 export function buildWorldSummary(
   characters: SummaryItem[],
   worldSettings: SummaryItem[],
-  config: SummaryConfig = { fullSummaryMaxItems: 500 }
+  config: SummaryConfig = { fullSummaryMaxItems: 500 },
+  locale: Locale = "zh"
 ): string {
   const totalItems = characters.length + worldSettings.length;
   if (totalItems === 0) return "";
 
+  const texts = t(locale);
   const compress = totalItems > config.fullSummaryMaxItems;
   const lines: string[] = [];
 
@@ -37,12 +40,12 @@ export function buildWorldSummary(
 
   const hasChars = characters.length > 0;
   if (hasChars) {
-    lines.push("### 角色");
+    lines.push(texts.charactersHeading);
     for (const imp of ["core", "major", "minor"] as const) {
       const group = charGroups[imp];
       if (group.length === 0) continue;
-      const label = imp === "core" ? "核心" : imp === "major" ? "重要" : "次要";
-      lines.push(`**${label}角色：**`);
+      const label = texts.importanceLabel[imp] || imp;
+      lines.push(`**${label}${locale === "zh" ? "角色" : " Characters"}：**`);
       for (const c of group) {
         const roleTag = c.role ? `[${c.role}]` : "";
         const summary = compress && imp === "minor"
@@ -56,7 +59,7 @@ export function buildWorldSummary(
   // World settings grouped by category
   const settingsByCategory: Record<string, SummaryItem[]> = {};
   for (const ws of worldSettings) {
-    const cat = ws.category || "其他";
+    const cat = ws.category || texts.uncategorized;
     if (!settingsByCategory[cat]) settingsByCategory[cat] = [];
     settingsByCategory[cat].push(ws);
   }
@@ -64,7 +67,7 @@ export function buildWorldSummary(
   const hasSettings = worldSettings.length > 0;
   if (hasSettings) {
     lines.push("");
-    lines.push("### 世界设定");
+    lines.push(texts.worldSettingsHeading);
     for (const [cat, items] of Object.entries(settingsByCategory)) {
       lines.push(`**${cat}：**`);
       for (const ws of items) {
@@ -80,25 +83,32 @@ export function buildWorldSummary(
 }
 
 /**
- * Get or refresh the world summary. If summaryStale, rebuild from DB and cache.
+ * Get or refresh the world summary.
+ * summaryStale controls whether to re-query DB; formatting is always done per locale.
  */
 export async function getOrRefreshWorldSummary(
   db: Db,
-  worldId: string
+  worldId: string,
+  locale: Locale = "zh"
 ): Promise<string> {
   const worlds = db.collection("worlds");
   const world = await worlds.findOne({ _id: new ObjectId(worldId) });
 
   if (!world) return "";
 
-  // If not stale, return cached summary
-  if (!world.summaryStale && world.summary) {
-    return world.summary as string;
-  }
-
   const config: SummaryConfig = {
     fullSummaryMaxItems: (world.summaryConfig as any)?.fullSummaryMaxItems ?? 500,
   };
+
+  // If not stale and we have cached raw data, rebuild formatted text from cache
+  if (!world.summaryStale && world.summaryCharacters && world.summarySettings) {
+    return buildWorldSummary(
+      world.summaryCharacters as SummaryItem[],
+      world.summarySettings as SummaryItem[],
+      config,
+      locale
+    );
+  }
 
   // Fetch characters and world settings
   const wid = new ObjectId(worldId);
@@ -129,13 +139,11 @@ export async function getOrRefreshWorldSummary(
     summary: (ws.summary as string) || "",
   }));
 
-  const summaryText = buildWorldSummary(charItems, settingItems, config);
-
-  // Cache it
+  // Cache raw data (not formatted text) so we can re-format per locale
   await worlds.updateOne(
     { _id: new ObjectId(worldId) },
-    { $set: { summary: summaryText, summaryStale: false } }
+    { $set: { summaryCharacters: charItems, summarySettings: settingItems, summaryStale: false } }
   );
 
-  return summaryText;
+  return buildWorldSummary(charItems, settingItems, config, locale);
 }

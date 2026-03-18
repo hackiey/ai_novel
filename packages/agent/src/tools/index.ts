@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import { ObjectId, type Db } from "mongodb";
 import * as handlers from "./handlers.js";
+import { t, type Locale } from "../i18n.js";
 
 export type VectorSearchFn = (args: {
   projectId?: string;
@@ -14,38 +15,39 @@ export type VectorSearchFn = (args: {
 export type OnDocumentChangedFn = (collection: string, id: string) => void;
 export type OnWorldSummaryStaleFn = (worldId: string) => void;
 
-export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, onDocumentChanged?: OnDocumentChangedFn, userId?: string, onWorldSummaryStale?: OnWorldSummaryStaleFn) {
+export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, onDocumentChanged?: OnDocumentChangedFn, userId?: string, onWorldSummaryStale?: OnWorldSummaryStaleFn, locale: Locale = "zh", worldId?: string, projectId?: string) {
+  const d = t(locale).tools;
+
   return createSdkMcpServer({
     name: "novel-tools",
     version: "1.0.0",
     tools: [
       tool(
         "semantic_search",
-        "搜索角色、世界观设定、草稿、章节中的相关内容。支持语义搜索（向量匹配）和关键词搜索。",
+        d.semantic_search,
         {
-          projectId: z.string().optional().describe("项目ID（用于搜索章节和项目级草稿）"),
-          worldId: z.string().optional().describe("世界观ID（用于搜索角色、世界观设定和世界观级草稿）"),
-          query: z.string().describe("搜索内容（支持语义理解，不必完全匹配关键词）"),
+          query: z.string().describe(d.semantic_search_query),
           scope: z
             .array(z.enum(["character", "world", "draft", "chapter"]))
             .optional()
-            .describe("搜索范围，可选。默认搜索所有类型。可指定一个或多个: character, world, draft, chapter"),
-          limit: z.number().optional().describe("返回结果数量上限，默认5"),
+            .describe(d.semantic_search_scope),
+          limit: z.number().optional().describe(d.semantic_search_limit),
         },
         async (args) => {
-          console.log("[semantic_search] called with:", JSON.stringify(args));
+          const fullArgs = { ...args, projectId, worldId };
+          console.log("[semantic_search] called with:", JSON.stringify(fullArgs));
           console.log("[semantic_search] vectorSearchFn available:", !!vectorSearchFn);
           // Prefer vector search if available, fall back to regex
           if (vectorSearchFn) {
             try {
-              const result = await vectorSearchFn(args);
+              const result = await vectorSearchFn(fullArgs);
               console.log("[semantic_search] vector result count:", result.results?.length);
               return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
             } catch (err) {
               console.error("[semantic_search] Vector search failed, falling back to regex:", err);
             }
           }
-          const result = await handlers.semanticSearch(args, db);
+          const result = await handlers.semanticSearch(fullArgs, db);
           console.log("[semantic_search] regex result count:", (result as any).results?.length);
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
@@ -53,26 +55,26 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
 
       tool(
         "update_character",
-        "更新角色信息。可以更新名称、角色类型、人设详情等。profile 中的字段会合并更新而非整体替换。",
+        d.update_character,
         {
-          id: z.string().describe("角色ID"),
-          name: z.string().optional().describe("角色名称"),
+          id: z.string().describe(d.update_character_id),
+          name: z.string().optional().describe(d.update_character_name),
           role: z
             .enum(["protagonist", "antagonist", "supporting", "minor", "other"])
             .optional()
-            .describe("角色类型"),
-          importance: z.enum(["core", "major", "minor"]).optional().describe("重要性级别"),
-          summary: z.string().optional().describe("一句话简介，不超过50字"),
-          aliases: z.array(z.string()).optional().describe("角色别名列表"),
+            .describe(d.update_character_role),
+          importance: z.enum(["core", "major", "minor"]).optional().describe(d.update_character_importance),
+          summary: z.string().optional().describe(d.update_character_summary),
+          aliases: z.array(z.string()).optional().describe(d.update_character_aliases),
           profile: z
             .object({
-              appearance: z.string().optional().describe("外貌描述"),
-              personality: z.string().optional().describe("性格特点"),
-              background: z.string().optional().describe("背景故事"),
-              goals: z.string().optional().describe("目标动机"),
+              appearance: z.string().optional().describe(d.update_character_appearance),
+              personality: z.string().optional().describe(d.update_character_personality),
+              background: z.string().optional().describe(d.update_character_background),
+              goals: z.string().optional().describe(d.update_character_goals),
             })
             .optional()
-            .describe("角色详细信息"),
+            .describe(d.update_character_profile),
         },
         async (args) => {
           const result = await handlers.updateCharacter(args, db);
@@ -86,18 +88,16 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
 
       tool(
         "create_character",
-        "创建新角色。优先使用worldId，如无worldId则使用projectId。",
+        d.create_character,
         {
-          worldId: z.string().optional().describe("世界观ID（优先使用）"),
-          projectId: z.string().optional().describe("项目ID（无worldId时使用）"),
-          name: z.string().describe("角色名称"),
+          name: z.string().describe(d.create_character_name),
           role: z
             .enum(["protagonist", "antagonist", "supporting", "minor", "other"])
             .optional()
-            .describe("角色类型，默认 other"),
-          importance: z.enum(["core", "major", "minor"]).optional().describe("重要性级别，默认 minor"),
-          summary: z.string().optional().describe("一句话简介，不超过50字"),
-          aliases: z.array(z.string()).optional().describe("角色别名"),
+            .describe(d.create_character_role),
+          importance: z.enum(["core", "major", "minor"]).optional().describe(d.create_character_importance),
+          summary: z.string().optional().describe(d.create_character_summary),
+          aliases: z.array(z.string()).optional().describe(d.create_character_aliases),
           profile: z
             .object({
               appearance: z.string().optional(),
@@ -106,21 +106,21 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
               goals: z.string().optional(),
             })
             .optional()
-            .describe("角色详细信息"),
+            .describe(d.create_character_profile),
         },
         async (args) => {
-          const result = await handlers.createCharacter(args, db, userId);
+          const result = await handlers.createCharacter({ ...args, worldId, projectId }, db, userId);
           if ((result as any)?._id) onDocumentChanged?.("characters", String((result as any)._id));
-          if (args.worldId) onWorldSummaryStale?.(args.worldId);
+          if (worldId) onWorldSummaryStale?.(worldId);
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
 
       tool(
         "delete_character",
-        "删除指定角色。此操作不可撤销，会同时删除相关的嵌入数据。",
+        d.delete_character,
         {
-          id: z.string().describe("要删除的角色ID"),
+          id: z.string().describe(d.delete_character_id),
         },
         async (args) => {
           const charDoc = await db.collection("characters").findOne({ _id: new ObjectId(args.id) });
@@ -132,15 +132,15 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
 
       tool(
         "update_world_setting",
-        "更新世界观设定。",
+        d.update_world_setting,
         {
-          id: z.string().describe("世界观设定ID"),
-          category: z.string().optional().describe("分类"),
-          title: z.string().optional().describe("标题"),
-          content: z.string().optional().describe("内容"),
-          tags: z.array(z.string()).optional().describe("标签"),
-          importance: z.enum(["core", "major", "minor"]).optional().describe("重要性级别"),
-          summary: z.string().optional().describe("一句话简介，不超过50字"),
+          id: z.string().describe(d.update_world_setting_id),
+          category: z.string().optional().describe(d.update_world_setting_category),
+          title: z.string().optional().describe(d.update_world_setting_title),
+          content: z.string().optional().describe(d.update_world_setting_content),
+          tags: z.array(z.string()).optional().describe(d.update_world_setting_tags),
+          importance: z.enum(["core", "major", "minor"]).optional().describe(d.update_world_setting_importance),
+          summary: z.string().optional().describe(d.update_world_setting_summary),
         },
         async (args) => {
           const result = await handlers.updateWorldSetting(args, db);
@@ -153,30 +153,28 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
 
       tool(
         "create_world_setting",
-        "创建新的世界观设定。优先使用worldId，如无worldId则使用projectId。",
+        d.create_world_setting,
         {
-          worldId: z.string().optional().describe("世界观ID（优先使用）"),
-          projectId: z.string().optional().describe("项目ID（无worldId时使用）"),
-          category: z.string().describe("分类，如: 地理、历史、魔法体系"),
-          title: z.string().describe("标题"),
-          content: z.string().optional().describe("内容"),
-          tags: z.array(z.string()).optional().describe("标签"),
-          importance: z.enum(["core", "major", "minor"]).optional().describe("重要性级别，默认 minor"),
-          summary: z.string().optional().describe("一句话简介，不超过50字"),
+          category: z.string().describe(d.create_world_setting_category),
+          title: z.string().describe(d.create_world_setting_title),
+          content: z.string().optional().describe(d.create_world_setting_content),
+          tags: z.array(z.string()).optional().describe(d.create_world_setting_tags),
+          importance: z.enum(["core", "major", "minor"]).optional().describe(d.create_world_setting_importance),
+          summary: z.string().optional().describe(d.create_world_setting_summary),
         },
         async (args) => {
-          const result = await handlers.createWorldSetting(args, db, userId);
+          const result = await handlers.createWorldSetting({ ...args, worldId, projectId }, db, userId);
           if ((result as any)?._id) onDocumentChanged?.("world_settings", String((result as any)._id));
-          if (args.worldId) onWorldSummaryStale?.(args.worldId);
+          if (worldId) onWorldSummaryStale?.(worldId);
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
 
       tool(
         "delete_world_setting",
-        "删除指定世界观设定。此操作不可撤销。",
+        d.delete_world_setting,
         {
-          id: z.string().describe("要删除的世界观设定ID"),
+          id: z.string().describe(d.delete_world_setting_id),
         },
         async (args) => {
           const wsDoc = await db.collection("world_settings").findOne({ _id: new ObjectId(args.id) });
@@ -188,16 +186,15 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
 
       tool(
         "create_chapter",
-        "创建新章节。如果不指定 order，会自动排在最后。",
+        d.create_chapter,
         {
-          projectId: z.string().describe("项目ID"),
-          title: z.string().describe("章节标题"),
-          content: z.string().optional().describe("章节初始内容"),
-          synopsis: z.string().optional().describe("章节梗概"),
-          order: z.number().optional().describe("章节排序，不指定则自动排在最后"),
+          title: z.string().describe(d.create_chapter_title),
+          content: z.string().optional().describe(d.create_chapter_content),
+          synopsis: z.string().optional().describe(d.create_chapter_synopsis),
+          order: z.number().optional().describe(d.create_chapter_order),
         },
         async (args) => {
-          const result = await handlers.createChapter(args, db, userId);
+          const result = await handlers.createChapter({ ...args, projectId: projectId! }, db, userId);
           if ((result as any)?._id) onDocumentChanged?.("chapters", String((result as any)._id));
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
@@ -205,9 +202,9 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
 
       tool(
         "get_chapter",
-        "根据ID获取章节完整内容。",
+        d.get_chapter,
         {
-          id: z.string().describe("章节ID"),
+          id: z.string().describe(d.get_chapter_id),
         },
         async (args) => {
           const result = await handlers.getChapter(args, db);
@@ -217,23 +214,21 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
 
       tool(
         "list_chapters",
-        "列出项目的所有章节，按章节顺序排列。",
-        {
-          projectId: z.string().describe("项目ID"),
-        },
-        async (args) => {
-          const result = await handlers.listChapters(args, db);
+        d.list_chapters,
+        {},
+        async () => {
+          const result = await handlers.listChapters({ projectId: projectId! }, db);
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
 
       tool(
         "continue_writing",
-        "续写章节。获取当前章节内容和前文上下文，供续写使用。返回章节内容和上下文信息，由AI根据这些信息生成续写内容。",
+        d.continue_writing,
         {
-          chapterId: z.string().describe("要续写的章节ID"),
-          instructions: z.string().optional().describe("续写指导说明，如情节方向、场景描写要求等"),
-          wordCount: z.number().optional().describe("目标续写字数，默认500"),
+          chapterId: z.string().describe(d.continue_writing_chapterId),
+          instructions: z.string().optional().describe(d.continue_writing_instructions),
+          wordCount: z.number().optional().describe(d.continue_writing_wordCount),
         },
         async (args) => {
           const result = await handlers.continueWriting(args, db);
@@ -243,14 +238,14 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
 
       tool(
         "update_chapter",
-        "更新章节内容、标题、状态等。",
+        d.update_chapter,
         {
-          id: z.string().describe("章节ID"),
-          title: z.string().optional().describe("章节标题"),
-          content: z.string().optional().describe("章节内容"),
-          synopsis: z.string().optional().describe("章节梗概"),
-          status: z.enum(["draft", "revision", "final"]).optional().describe("章节状态"),
-          order: z.number().optional().describe("章节排序"),
+          id: z.string().describe(d.update_chapter_id),
+          title: z.string().optional().describe(d.update_chapter_title),
+          content: z.string().optional().describe(d.update_chapter_content),
+          synopsis: z.string().optional().describe(d.update_chapter_synopsis),
+          status: z.enum(["draft", "revision", "final"]).optional().describe(d.update_chapter_status),
+          order: z.number().optional().describe(d.update_chapter_order),
         },
         async (args) => {
           const result = await handlers.updateChapter(args, db);
@@ -261,9 +256,9 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
 
       tool(
         "delete_chapter",
-        "删除指定章节。此操作不可撤销，会同时删除相关的嵌入数据。",
+        d.delete_chapter,
         {
-          id: z.string().describe("要删除的章节ID"),
+          id: z.string().describe(d.delete_chapter_id),
         },
         async (args) => {
           const result = await handlers.deleteChapter(args, db);
@@ -273,9 +268,9 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
 
       tool(
         "get_draft",
-        "根据ID获取草稿详情。",
+        d.get_draft,
         {
-          id: z.string().describe("草稿ID"),
+          id: z.string().describe(d.get_draft_id),
         },
         async (args) => {
           const result = await handlers.getDraft(args, db);
@@ -285,18 +280,16 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
 
       tool(
         "create_draft",
-        "创建草稿，用于保存创作过程中的想法、灵感、决策等。可关联到项目或世界观。",
+        d.create_draft,
         {
-          projectId: z.string().optional().describe("项目ID（可选，与worldId至少提供一个）"),
-          worldId: z.string().optional().describe("世界观ID（可选，与projectId至少提供一个）"),
-          title: z.string().describe("草稿标题"),
-          content: z.string().optional().describe("草稿内容"),
-          tags: z.array(z.string()).optional().describe("标签"),
-          linkedCharacters: z.array(z.string()).optional().describe("关联角色ID列表"),
-          linkedWorldSettings: z.array(z.string()).optional().describe("关联世界观设定ID列表"),
+          title: z.string().describe(d.create_draft_title),
+          content: z.string().optional().describe(d.create_draft_content),
+          tags: z.array(z.string()).optional().describe(d.create_draft_tags),
+          linkedCharacters: z.array(z.string()).optional().describe(d.create_draft_linkedCharacters),
+          linkedWorldSettings: z.array(z.string()).optional().describe(d.create_draft_linkedWorldSettings),
         },
         async (args) => {
-          const result = await handlers.createDraft(args, db, userId);
+          const result = await handlers.createDraft({ ...args, projectId, worldId }, db, userId);
           if ((result as any)?._id) onDocumentChanged?.("drafts", String((result as any)._id));
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
@@ -304,9 +297,9 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
 
       tool(
         "delete_draft",
-        "删除指定草稿。此操作不可撤销。",
+        d.delete_draft,
         {
-          id: z.string().describe("要删除的草稿ID"),
+          id: z.string().describe(d.delete_draft_id),
         },
         async (args) => {
           const result = await handlers.deleteDraft(args, db);
@@ -315,35 +308,22 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
       ),
 
       tool(
-        "get_memory",
-        "读取当前世界观的用户偏好记忆。返回之前保存的用户行为偏好和工作方式指导。",
-        {
-          worldId: z.string().describe("世界观ID"),
-        },
-        async (args) => {
-          const result = await handlers.getMemory(args, db);
-          return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-        }
-      ),
-
-      tool(
         "update_memory",
-        "更新用户偏好记忆。整体覆盖 content 字段。当用户要求你记住某些做事方式、行为偏好时调用此工具保存。",
+        d.update_memory,
         {
-          worldId: z.string().describe("世界观ID"),
-          content: z.string().describe("完整的记忆内容（会整体覆盖旧内容，请先读取再追加）"),
+          content: z.string().describe(d.update_memory_content),
         },
         async (args) => {
-          const result = await handlers.updateMemory(args, db);
+          const result = await handlers.updateMemory({ ...args, worldId: worldId! }, db);
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
 
       tool(
         "generate_synopsis",
-        "获取章节内容，用于生成章节梗概。返回章节全文供AI总结。",
+        d.generate_synopsis,
         {
-          chapterId: z.string().describe("章节ID"),
+          chapterId: z.string().describe(d.generate_synopsis_chapterId),
         },
         async (args) => {
           const result = await handlers.generateSynopsis(args, db);

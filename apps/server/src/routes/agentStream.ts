@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { ObjectId } from "mongodb";
-import { NovelAgentSession, getOrRefreshWorldSummary } from "@ai-novel/agent";
-import type { HistoryMessage, HistoryToolCall, VectorSearchFn } from "@ai-novel/agent";
+import { NovelAgentSession, getOrRefreshWorldSummary, resolveLocale } from "@ai-novel/agent";
+import type { HistoryMessage, HistoryToolCall, VectorSearchFn, Locale } from "@ai-novel/agent";
 import { getDb } from "../db.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 import { verifyToken, type JwtPayload } from "../auth/jwt.js";
@@ -29,14 +29,16 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       return reply.status(401).send({ error: "Unauthorized" });
     }
 
-    const { projectId, worldId, message, sessionId: inputSessionId, model } =
+    const { projectId, worldId, message, sessionId: inputSessionId, model, locale: rawLocale } =
       request.body as {
         projectId: string;
         worldId?: string;
         message: string;
         sessionId?: string;
         model?: string;
+        locale?: string;
       };
+    const locale: Locale = resolveLocale(rawLocale);
 
     if (!message) {
       return reply.status(400).send({ error: "message is required" });
@@ -160,7 +162,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     let worldSummary: string | undefined;
     if (worldId) {
       try {
-        worldSummary = await getOrRefreshWorldSummary(db, worldId);
+        worldSummary = await getOrRefreshWorldSummary(db, worldId, locale);
       } catch (err) {
         console.error("[WorldSummary] Failed to get summary:", err);
       }
@@ -171,7 +173,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     let fullText = "";
 
     try {
-      for await (const event of session.chat(message, history, memoryContent, worldSummary)) {
+      for await (const event of session.chat(message, history, memoryContent, worldSummary, locale)) {
         reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
         allEvents.push(event);
 

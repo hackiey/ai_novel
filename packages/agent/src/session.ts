@@ -4,6 +4,7 @@ import { buildSystemPromptWithHistory } from "./systemPrompt.js";
 import type { HistoryMessage } from "./systemPrompt.js";
 import { createNovelToolsServer } from "./tools/index.js";
 import type { VectorSearchFn, OnDocumentChangedFn, OnWorldSummaryStaleFn } from "./tools/index.js";
+import type { Locale } from "./i18n.js";
 
 const DEFAULT_MODEL = "claude-sonnet-4-6-20250514";
 
@@ -51,7 +52,7 @@ export class NovelAgentSession {
     this.onWorldSummaryStale = options.onWorldSummaryStale;
   }
 
-  async *chat(userMessage: string, history?: HistoryMessage[], memory?: string, worldSummary?: string): AsyncGenerator<AgentEvent> {
+  async *chat(userMessage: string, history?: HistoryMessage[], memory?: string, worldSummary?: string, locale: Locale = "zh"): AsyncGenerator<AgentEvent> {
     const env: Record<string, string | undefined> = {
       ...process.env,
       ANTHROPIC_API_KEY: this.apiKey,
@@ -66,9 +67,10 @@ export class NovelAgentSession {
       history,
       memory,
       worldSummary,
+      locale,
     );
 
-    const novelToolsServer = createNovelToolsServer(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale);
+    const novelToolsServer = createNovelToolsServer(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale, locale, this.worldId, this.projectId);
     const abortController = new AbortController();
     this.abortController = abortController;
 

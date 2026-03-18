@@ -1,0 +1,328 @@
+export type Locale = "zh" | "en";
+
+export function resolveLocale(raw?: string): Locale {
+  if (!raw) return "zh";
+  const lower = raw.toLowerCase();
+  if (lower === "zh" || lower.startsWith("zh-")) return "zh";
+  return "en";
+}
+
+const zh = {
+  // ── System prompt ──
+  systemRole: "你是一位专业的小说创作助手AI，正在协助用户创作一部小说。",
+  idSectionWithWorld: (projectId: string, worldId: string) =>
+    `当前项目ID: ${projectId}，当前世界观ID: ${worldId}。
+- 角色和世界观设定属于世界观（worldId: ${worldId}），可被多个项目共享
+- 章节属于项目（projectId: ${projectId}）
+- 讨论记录可关联到项目或世界观
+- projectId 和 worldId 已自动注入到工具调用中，无需手动传递`,
+  idSectionNoWorld: (projectId: string) =>
+    `当前项目ID: ${projectId}。本项目未关联世界观。
+- 所有查询请使用 projectId: ${projectId}`,
+  coreAbilities: `## 你的核心能力
+
+1. **角色管理** - 创建、更新、删除角色人设（外貌、性格、背景、目标、人物关系等）
+2. **世界观构建** - 管理世界观设定（地理、历史、魔法体系、社会制度、科技水平等），支持增删改查
+3. **章节管理** - 创建、查询、更新、删除章节，以及根据上下文续写章节内容
+4. **语义搜索** - 在角色、世界观、讨论记录、章节中搜索相关信息。搜索角色或世界设定时会返回完整详情
+5. **情节建议** - 基于已有设定和剧情，提供情节发展建议
+6. **一致性检查** - 检查角色行为、世界观规则是否前后一致`,
+  principles: `## 工作原则
+
+1. **主动获取上下文**：在回答用户问题或执行任务之前，主动使用工具查询相关角色、世界观、已有章节等信息，确保回答基于完整的项目上下文。
+2. **保持风格一致**：续写或创作时，分析已有章节的文风（叙事视角、用词风格、节奏等），保持一致。
+3. **尊重已有设定**：所有创作都必须与已建立的角色设定和世界观保持一致，如发现冲突应主动提醒用户。
+4. **中文创作**：默认使用中文进行创作，除非用户明确要求其他语言。
+5. **工具优先**：需要查询项目数据时，优先使用工具而非凭记忆回答。每次对话开始时，如果涉及具体角色或情节，先搜索获取最新数据。`,
+  interaction: `## 交互方式
+
+- 回答要专业但不生硬，像一位经验丰富的编辑和创作伙伴
+- 给出建议时提供具体理由，而不是空泛的评价
+- 续写时注重细节描写和情感渲染，避免流水账式叙述
+- 对于模糊的指令，先确认用户意图再执行`,
+  notes: `## 注意事项
+
+- 续写章节时，先获取该章节及前文上下文，再进行创作`,
+
+  // ── World summary ──
+  worldOverviewHeading: "## 世界观概览",
+  worldOverviewIntro: "以下是当前世界观中所有角色和设定的概览。如需了解某个角色或设定的详细信息，请使用 semantic_search 工具搜索对应名称或关键词。",
+  charactersHeading: "### 角色",
+  worldSettingsHeading: "### 世界设定",
+  importanceLabel: { core: "核心", major: "重要", minor: "次要" } as Record<string, string>,
+  uncategorized: "其他",
+
+  // ── Memory section ──
+  memoryHeading: "## 用户偏好记忆",
+  memoryIntro: "以下是用户之前要求你记住的行为偏好和工作方式指导，请严格遵守：",
+  memoryFooter: "> 当用户要求你记住新的偏好时，将新偏好与上方已有的记忆内容合并后，用 update_memory 保存完整内容。",
+
+  // ── History section ──
+  historyHeading: "## 对话历史",
+  historyIntro: "以下是本次会话的历史对话记录（包含工具调用），你已经获取过的数据不需要重复查询：",
+  historyUser: "**用户：**",
+  historyAssistantTool: "**助手（已调用工具）：**",
+  historyAssistant: "**助手：**",
+  historyFooter: "---\n请基于以上对话历史继续回答用户的新消息。不要重复查询已经获取过的数据，除非用户明确要求刷新。",
+
+  // ── Tool descriptions ──
+  tools: {
+    semantic_search: "搜索角色、世界观设定、草稿、章节中的相关内容。支持语义搜索（向量匹配）和关键词搜索。projectId 和 worldId 已自动注入。",
+    semantic_search_query: "搜索内容（支持语义理解，不必完全匹配关键词）",
+    semantic_search_scope: "搜索范围，可选。默认搜索所有类型。可指定一个或多个: character, world, draft, chapter",
+    semantic_search_limit: "返回结果数量上限，默认5",
+
+    update_character: "更新角色信息。可以更新名称、角色类型、人设详情等。profile 中的字段会合并更新而非整体替换。",
+    update_character_id: "角色ID",
+    update_character_name: "角色名称",
+    update_character_role: "角色类型",
+    update_character_importance: "重要性级别",
+    update_character_summary: "一句话简介，不超过50字",
+    update_character_aliases: "角色别名列表",
+    update_character_profile: "角色详细信息",
+    update_character_appearance: "外貌描述",
+    update_character_personality: "性格特点",
+    update_character_background: "背景故事",
+    update_character_goals: "目标动机",
+
+    create_character: "创建新角色。worldId 和 projectId 已自动注入。",
+    create_character_name: "角色名称",
+    create_character_role: "角色类型，默认 other",
+    create_character_importance: "重要性级别，默认 minor",
+    create_character_summary: "一句话简介，不超过50字",
+    create_character_aliases: "角色别名",
+    create_character_profile: "角色详细信息",
+
+    delete_character: "删除指定角色。此操作不可撤销，会同时删除相关的嵌入数据。",
+    delete_character_id: "要删除的角色ID",
+
+    update_world_setting: "更新世界观设定。",
+    update_world_setting_id: "世界观设定ID",
+    update_world_setting_category: "分类",
+    update_world_setting_title: "标题",
+    update_world_setting_content: "内容",
+    update_world_setting_tags: "标签",
+    update_world_setting_importance: "重要性级别",
+    update_world_setting_summary: "一句话简介，不超过50字",
+
+    create_world_setting: "创建新的世界观设定。worldId 和 projectId 已自动注入。",
+    create_world_setting_category: "分类，如: 地理、历史、魔法体系",
+    create_world_setting_title: "标题",
+    create_world_setting_content: "内容",
+    create_world_setting_tags: "标签",
+    create_world_setting_importance: "重要性级别，默认 minor",
+    create_world_setting_summary: "一句话简介，不超过50字",
+
+    delete_world_setting: "删除指定世界观设定。此操作不可撤销。",
+    delete_world_setting_id: "要删除的世界观设定ID",
+
+    create_chapter: "创建新章节。如果不指定 order，会自动排在最后。projectId 已自动注入。",
+    create_chapter_title: "章节标题",
+    create_chapter_content: "章节初始内容",
+    create_chapter_synopsis: "章节梗概",
+    create_chapter_order: "章节排序，不指定则自动排在最后",
+
+    get_chapter: "根据ID获取章节完整内容。",
+    get_chapter_id: "章节ID",
+
+    list_chapters: "列出项目的所有章节，按章节顺序排列。projectId 已自动注入。",
+
+    continue_writing: "续写章节。获取当前章节内容和前文上下文，供续写使用。返回章节内容和上下文信息，由AI根据这些信息生成续写内容。",
+    continue_writing_chapterId: "要续写的章节ID",
+    continue_writing_instructions: "续写指导说明，如情节方向、场景描写要求等",
+    continue_writing_wordCount: "目标续写字数，默认500",
+
+    update_chapter: "更新章节内容、标题、状态等。",
+    update_chapter_id: "章节ID",
+    update_chapter_title: "章节标题",
+    update_chapter_content: "章节内容",
+    update_chapter_synopsis: "章节梗概",
+    update_chapter_status: "章节状态",
+    update_chapter_order: "章节排序",
+
+    delete_chapter: "删除指定章节。此操作不可撤销，会同时删除相关的嵌入数据。",
+    delete_chapter_id: "要删除的章节ID",
+
+    get_draft: "根据ID获取草稿详情。",
+    get_draft_id: "草稿ID",
+
+    create_draft: "创建草稿，用于保存创作过程中的想法、灵感、决策等。projectId 和 worldId 已自动注入。",
+    create_draft_title: "草稿标题",
+    create_draft_content: "草稿内容",
+    create_draft_tags: "标签",
+    create_draft_linkedCharacters: "关联角色ID列表",
+    create_draft_linkedWorldSettings: "关联世界观设定ID列表",
+
+    delete_draft: "删除指定草稿。此操作不可撤销。",
+    delete_draft_id: "要删除的草稿ID",
+
+    update_memory: "更新用户偏好记忆。整体覆盖 content 字段。当用户要求你记住某些做事方式、行为偏好时调用此工具保存。worldId 已自动注入。",
+    update_memory_content: "完整的记忆内容（会整体覆盖旧内容，请先读取再追加）",
+
+    generate_synopsis: "获取章节内容，用于生成章节梗概。返回章节全文供AI总结。",
+    generate_synopsis_chapterId: "章节ID",
+  },
+};
+
+const en: typeof zh = {
+  // ── System prompt ──
+  systemRole: "You are a professional novel writing assistant AI, helping the user create a novel.",
+  idSectionWithWorld: (projectId: string, worldId: string) =>
+    `Current project ID: ${projectId}, current world ID: ${worldId}.
+- Characters and world settings belong to the world (worldId: ${worldId}) and can be shared across projects
+- Chapters belong to the project (projectId: ${projectId})
+- Drafts can be associated with a project or a world
+- projectId and worldId are automatically injected into tool calls — no need to pass them manually`,
+  idSectionNoWorld: (projectId: string) =>
+    `Current project ID: ${projectId}. This project has no associated world.
+- Use projectId: ${projectId} for all queries`,
+  coreAbilities: `## Core Abilities
+
+1. **Character Management** — Create, update, and delete character profiles (appearance, personality, background, goals, relationships, etc.)
+2. **World Building** — Manage world settings (geography, history, magic systems, social structure, technology, etc.) with full CRUD support
+3. **Chapter Management** — Create, query, update, delete chapters, and continue writing based on context
+4. **Semantic Search** — Search across characters, world settings, drafts, and chapters. Searching characters or world settings returns full details
+5. **Plot Suggestions** — Provide plot development suggestions based on existing settings and storylines
+6. **Consistency Checks** — Verify that character behavior and world rules remain consistent`,
+  principles: `## Working Principles
+
+1. **Proactively gather context**: Before answering or executing tasks, use tools to query relevant characters, world settings, and existing chapters to ensure answers are based on complete project context.
+2. **Maintain stylistic consistency**: When continuing or creating content, analyze the writing style of existing chapters (narrative perspective, word choice, pacing) and stay consistent.
+3. **Respect established settings**: All creative output must align with established character profiles and world settings. If conflicts are found, proactively alert the user.
+4. **Language**: Write in the same language as the user's messages unless explicitly told otherwise.
+5. **Tools first**: When querying project data, use tools rather than relying on memory. At the start of each conversation involving specific characters or plots, search for the latest data.`,
+  interaction: `## Interaction Style
+
+- Be professional yet approachable — act like an experienced editor and writing partner
+- Provide concrete reasoning when giving suggestions, not vague feedback
+- Focus on vivid details and emotional depth when writing, avoid flat narration
+- For ambiguous instructions, confirm the user's intent before proceeding`,
+  notes: `## Notes
+
+- When continuing a chapter, first retrieve the chapter and preceding context before writing`,
+
+  // ── World summary ──
+  worldOverviewHeading: "## World Overview",
+  worldOverviewIntro: "Below is an overview of all characters and settings in the current world. To get detailed information about a specific character or setting, use the semantic_search tool with the corresponding name or keyword.",
+  charactersHeading: "### Characters",
+  worldSettingsHeading: "### World Settings",
+  importanceLabel: { core: "Core", major: "Major", minor: "Minor" },
+  uncategorized: "Other",
+
+  // ── Memory section ──
+  memoryHeading: "## User Preference Memory",
+  memoryIntro: "Below are the user's previously saved behavior preferences and workflow guidelines. Follow them strictly:",
+  memoryFooter: "> When the user asks you to remember a new preference, merge it with the existing memory shown above, then use update_memory to save the complete content.",
+
+  // ── History section ──
+  historyHeading: "## Conversation History",
+  historyIntro: "Below is the conversation history for this session (including tool calls). You do not need to re-query data you have already fetched:",
+  historyUser: "**User:**",
+  historyAssistantTool: "**Assistant (tool calls made):**",
+  historyAssistant: "**Assistant:**",
+  historyFooter: "---\nContinue answering the user's new message based on the conversation history above. Do not re-query data already fetched, unless the user explicitly requests a refresh.",
+
+  // ── Tool descriptions ──
+  tools: {
+    semantic_search: "Search for relevant content across characters, world settings, drafts, and chapters. Supports semantic search (vector matching) and keyword search. projectId and worldId are auto-injected.",
+    semantic_search_query: "Search query (supports semantic understanding, exact keyword match not required)",
+    semantic_search_scope: "Search scope, optional. Defaults to all types. Specify one or more: character, world, draft, chapter",
+    semantic_search_limit: "Maximum number of results, default 5",
+
+    update_character: "Update character information. Can update name, role type, profile details, etc. Fields in profile are merged rather than replaced entirely.",
+    update_character_id: "Character ID",
+    update_character_name: "Character name",
+    update_character_role: "Character role type",
+    update_character_importance: "Importance level",
+    update_character_summary: "One-line summary, max 50 characters",
+    update_character_aliases: "Character aliases list",
+    update_character_profile: "Character details",
+    update_character_appearance: "Appearance description",
+    update_character_personality: "Personality traits",
+    update_character_background: "Background story",
+    update_character_goals: "Goals and motivations",
+
+    create_character: "Create a new character. worldId and projectId are auto-injected.",
+    create_character_name: "Character name",
+    create_character_role: "Character role type, default: other",
+    create_character_importance: "Importance level, default: minor",
+    create_character_summary: "One-line summary, max 50 characters",
+    create_character_aliases: "Character aliases",
+    create_character_profile: "Character details",
+
+    delete_character: "Delete a character. This action is irreversible and will also delete related embedding data.",
+    delete_character_id: "Character ID to delete",
+
+    update_world_setting: "Update a world setting.",
+    update_world_setting_id: "World setting ID",
+    update_world_setting_category: "Category",
+    update_world_setting_title: "Title",
+    update_world_setting_content: "Content",
+    update_world_setting_tags: "Tags",
+    update_world_setting_importance: "Importance level",
+    update_world_setting_summary: "One-line summary, max 50 characters",
+
+    create_world_setting: "Create a new world setting. worldId and projectId are auto-injected.",
+    create_world_setting_category: "Category, e.g.: Geography, History, Magic System",
+    create_world_setting_title: "Title",
+    create_world_setting_content: "Content",
+    create_world_setting_tags: "Tags",
+    create_world_setting_importance: "Importance level, default: minor",
+    create_world_setting_summary: "One-line summary, max 50 characters",
+
+    delete_world_setting: "Delete a world setting. This action is irreversible.",
+    delete_world_setting_id: "World setting ID to delete",
+
+    create_chapter: "Create a new chapter. If order is not specified, it will be placed at the end. projectId is auto-injected.",
+    create_chapter_title: "Chapter title",
+    create_chapter_content: "Initial chapter content",
+    create_chapter_synopsis: "Chapter synopsis",
+    create_chapter_order: "Chapter order; auto-placed at end if not specified",
+
+    get_chapter: "Get the full content of a chapter by ID.",
+    get_chapter_id: "Chapter ID",
+
+    list_chapters: "List all chapters in the project, sorted by chapter order. projectId is auto-injected.",
+
+    continue_writing: "Continue writing a chapter. Retrieves current chapter content and preceding context for continuation. Returns chapter content and context info for the AI to generate continuation.",
+    continue_writing_chapterId: "Chapter ID to continue writing",
+    continue_writing_instructions: "Writing guidance, e.g. plot direction, scene description requirements",
+    continue_writing_wordCount: "Target word count for continuation, default 500",
+
+    update_chapter: "Update chapter content, title, status, etc.",
+    update_chapter_id: "Chapter ID",
+    update_chapter_title: "Chapter title",
+    update_chapter_content: "Chapter content",
+    update_chapter_synopsis: "Chapter synopsis",
+    update_chapter_status: "Chapter status",
+    update_chapter_order: "Chapter order",
+
+    delete_chapter: "Delete a chapter. This action is irreversible and will also delete related embedding data.",
+    delete_chapter_id: "Chapter ID to delete",
+
+    get_draft: "Get draft details by ID.",
+    get_draft_id: "Draft ID",
+
+    create_draft: "Create a draft to save ideas, inspirations, and decisions during the creative process. projectId and worldId are auto-injected.",
+    create_draft_title: "Draft title",
+    create_draft_content: "Draft content",
+    create_draft_tags: "Tags",
+    create_draft_linkedCharacters: "Linked character ID list",
+    create_draft_linkedWorldSettings: "Linked world setting ID list",
+
+    delete_draft: "Delete a draft. This action is irreversible.",
+    delete_draft_id: "Draft ID to delete",
+
+    update_memory: "Update user preference memory. Overwrites the entire content field. Call this when the user asks you to remember certain work styles or behavior preferences. worldId is auto-injected.",
+    update_memory_content: "Complete memory content (will overwrite old content entirely; read first, then append)",
+
+    generate_synopsis: "Retrieve chapter content for generating a chapter synopsis. Returns the full chapter text for AI summarization.",
+    generate_synopsis_chapterId: "Chapter ID",
+  },
+};
+
+const locales: Record<Locale, typeof zh> = { zh, en };
+
+export function t(locale: Locale) {
+  return locales[locale];
+}
