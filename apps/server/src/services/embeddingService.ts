@@ -65,24 +65,50 @@ function extractTitle(collection: string, doc: any): string {
 }
 
 /**
- * Extract a short excerpt from a document for display in search results.
+ * Extract content from a document for display in search results.
+ * For characters and world_settings, returns full detail.
+ * For drafts and chapters, returns a short excerpt.
  */
 function extractExcerpt(collection: string, doc: any, maxLen = 200): string {
-  let text = "";
   switch (collection) {
-    case "characters":
-      text = doc.profile?.background || doc.profile?.personality || "";
-      break;
-    case "chapters":
-      text = doc.synopsis || doc.content || "";
-      break;
-    default:
-      text = doc.content || "";
+    case "characters": {
+      const parts: string[] = [];
+      if (doc.name) parts.push(`名称: ${doc.name}`);
+      if (doc.aliases?.length) parts.push(`别名: ${doc.aliases.join(", ")}`);
+      if (doc.role) parts.push(`角色类型: ${doc.role}`);
+      if (doc.importance) parts.push(`重要性: ${doc.importance}`);
+      const p = doc.profile;
+      if (p) {
+        if (p.appearance) parts.push(`外貌: ${p.appearance}`);
+        if (p.personality) parts.push(`性格: ${p.personality}`);
+        if (p.background) parts.push(`背景: ${p.background}`);
+        if (p.goals) parts.push(`目标: ${p.goals}`);
+        if (p.relationships?.length) {
+          const rels = p.relationships.map((r: any) => `${r.characterName}: ${r.relationship}`).join("; ");
+          parts.push(`关系: ${rels}`);
+        }
+      }
+      return parts.join("\n");
+    }
+    case "world_settings": {
+      const parts: string[] = [];
+      if (doc.category) parts.push(`分类: ${doc.category}`);
+      if (doc.title) parts.push(`标题: ${doc.title}`);
+      if (doc.importance) parts.push(`重要性: ${doc.importance}`);
+      if (doc.tags?.length) parts.push(`标签: ${doc.tags.join(", ")}`);
+      if (doc.content) parts.push(`内容: ${doc.content}`);
+      return parts.join("\n");
+    }
+    default: {
+      const text = collection === "chapters"
+        ? (doc.synopsis || doc.content || "")
+        : (doc.content || "");
+      if (text.length > maxLen) {
+        return text.slice(0, maxLen) + "...";
+      }
+      return text;
+    }
   }
-  if (text.length > maxLen) {
-    return text.slice(0, maxLen) + "...";
-  }
-  return text;
 }
 
 interface QueueEntry {
@@ -353,6 +379,11 @@ export class ServerEmbeddingService {
               synopsis: 1,
               content: 1,
               profile: 1,
+              role: 1,
+              aliases: 1,
+              importance: 1,
+              category: 1,
+              tags: 1,
               score: { $meta: "vectorSearchScore" },
             },
           },

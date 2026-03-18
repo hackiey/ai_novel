@@ -3,7 +3,7 @@ import type { Db } from "mongodb";
 import { buildSystemPromptWithHistory } from "./systemPrompt.js";
 import type { HistoryMessage } from "./systemPrompt.js";
 import { createNovelToolsServer } from "./tools/index.js";
-import type { VectorSearchFn, OnDocumentChangedFn } from "./tools/index.js";
+import type { VectorSearchFn, OnDocumentChangedFn, OnWorldSummaryStaleFn } from "./tools/index.js";
 
 const DEFAULT_MODEL = "claude-sonnet-4-6-20250514";
 
@@ -25,6 +25,7 @@ export class NovelAgentSession {
   private abortController?: AbortController;
   private vectorSearchFn?: VectorSearchFn;
   private onDocumentChanged?: OnDocumentChangedFn;
+  private onWorldSummaryStale?: OnWorldSummaryStaleFn;
 
   constructor(options: {
     apiKey: string;
@@ -36,6 +37,7 @@ export class NovelAgentSession {
     userId?: string;
     vectorSearchFn?: VectorSearchFn;
     onDocumentChanged?: OnDocumentChangedFn;
+    onWorldSummaryStale?: OnWorldSummaryStaleFn;
   }) {
     this.apiKey = options.apiKey;
     this.baseURL = options.baseURL;
@@ -46,9 +48,10 @@ export class NovelAgentSession {
     this.userId = options.userId;
     this.vectorSearchFn = options.vectorSearchFn;
     this.onDocumentChanged = options.onDocumentChanged;
+    this.onWorldSummaryStale = options.onWorldSummaryStale;
   }
 
-  async *chat(userMessage: string, history?: HistoryMessage[], memory?: string): AsyncGenerator<AgentEvent> {
+  async *chat(userMessage: string, history?: HistoryMessage[], memory?: string, worldSummary?: string): AsyncGenerator<AgentEvent> {
     const env: Record<string, string | undefined> = {
       ...process.env,
       ANTHROPIC_API_KEY: this.apiKey,
@@ -62,9 +65,10 @@ export class NovelAgentSession {
       this.worldId,
       history,
       memory,
+      worldSummary,
     );
 
-    const novelToolsServer = createNovelToolsServer(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId);
+    const novelToolsServer = createNovelToolsServer(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale);
     const abortController = new AbortController();
     this.abortController = abortController;
 

@@ -72,6 +72,8 @@ export const characterRouter = router({
         name: input.name,
         aliases: input.aliases ?? [],
         role: input.role ?? "other",
+        importance: input.importance ?? "minor",
+        summary: input.summary ?? "",
         profile,
         wordCount: computeCharacterWordCount(profile),
         createdAt: now,
@@ -79,6 +81,11 @@ export const characterRouter = router({
       };
       const result = await ctx.db.collection("characters").insertOne(doc);
       getEmbeddingService()?.enqueue("characters", result.insertedId.toHexString());
+      // Mark world summary as stale
+      await ctx.db.collection("worlds").updateOne(
+        { _id: new ObjectId(input.worldId) },
+        { $set: { summaryStale: true } }
+      );
       return serializeDoc({ _id: result.insertedId, ...doc });
     }),
 
@@ -91,6 +98,8 @@ export const characterRouter = router({
       if (input.data.name !== undefined) updateFields.name = input.data.name;
       if (input.data.aliases !== undefined) updateFields.aliases = input.data.aliases;
       if (input.data.role !== undefined) updateFields.role = input.data.role;
+      if (input.data.importance !== undefined) updateFields.importance = input.data.importance;
+      if (input.data.summary !== undefined) updateFields.summary = input.data.summary;
       if (input.data.profile !== undefined) {
         updateFields.profile = input.data.profile;
         updateFields.wordCount = computeCharacterWordCount(input.data.profile);
@@ -114,16 +123,33 @@ export const characterRouter = router({
         }
       }
 
-      if (result) getEmbeddingService()?.enqueue("characters", input.id);
+      if (result) {
+        getEmbeddingService()?.enqueue("characters", input.id);
+        // Mark world summary as stale
+        if (result.worldId) {
+          await ctx.db.collection("worlds").updateOne(
+            { _id: result.worldId instanceof ObjectId ? result.worldId : new ObjectId(result.worldId as string) },
+            { $set: { summaryStale: true } }
+          );
+        }
+      }
       return serializeDoc(result);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .mutation(async ({ ctx, input }) => {
+      const doc = await ctx.db.collection("characters").findOne({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
       await ctx.db
         .collection("characters")
         .deleteOne({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
+      // Mark world summary as stale
+      if (doc?.worldId) {
+        await ctx.db.collection("worlds").updateOne(
+          { _id: doc.worldId instanceof ObjectId ? doc.worldId : new ObjectId(doc.worldId as string) },
+          { $set: { summaryStale: true } }
+        );
+      }
       return { success: true };
     }),
 });

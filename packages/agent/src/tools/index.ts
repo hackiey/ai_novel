@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
-import type { Db } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 import * as handlers from "./handlers.js";
 
 export type VectorSearchFn = (args: {
@@ -12,8 +12,9 @@ export type VectorSearchFn = (args: {
 }) => Promise<{ results: Array<{ collection: string; id: string; title: string; excerpt: string; score: number }>; total: number }>;
 
 export type OnDocumentChangedFn = (collection: string, id: string) => void;
+export type OnWorldSummaryStaleFn = (worldId: string) => void;
 
-export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, onDocumentChanged?: OnDocumentChangedFn, userId?: string) {
+export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, onDocumentChanged?: OnDocumentChangedFn, userId?: string, onWorldSummaryStale?: OnWorldSummaryStaleFn) {
   return createSdkMcpServer({
     name: "novel-tools",
     version: "1.0.0",
@@ -51,31 +52,6 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
       ),
 
       tool(
-        "get_character",
-        "根据ID获取角色的完整信息，包括外貌、性格、背景、人物关系等。",
-        {
-          id: z.string().describe("角色ID"),
-        },
-        async (args) => {
-          const result = await handlers.getCharacter(args, db);
-          return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-        }
-      ),
-
-      tool(
-        "list_characters",
-        "列出所有角色。优先使用worldId查询，如无worldId则使用projectId。",
-        {
-          worldId: z.string().optional().describe("世界观ID（优先使用）"),
-          projectId: z.string().optional().describe("项目ID（无worldId时使用）"),
-        },
-        async (args) => {
-          const result = await handlers.listCharacters(args, db);
-          return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-        }
-      ),
-
-      tool(
         "update_character",
         "更新角色信息。可以更新名称、角色类型、人设详情等。profile 中的字段会合并更新而非整体替换。",
         {
@@ -85,6 +61,8 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
             .enum(["protagonist", "antagonist", "supporting", "minor", "other"])
             .optional()
             .describe("角色类型"),
+          importance: z.enum(["core", "major", "minor"]).optional().describe("重要性级别"),
+          summary: z.string().optional().describe("一句话简介，不超过50字"),
           aliases: z.array(z.string()).optional().describe("角色别名列表"),
           profile: z
             .object({
@@ -99,6 +77,9 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
         async (args) => {
           const result = await handlers.updateCharacter(args, db);
           onDocumentChanged?.("characters", args.id);
+          // Look up the character's worldId to mark summary stale
+          const charDoc = await db.collection("characters").findOne({ _id: new ObjectId(args.id) });
+          if (charDoc?.worldId) onWorldSummaryStale?.(charDoc.worldId.toHexString());
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
@@ -114,6 +95,8 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
             .enum(["protagonist", "antagonist", "supporting", "minor", "other"])
             .optional()
             .describe("角色类型，默认 other"),
+          importance: z.enum(["core", "major", "minor"]).optional().describe("重要性级别，默认 minor"),
+          summary: z.string().optional().describe("一句话简介，不超过50字"),
           aliases: z.array(z.string()).optional().describe("角色别名"),
           profile: z
             .object({
@@ -128,6 +111,7 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
         async (args) => {
           const result = await handlers.createCharacter(args, db, userId);
           if ((result as any)?._id) onDocumentChanged?.("characters", String((result as any)._id));
+          if (args.worldId) onWorldSummaryStale?.(args.worldId);
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
@@ -139,33 +123,9 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
           id: z.string().describe("要删除的角色ID"),
         },
         async (args) => {
+          const charDoc = await db.collection("characters").findOne({ _id: new ObjectId(args.id) });
           const result = await handlers.deleteCharacter(args, db);
-          return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-        }
-      ),
-
-      tool(
-        "get_world_setting",
-        "根据ID获取世界观设定详情。",
-        {
-          id: z.string().describe("世界观设定ID"),
-        },
-        async (args) => {
-          const result = await handlers.getWorldSetting(args, db);
-          return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-        }
-      ),
-
-      tool(
-        "list_world_settings",
-        "列出世界观设定条目，可按分类筛选。优先使用worldId查询，如无worldId则使用projectId。",
-        {
-          worldId: z.string().optional().describe("世界观ID（优先使用）"),
-          projectId: z.string().optional().describe("项目ID（无worldId时使用）"),
-          category: z.string().optional().describe("按分类筛选，如: 地理、历史、魔法体系、社会制度等"),
-        },
-        async (args) => {
-          const result = await handlers.listWorldSettings(args, db);
+          if (charDoc?.worldId) onWorldSummaryStale?.(charDoc.worldId.toHexString());
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
@@ -179,10 +139,14 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
           title: z.string().optional().describe("标题"),
           content: z.string().optional().describe("内容"),
           tags: z.array(z.string()).optional().describe("标签"),
+          importance: z.enum(["core", "major", "minor"]).optional().describe("重要性级别"),
+          summary: z.string().optional().describe("一句话简介，不超过50字"),
         },
         async (args) => {
           const result = await handlers.updateWorldSetting(args, db);
           onDocumentChanged?.("world_settings", args.id);
+          const wsDoc = await db.collection("world_settings").findOne({ _id: new ObjectId(args.id) });
+          if (wsDoc?.worldId) onWorldSummaryStale?.(wsDoc.worldId.toHexString());
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
@@ -197,10 +161,13 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
           title: z.string().describe("标题"),
           content: z.string().optional().describe("内容"),
           tags: z.array(z.string()).optional().describe("标签"),
+          importance: z.enum(["core", "major", "minor"]).optional().describe("重要性级别，默认 minor"),
+          summary: z.string().optional().describe("一句话简介，不超过50字"),
         },
         async (args) => {
           const result = await handlers.createWorldSetting(args, db, userId);
           if ((result as any)?._id) onDocumentChanged?.("world_settings", String((result as any)._id));
+          if (args.worldId) onWorldSummaryStale?.(args.worldId);
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),
@@ -212,7 +179,9 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
           id: z.string().describe("要删除的世界观设定ID"),
         },
         async (args) => {
+          const wsDoc = await db.collection("world_settings").findOne({ _id: new ObjectId(args.id) });
           const result = await handlers.deleteWorldSetting(args, db);
+          if (wsDoc?.worldId) onWorldSummaryStale?.(wsDoc.worldId.toHexString());
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
       ),

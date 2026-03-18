@@ -68,6 +68,11 @@ export const worldSchema = z.object({
   userId: objectIdSchema,
   name: z.string().min(1).max(200),
   description: z.string().max(2000).default(""),
+  summary: z.string().default(""),
+  summaryStale: z.boolean().default(true),
+  summaryConfig: z.object({
+    fullSummaryMaxItems: z.number().default(500),
+  }).default({}),
   ...timestampsSchema.shape,
 });
 
@@ -130,6 +135,8 @@ export const characterProfileSchema = z.object({
   customFields: z.record(z.string(), z.string()).default({}),
 });
 
+export const importanceSchema = z.enum(["core", "major", "minor"]);
+
 export const characterSchema = z.object({
   _id: objectIdSchema,
   userId: objectIdSchema,
@@ -137,6 +144,8 @@ export const characterSchema = z.object({
   name: z.string().min(1).max(200),
   aliases: z.array(z.string().max(200)).default([]),
   role: z.enum(["protagonist", "antagonist", "supporting", "minor", "other"]).default("other"),
+  importance: importanceSchema.default("minor"),
+  summary: z.string().max(100).default(""),
   profile: characterProfileSchema.default({}),
   embedding: z.array(z.number()).optional(),
   embeddingText: z.string().optional(),
@@ -148,6 +157,8 @@ export const createCharacterSchema = z.object({
   name: z.string().min(1).max(200),
   aliases: z.array(z.string().max(200)).optional(),
   role: z.enum(["protagonist", "antagonist", "supporting", "minor", "other"]).optional(),
+  importance: importanceSchema.optional(),
+  summary: z.string().max(100).optional(),
   profile: characterProfileSchema.partial().optional(),
 });
 
@@ -167,6 +178,8 @@ export const worldSettingSchema = z.object({
   title: z.string().min(1).max(200),
   content: z.string().max(50000).default(""),
   tags: z.array(z.string().max(100)).default([]),
+  importance: importanceSchema.default("minor"),
+  summary: z.string().max(100).default(""),
   embedding: z.array(z.number()).optional(),
   embeddingText: z.string().optional(),
   ...timestampsSchema.shape,
@@ -178,6 +191,8 @@ export const createWorldSettingSchema = z.object({
   title: z.string().min(1).max(200),
   content: z.string().max(50000).optional(),
   tags: z.array(z.string().max(100)).optional(),
+  importance: importanceSchema.optional(),
+  summary: z.string().max(100).optional(),
 });
 
 export const updateWorldSettingSchema = createWorldSettingSchema.omit({ worldId: true }).partial();

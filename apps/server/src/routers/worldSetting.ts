@@ -52,11 +52,18 @@ export const worldSettingRouter = router({
         title: input.title,
         content: input.content ?? "",
         tags: input.tags ?? [],
+        importance: input.importance ?? "minor",
+        summary: input.summary ?? "",
         createdAt: now,
         updatedAt: now,
       };
       const result = await ctx.db.collection("world_settings").insertOne(doc);
       getEmbeddingService()?.enqueue("world_settings", result.insertedId.toHexString());
+      // Mark world summary as stale
+      await ctx.db.collection("worlds").updateOne(
+        { _id: new ObjectId(input.worldId) },
+        { $set: { summaryStale: true } }
+      );
       return serializeDoc({ _id: result.insertedId, ...doc });
     }),
 
@@ -70,6 +77,8 @@ export const worldSettingRouter = router({
       if (input.data.title !== undefined) updateFields.title = input.data.title;
       if (input.data.content !== undefined) updateFields.content = input.data.content;
       if (input.data.tags !== undefined) updateFields.tags = input.data.tags;
+      if (input.data.importance !== undefined) updateFields.importance = input.data.importance;
+      if (input.data.summary !== undefined) updateFields.summary = input.data.summary;
 
       const result = await ctx.db
         .collection("world_settings")
@@ -78,16 +87,33 @@ export const worldSettingRouter = router({
           { $set: updateFields },
           { returnDocument: "after" }
         );
-      if (result) getEmbeddingService()?.enqueue("world_settings", input.id);
+      if (result) {
+        getEmbeddingService()?.enqueue("world_settings", input.id);
+        // Mark world summary as stale
+        if (result.worldId) {
+          await ctx.db.collection("worlds").updateOne(
+            { _id: result.worldId instanceof ObjectId ? result.worldId : new ObjectId(result.worldId as string) },
+            { $set: { summaryStale: true } }
+          );
+        }
+      }
       return serializeDoc(result);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .mutation(async ({ ctx, input }) => {
+      const doc = await ctx.db.collection("world_settings").findOne({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
       await ctx.db
         .collection("world_settings")
         .deleteOne({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
+      // Mark world summary as stale
+      if (doc?.worldId) {
+        await ctx.db.collection("worlds").updateOne(
+          { _id: doc.worldId instanceof ObjectId ? doc.worldId : new ObjectId(doc.worldId as string) },
+          { $set: { summaryStale: true } }
+        );
+      }
       return { success: true };
     }),
 });

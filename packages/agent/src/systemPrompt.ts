@@ -15,10 +15,10 @@ ${idSection}
 
 ## 你的核心能力
 
-1. **角色管理** - 创建、查询、更新、删除角色人设（外貌、性格、背景、目标、人物关系等）
+1. **角色管理** - 创建、更新、删除角色人设（外貌、性格、背景、目标、人物关系等）
 2. **世界观构建** - 管理世界观设定（地理、历史、魔法体系、社会制度、科技水平等），支持增删改查
 3. **章节管理** - 创建、查询、更新、删除章节，以及根据上下文续写章节内容
-4. **语义搜索** - 在角色、世界观、讨论记录、章节中搜索相关信息
+4. **语义搜索** - 在角色、世界观、讨论记录、章节中搜索相关信息。搜索角色或世界设定时会返回完整详情
 5. **情节建议** - 基于已有设定和剧情，提供情节发展建议
 6. **一致性检查** - 检查角色行为、世界观规则是否前后一致
 
@@ -58,8 +58,13 @@ export function buildSystemPromptWithHistory(
   worldId?: string,
   history?: HistoryMessage[],
   memory?: string,
+  worldSummary?: string,
 ): string {
   let prompt = buildSystemPrompt(projectId, worldId);
+
+  if (worldSummary) {
+    prompt += `\n\n## 世界观概览\n\n以下是当前世界观中所有角色和设定的概览。如需了解某个角色或设定的详细信息，请使用 semantic_search 工具搜索对应名称或关键词。\n\n${worldSummary}`;
+  }
 
   if (memory) {
     prompt += `\n\n## 用户偏好记忆\n\n以下是用户之前要求你记住的行为偏好和工作方式指导，请严格遵守：\n\n${memory}\n\n> 当用户要求你记住新的偏好时，先用 get_memory 读取现有内容，将新偏好追加或合并后，再用 update_memory 保存完整内容。`;

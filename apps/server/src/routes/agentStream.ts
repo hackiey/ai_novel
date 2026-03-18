@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { ObjectId } from "mongodb";
-import { NovelAgentSession } from "@ai-novel/agent";
+import { NovelAgentSession, getOrRefreshWorldSummary } from "@ai-novel/agent";
 import type { HistoryMessage, HistoryToolCall, VectorSearchFn } from "@ai-novel/agent";
 import { getDb } from "../db.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
@@ -93,6 +93,12 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
         onDocumentChanged: embeddingSvc
           ? (collection, id) => embeddingSvc.enqueue(collection, id)
           : undefined,
+        onWorldSummaryStale: (wId) => {
+          db.collection("worlds").updateOne(
+            { _id: new ObjectId(wId) },
+            { $set: { summaryStale: true } }
+          ).catch((err) => console.error("[WorldSummary] Failed to mark stale:", err));
+        },
       });
       sessions.set(sessionId, session);
     }
@@ -150,12 +156,22 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       }
     }
 
+    // Get world summary
+    let worldSummary: string | undefined;
+    if (worldId) {
+      try {
+        worldSummary = await getOrRefreshWorldSummary(db, worldId);
+      } catch (err) {
+        console.error("[WorldSummary] Failed to get summary:", err);
+      }
+    }
+
     // Stream agent events
     const allEvents: any[] = [];
     let fullText = "";
 
     try {
-      for await (const event of session.chat(message, history, memoryContent)) {
+      for await (const event of session.chat(message, history, memoryContent, worldSummary)) {
         reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
         allEvents.push(event);
 

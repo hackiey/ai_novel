@@ -21,6 +21,38 @@ function serialize(doc: unknown): unknown {
   return doc;
 }
 
+// ============ Detail Formatters ============
+
+function formatCharacterDetail(doc: any): string {
+  const parts: string[] = [];
+  if (doc.name) parts.push(`名称: ${doc.name}`);
+  if (doc.aliases?.length) parts.push(`别名: ${doc.aliases.join(", ")}`);
+  if (doc.role) parts.push(`角色类型: ${doc.role}`);
+  if (doc.importance) parts.push(`重要性: ${doc.importance}`);
+  const p = doc.profile;
+  if (p) {
+    if (p.appearance) parts.push(`外貌: ${p.appearance}`);
+    if (p.personality) parts.push(`性格: ${p.personality}`);
+    if (p.background) parts.push(`背景: ${p.background}`);
+    if (p.goals) parts.push(`目标: ${p.goals}`);
+    if (p.relationships?.length) {
+      const rels = p.relationships.map((r: any) => `${r.characterName}: ${r.relationship}`).join("; ");
+      parts.push(`关系: ${rels}`);
+    }
+  }
+  return parts.join("\n");
+}
+
+function formatWorldSettingDetail(doc: any): string {
+  const parts: string[] = [];
+  if (doc.category) parts.push(`分类: ${doc.category}`);
+  if (doc.title) parts.push(`标题: ${doc.title}`);
+  if (doc.importance) parts.push(`重要性: ${doc.importance}`);
+  if (doc.tags?.length) parts.push(`标签: ${doc.tags.join(", ")}`);
+  if (doc.content) parts.push(`内容: ${doc.content}`);
+  return parts.join("\n");
+}
+
 // ============ Semantic Search ============
 
 export async function semanticSearch(
@@ -57,10 +89,7 @@ export async function semanticSearch(
       results.push({
         collection: "character",
         title: c.name,
-        excerpt: [c.profile?.personality, c.profile?.background]
-          .filter(Boolean)
-          .join(" ")
-          .slice(0, 200),
+        excerpt: formatCharacterDetail(c),
         id: c._id.toHexString(),
       });
     }
@@ -80,7 +109,7 @@ export async function semanticSearch(
       results.push({
         collection: "world",
         title: `[${w.category}] ${w.title}`,
-        excerpt: (w.content ?? "").slice(0, 200),
+        excerpt: formatWorldSettingDetail(w),
         id: w._id.toHexString(),
       });
     }
@@ -143,34 +172,8 @@ export async function semanticSearch(
 
 // ============ Character Handlers ============
 
-export async function getCharacter(
-  args: { id: string },
-  db: Db
-): Promise<unknown> {
-  const character = await db
-    .collection("characters")
-    .findOne({ _id: toObjectId(args.id) });
-  if (!character) return { error: `Character not found: ${args.id}` };
-  return serialize(character);
-}
-
-export async function listCharacters(
-  args: { worldId?: string; projectId?: string },
-  db: Db
-): Promise<unknown> {
-  const filter: Record<string, unknown> = {};
-  if (args.worldId) filter.worldId = new ObjectId(args.worldId);
-  else if (args.projectId) filter.projectId = new ObjectId(args.projectId);
-  const characters = await db
-    .collection("characters")
-    .find(filter)
-    .sort({ name: 1 })
-    .toArray();
-  return serialize(characters);
-}
-
 export async function createCharacter(
-  args: { worldId?: string; projectId?: string; name: string; role?: string; aliases?: string[]; profile?: Record<string, unknown> },
+  args: { worldId?: string; projectId?: string; name: string; role?: string; aliases?: string[]; profile?: Record<string, unknown>; importance?: string; summary?: string },
   db: Db,
   userId?: string
 ): Promise<unknown> {
@@ -183,6 +186,8 @@ export async function createCharacter(
     name: args.name,
     aliases: args.aliases ?? [],
     role: args.role ?? "other",
+    importance: args.importance ?? "minor",
+    summary: args.summary ?? "",
     profile: {
       appearance: "",
       personality: "",
@@ -201,7 +206,7 @@ export async function createCharacter(
 }
 
 export async function updateCharacter(
-  args: { id: string; name?: string; role?: string; aliases?: string[]; profile?: Record<string, unknown> },
+  args: { id: string; name?: string; role?: string; aliases?: string[]; profile?: Record<string, unknown>; importance?: string; summary?: string },
   db: Db
 ): Promise<unknown> {
   const { id, ...updates } = args;
@@ -210,6 +215,8 @@ export async function updateCharacter(
   if (updates.name !== undefined) setFields.name = updates.name;
   if (updates.role !== undefined) setFields.role = updates.role;
   if (updates.aliases !== undefined) setFields.aliases = updates.aliases;
+  if (updates.importance !== undefined) setFields.importance = updates.importance;
+  if (updates.summary !== undefined) setFields.summary = updates.summary;
 
   // For profile, merge subfields rather than replacing the whole profile
   if (updates.profile) {
@@ -247,36 +254,8 @@ export async function deleteCharacter(
 
 // ============ World Setting Handlers ============
 
-export async function getWorldSetting(
-  args: { id: string },
-  db: Db
-): Promise<unknown> {
-  const setting = await db
-    .collection("world_settings")
-    .findOne({ _id: toObjectId(args.id) });
-  if (!setting) return { error: `World setting not found: ${args.id}` };
-  return serialize(setting);
-}
-
-export async function listWorldSettings(
-  args: { worldId?: string; projectId?: string; category?: string },
-  db: Db
-): Promise<unknown> {
-  const filter: Record<string, unknown> = {};
-  if (args.worldId) filter.worldId = new ObjectId(args.worldId);
-  else if (args.projectId) filter.projectId = new ObjectId(args.projectId);
-  if (args.category) filter.category = args.category;
-
-  const settings = await db
-    .collection("world_settings")
-    .find(filter)
-    .sort({ category: 1, title: 1 })
-    .toArray();
-  return serialize(settings);
-}
-
 export async function createWorldSetting(
-  args: { worldId?: string; projectId?: string; category: string; title: string; content?: string; tags?: string[] },
+  args: { worldId?: string; projectId?: string; category: string; title: string; content?: string; tags?: string[]; importance?: string; summary?: string },
   db: Db,
   userId?: string
 ): Promise<unknown> {
@@ -290,6 +269,8 @@ export async function createWorldSetting(
     title: args.title,
     content: args.content ?? "",
     tags: args.tags ?? [],
+    importance: args.importance ?? "minor",
+    summary: args.summary ?? "",
     createdAt: now,
     updatedAt: now,
   };
@@ -299,7 +280,7 @@ export async function createWorldSetting(
 }
 
 export async function updateWorldSetting(
-  args: { id: string; category?: string; title?: string; content?: string; tags?: string[] },
+  args: { id: string; category?: string; title?: string; content?: string; tags?: string[]; importance?: string; summary?: string },
   db: Db
 ): Promise<unknown> {
   const { id, ...updates } = args;
@@ -308,6 +289,8 @@ export async function updateWorldSetting(
   if (updates.title !== undefined) setFields.title = updates.title;
   if (updates.content !== undefined) setFields.content = updates.content;
   if (updates.tags !== undefined) setFields.tags = updates.tags;
+  if (updates.importance !== undefined) setFields.importance = updates.importance;
+  if (updates.summary !== undefined) setFields.summary = updates.summary;
 
   const result = await db
     .collection("world_settings")
