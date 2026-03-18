@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
 import { createProjectSchema, updateProjectSchema, objectIdSchema } from "@ai-novel/types";
-import { router, protectedProcedure } from "../trpc.js";
+import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 
 function serializeDoc(doc: any) {
   if (!doc) return null;
@@ -13,7 +13,7 @@ export const projectRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const docs = await ctx.db
       .collection("projects")
-      .find({ userId: ctx.user.userId })
+      .find({ userId: userIdFilter(ctx.user.userId) })
       .sort({ updatedAt: -1 })
       .toArray();
     return docs.map(serializeDoc);
@@ -24,7 +24,7 @@ export const projectRouter = router({
     .query(async ({ ctx, input }) => {
       const doc = await ctx.db
         .collection("projects")
-        .findOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
+        .findOne({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
       return serializeDoc(doc);
     }),
 
@@ -62,7 +62,7 @@ export const projectRouter = router({
       const result = await ctx.db
         .collection("projects")
         .findOneAndUpdate(
-          { _id: new ObjectId(input.id), userId: ctx.user.userId },
+          { _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) },
           { $set: updateFields },
           { returnDocument: "after" }
         );
@@ -74,7 +74,7 @@ export const projectRouter = router({
     .query(async ({ ctx, input }) => {
       const docs = await ctx.db
         .collection("projects")
-        .find({ worldId: input.worldId, userId: ctx.user.userId })
+        .find({ worldId: input.worldId, userId: userIdFilter(ctx.user.userId) })
         .sort({ updatedAt: -1 })
         .toArray();
       return docs.map(serializeDoc);
@@ -85,7 +85,7 @@ export const projectRouter = router({
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .collection("projects")
-        .deleteOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
+        .deleteOne({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
       return { success: true };
     }),
 });

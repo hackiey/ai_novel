@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
 import { createWorldSchema, updateWorldSchema, objectIdSchema } from "@ai-novel/types";
-import { router, protectedProcedure } from "../trpc.js";
+import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 
 function serializeDoc(doc: any) {
   if (!doc) return null;
@@ -13,7 +13,7 @@ export const worldRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const docs = await ctx.db
       .collection("worlds")
-      .find({ userId: ctx.user.userId })
+      .find({ userId: userIdFilter(ctx.user.userId) })
       .sort({ updatedAt: -1 })
       .toArray();
     return docs.map(serializeDoc);
@@ -24,7 +24,7 @@ export const worldRouter = router({
     .query(async ({ ctx, input }) => {
       const doc = await ctx.db
         .collection("worlds")
-        .findOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
+        .findOne({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
       return serializeDoc(doc);
     }),
 
@@ -55,7 +55,7 @@ export const worldRouter = router({
       const result = await ctx.db
         .collection("worlds")
         .findOneAndUpdate(
-          { _id: new ObjectId(input.id), userId: ctx.user.userId },
+          { _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) },
           { $set: updateFields },
           { returnDocument: "after" }
         );
@@ -67,7 +67,7 @@ export const worldRouter = router({
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .collection("worlds")
-        .deleteOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
+        .deleteOne({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
       return { success: true };
     }),
 });

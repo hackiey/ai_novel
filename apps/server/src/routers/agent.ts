@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
-import { router, protectedProcedure } from "../trpc.js";
+import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { objectIdSchema } from "@ai-novel/types";
 import { sessions } from "../routes/agentStream.js";
 
@@ -31,7 +31,7 @@ export const agentRouter = router({
     .query(async ({ ctx, input }) => {
       const docs = await ctx.db
         .collection("agent_sessions")
-        .find({ worldId: input.worldId, userId: ctx.user.userId })
+        .find({ worldId: input.worldId, userId: userIdFilter(ctx.user.userId) })
         .sort({ updatedAt: -1 })
         .toArray();
       return docs.map((doc) => {
@@ -46,7 +46,7 @@ export const agentRouter = router({
       // Verify session belongs to user
       const session = await ctx.db.collection("agent_sessions").findOne({
         sessionId: input.sessionId,
-        userId: ctx.user.userId,
+        userId: userIdFilter(ctx.user.userId),
       });
       if (!session) return [];
 
@@ -67,7 +67,7 @@ export const agentRouter = router({
       // Verify session belongs to user
       const session = await ctx.db.collection("agent_sessions").findOne({
         sessionId: input.sessionId,
-        userId: ctx.user.userId,
+        userId: userIdFilter(ctx.user.userId),
       });
       if (!session) throw new Error("Session not found");
 
@@ -95,7 +95,7 @@ export const agentRouter = router({
         session.close();
         sessions.delete(input.sessionId);
       }
-      await ctx.db.collection("agent_sessions").deleteOne({ sessionId: input.sessionId, userId: ctx.user.userId });
+      await ctx.db.collection("agent_sessions").deleteOne({ sessionId: input.sessionId, userId: userIdFilter(ctx.user.userId) });
       await ctx.db.collection("agent_messages").deleteMany({ sessionId: input.sessionId });
       return { success: true };
     }),

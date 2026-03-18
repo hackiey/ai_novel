@@ -19,6 +19,7 @@ export class NovelAgentSession {
   private db: Db;
   private projectId: string;
   private worldId?: string;
+  private userId?: string;
   private apiKey: string;
   private baseURL?: string;
   private abortController?: AbortController;
@@ -32,6 +33,7 @@ export class NovelAgentSession {
     db: Db;
     projectId: string;
     worldId?: string;
+    userId?: string;
     vectorSearchFn?: VectorSearchFn;
     onDocumentChanged?: OnDocumentChangedFn;
   }) {
@@ -41,6 +43,7 @@ export class NovelAgentSession {
     this.db = options.db;
     this.projectId = options.projectId;
     this.worldId = options.worldId;
+    this.userId = options.userId;
     this.vectorSearchFn = options.vectorSearchFn;
     this.onDocumentChanged = options.onDocumentChanged;
   }
@@ -61,7 +64,7 @@ export class NovelAgentSession {
       memory,
     );
 
-    const novelToolsServer = createNovelToolsServer(this.db, this.vectorSearchFn, this.onDocumentChanged);
+    const novelToolsServer = createNovelToolsServer(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId);
     const abortController = new AbortController();
     this.abortController = abortController;
 

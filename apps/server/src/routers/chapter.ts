@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
 import { createChapterSchema, updateChapterSchema, objectIdSchema } from "@ai-novel/types";
-import { router, protectedProcedure } from "../trpc.js";
+import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 
 function serializeDoc(doc: any) {
@@ -25,7 +25,7 @@ export const chapterRouter = router({
     .query(async ({ ctx, input }) => {
       const docs = await ctx.db
         .collection("chapters")
-        .find({ projectId: { $in: [input.projectId, new ObjectId(input.projectId)] }, userId: ctx.user.userId })
+        .find({ projectId: { $in: [input.projectId, new ObjectId(input.projectId)] }, userId: userIdFilter(ctx.user.userId) })
         .sort({ order: 1 })
         .toArray();
       return docs.map(serializeDoc);
@@ -36,7 +36,7 @@ export const chapterRouter = router({
     .query(async ({ ctx, input }) => {
       const doc = await ctx.db
         .collection("chapters")
-        .findOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
+        .findOne({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
       return serializeDoc(doc);
     }),
 
@@ -93,7 +93,7 @@ export const chapterRouter = router({
       const result = await ctx.db
         .collection("chapters")
         .findOneAndUpdate(
-          { _id: new ObjectId(input.id), userId: ctx.user.userId },
+          { _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) },
           { $set: updateFields },
           { returnDocument: "after" }
         );
@@ -106,7 +106,7 @@ export const chapterRouter = router({
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .collection("chapters")
-        .deleteOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
+        .deleteOne({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
       return { success: true };
     }),
 
@@ -125,7 +125,7 @@ export const chapterRouter = router({
           filter: {
             _id: new ObjectId(item.id),
             projectId: { $in: [input.projectId, new ObjectId(input.projectId)] },
-            userId: ctx.user.userId,
+            userId: userIdFilter(ctx.user.userId),
           },
           update: { $set: { order: item.order, updatedAt: now } },
         },
@@ -137,7 +137,7 @@ export const chapterRouter = router({
 
       const docs = await ctx.db
         .collection("chapters")
-        .find({ projectId: { $in: [input.projectId, new ObjectId(input.projectId)] }, userId: ctx.user.userId })
+        .find({ projectId: { $in: [input.projectId, new ObjectId(input.projectId)] }, userId: userIdFilter(ctx.user.userId) })
         .sort({ order: 1 })
         .toArray();
       return docs.map(serializeDoc);

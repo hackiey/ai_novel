@@ -1,8 +1,13 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import { CreateFastifyContextOptions } from "@trpc/server/adapters/fastify";
-import { Db } from "mongodb";
+import { Db, ObjectId } from "mongodb";
 import { getDb } from "./db.js";
 import { verifyToken, type JwtPayload } from "./auth/jwt.js";
+
+/** Build a MongoDB filter that matches userId stored as either string or ObjectId */
+export function userIdFilter(userId: string) {
+  return { $in: [userId, new ObjectId(userId)] };
+}
 
 export interface Context {
   db: Db;

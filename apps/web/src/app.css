@@ -11,6 +11,12 @@ body {
   min-height: 100vh;
 }
 
+button,
+[role="button"],
+a {
+  cursor: pointer;
+}
+
 /* TipTap editor typography — restore heading/block styles reset by Tailwind preflight */
 .tiptap h1 {
   font-size: 2em;

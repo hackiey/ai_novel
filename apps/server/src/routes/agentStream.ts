@@ -88,6 +88,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
         db,
         projectId,
         worldId,
+        userId: user.userId,
         vectorSearchFn,
         onDocumentChanged: embeddingSvc
           ? (collection, id) => embeddingSvc.enqueue(collection, id)

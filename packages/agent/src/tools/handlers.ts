@@ -171,7 +171,8 @@ export async function listCharacters(
 
 export async function createCharacter(
   args: { worldId?: string; projectId?: string; name: string; role?: string; aliases?: string[]; profile?: Record<string, unknown> },
-  db: Db
+  db: Db,
+  userId?: string
 ): Promise<unknown> {
   const now = new Date();
   const ownerId = args.worldId || args.projectId;
@@ -194,6 +195,7 @@ export async function createCharacter(
     createdAt: now,
     updatedAt: now,
   };
+  if (userId) doc.userId = userId;
   const result = await db.collection("characters").insertOne(doc);
   return serialize({ ...doc, _id: result.insertedId });
 }
@@ -275,7 +277,8 @@ export async function listWorldSettings(
 
 export async function createWorldSetting(
   args: { worldId?: string; projectId?: string; category: string; title: string; content?: string; tags?: string[] },
-  db: Db
+  db: Db,
+  userId?: string
 ): Promise<unknown> {
   const now = new Date();
   const ownerId = args.worldId || args.projectId;
@@ -290,6 +293,7 @@ export async function createWorldSetting(
     createdAt: now,
     updatedAt: now,
   };
+  if (userId) doc.userId = userId;
   const result = await db.collection("world_settings").insertOne(doc);
   return serialize({ ...doc, _id: result.insertedId });
 }
@@ -358,7 +362,8 @@ export async function listChapters(
 
 export async function createChapter(
   args: { projectId: string; title: string; content?: string; synopsis?: string; order?: number },
-  db: Db
+  db: Db,
+  userId?: string
 ): Promise<unknown> {
   const now = new Date();
   const content = args.content ?? "";
@@ -374,7 +379,7 @@ export async function createChapter(
     order = lastChapter.length > 0 ? (lastChapter[0].order as number) + 1 : 0;
   }
 
-  const doc = {
+  const doc: Record<string, unknown> = {
     projectId: new ObjectId(args.projectId),
     order,
     title: args.title,
@@ -385,6 +390,7 @@ export async function createChapter(
     createdAt: now,
     updatedAt: now,
   };
+  if (userId) doc.userId = userId;
   const result = await db.collection("chapters").insertOne(doc);
   return serialize({ ...doc, _id: result.insertedId });
 }
@@ -498,7 +504,8 @@ export async function createDraft(
     linkedCharacters?: string[];
     linkedWorldSettings?: string[];
   },
-  db: Db
+  db: Db,
+  userId?: string
 ): Promise<unknown> {
   const now = new Date();
   const doc: Record<string, any> = {
@@ -510,6 +517,7 @@ export async function createDraft(
     createdAt: now,
     updatedAt: now,
   };
+  if (userId) doc.userId = userId;
   if (args.projectId) doc.projectId = new ObjectId(args.projectId);
   if (args.worldId) doc.worldId = new ObjectId(args.worldId);
   const result = await db.collection("drafts").insertOne(doc);

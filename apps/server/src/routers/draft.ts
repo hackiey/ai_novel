@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ObjectId, Filter } from "mongodb";
 import { createDraftSchema, updateDraftSchema, objectIdSchema } from "@ai-novel/types";
-import { router, protectedProcedure } from "../trpc.js";
+import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 
 function serializeDoc(doc: any) {
@@ -17,7 +17,7 @@ export const draftRouter = router({
       worldId: objectIdSchema.optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const filter: Filter<any> = { userId: ctx.user.userId };
+      const filter: Filter<any> = { userId: userIdFilter(ctx.user.userId) };
       if (input.projectId) filter.projectId = { $in: [input.projectId, new ObjectId(input.projectId)] };
       if (input.worldId) filter.worldId = { $in: [input.worldId, new ObjectId(input.worldId)] };
       const docs = await ctx.db
@@ -33,7 +33,7 @@ export const draftRouter = router({
     .query(async ({ ctx, input }) => {
       const doc = await ctx.db
         .collection("drafts")
-        .findOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
+        .findOne({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
       return serializeDoc(doc);
     }),
 
@@ -73,7 +73,7 @@ export const draftRouter = router({
       const result = await ctx.db
         .collection("drafts")
         .findOneAndUpdate(
-          { _id: new ObjectId(input.id), userId: ctx.user.userId },
+          { _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) },
           { $set: updateFields },
           { returnDocument: "after" }
         );
@@ -86,7 +86,7 @@ export const draftRouter = router({
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .collection("drafts")
-        .deleteOne({ _id: new ObjectId(input.id), userId: ctx.user.userId });
+        .deleteOne({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
       return { success: true };
     }),
 });

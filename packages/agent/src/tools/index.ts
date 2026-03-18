@@ -13,7 +13,7 @@ export type VectorSearchFn = (args: {
 
 export type OnDocumentChangedFn = (collection: string, id: string) => void;
 
-export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, onDocumentChanged?: OnDocumentChangedFn) {
+export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, onDocumentChanged?: OnDocumentChangedFn, userId?: string) {
   return createSdkMcpServer({
     name: "novel-tools",
     version: "1.0.0",
@@ -126,7 +126,7 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
             .describe("角色详细信息"),
         },
         async (args) => {
-          const result = await handlers.createCharacter(args, db);
+          const result = await handlers.createCharacter(args, db, userId);
           if ((result as any)?._id) onDocumentChanged?.("characters", String((result as any)._id));
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
@@ -199,7 +199,7 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
           tags: z.array(z.string()).optional().describe("标签"),
         },
         async (args) => {
-          const result = await handlers.createWorldSetting(args, db);
+          const result = await handlers.createWorldSetting(args, db, userId);
           if ((result as any)?._id) onDocumentChanged?.("world_settings", String((result as any)._id));
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
@@ -228,7 +228,7 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
           order: z.number().optional().describe("章节排序，不指定则自动排在最后"),
         },
         async (args) => {
-          const result = await handlers.createChapter(args, db);
+          const result = await handlers.createChapter(args, db, userId);
           if ((result as any)?._id) onDocumentChanged?.("chapters", String((result as any)._id));
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }
@@ -327,7 +327,7 @@ export function createNovelToolsServer(db: Db, vectorSearchFn?: VectorSearchFn, 
           linkedWorldSettings: z.array(z.string()).optional().describe("关联世界观设定ID列表"),
         },
         async (args) => {
-          const result = await handlers.createDraft(args, db);
+          const result = await handlers.createDraft(args, db, userId);
           if ((result as any)?._id) onDocumentChanged?.("drafts", String((result as any)._id));
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         }

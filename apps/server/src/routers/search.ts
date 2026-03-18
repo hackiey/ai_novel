@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { objectIdSchema } from "@ai-novel/types";
-import { router, protectedProcedure } from "../trpc.js";
+import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 
 export const searchRouter = router({
@@ -49,7 +49,7 @@ export const searchRouter = router({
       }> = [];
 
       // Build base filter from projectId/worldId
-      const baseFilter: Record<string, any> = { userId: ctx.user.userId };
+      const baseFilter: Record<string, any> = { userId: userIdFilter(ctx.user.userId) };
       if (input.projectId) baseFilter.projectId = input.projectId;
       if (input.worldId) baseFilter.worldId = input.worldId;
 
@@ -69,7 +69,7 @@ export const searchRouter = router({
           const orConditions = fields.map((field) => ({ [field]: regex }));
 
           // Characters and world_settings use worldId, chapters use projectId
-          const collFilter: Record<string, any> = { userId: ctx.user.userId };
+          const collFilter: Record<string, any> = { userId: userIdFilter(ctx.user.userId) };
           if (collName === "characters" || collName === "world_settings") {
             if (input.worldId) collFilter.worldId = input.worldId;
           } else if (collName === "chapters") {
