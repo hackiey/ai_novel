@@ -55,7 +55,10 @@
       "Bash(node:*)",
       "Bash(npx tsx:*)",
       "Bash(cd:*)",
-      "Bash(pnpm:*)"
+      "Bash(pnpm:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx expo:*)",
+      "Bash(ls:*)"
     ]
   }
 }

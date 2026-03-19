@@ -8,17 +8,27 @@
     "build": "echo 'Mobile build configured'"
   },
   "dependencies": {
-    "expo": "~52.0.0",
-    "expo-router": "~4.0.0",
-    "react": "^19.0.0",
-    "react-native": "^0.77.0",
-    "react-native-safe-area-context": "~5.1.0",
-    "react-native-screens": "~4.4.0",
+    "@expo/metro-runtime": "^6.1.2",
+    "@react-native-async-storage/async-storage": "^2.2.0",
     "@tanstack/react-query": "^5.64.0",
-    "nativewind": "^4.1.0"
+    "@trpc/client": "^11.0.0",
+    "@trpc/react-query": "^11.0.0",
+    "expo": "~54.0.33",
+    "expo-constants": "~18.0.13",
+    "expo-linking": "^8.0.11",
+    "expo-router": "~6.0.23",
+    "i18next": "^25.8.18",
+    "react": "^19.1.0",
+    "react-dom": "19.1.0",
+    "react-i18next": "^16.5.8",
+    "react-native": "^0.81.5",
+    "react-native-markdown-display": "^7.0.2",
+    "react-native-safe-area-context": "~5.6.2",
+    "react-native-screens": "~4.16.0",
+    "superjson": "^2.2.6"
   },
   "devDependencies": {
-    "@types/react": "^19.0.0",
+    "@types/react": "^19.1.17",
     "typescript": "^5.7.0"
   }
 }
