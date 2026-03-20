@@ -61,7 +61,10 @@ export async function semanticSearch(
 ): Promise<unknown> {
   const { query, limit = 5 } = args;
   const scope = args.scope ?? ["character", "world", "draft", "chapter"];
-  const regex = { $regex: query, $options: "i" };
+  // Split query by whitespace and join with | for OR matching, escape special regex chars
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = escaped.trim().split(/\s+/).join("|");
+  const regex = { $regex: pattern, $options: "i" };
   const worldFilter: Record<string, any> = {};
   if (args.worldId) worldFilter.worldId = new ObjectId(args.worldId);
   const projectFilter: Record<string, any> = {};

@@ -3,28 +3,129 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Typography from "@tiptap/extension-typography";
 import Underline from "@tiptap/extension-underline";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { marked } from "marked";
 import { EditorToolbar } from "./EditorToolbar";
 
-/** Convert plain text (no HTML tags) to <p>-wrapped paragraphs for TipTap */
+// Configure marked for synchronous rendering, no extra wrappers
+marked.use({
+  async: false,
+  gfm: true,
+  breaks: true, // Convert single \n to <br>
+});
+
+const markdownPattern = /^(?:\s{0,3}(?:[-*+]\s+|\d+\.\s+|>\s+|#{1,6}\s+|```|~~~)|\|.+\||(?:-{3,}|_{3,}|\*{3,})\s*$)|(?:\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\[[^\]]+\]\([^)]+\))/m;
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function wrapPlainTextParagraphs(text: string): string {
+  return text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `<p>${escapeHtml(line)}</p>`)
+    .join("");
+}
+
+function looksLikeMarkdown(text: string): boolean {
+  return markdownPattern.test(text);
+}
+
+/**
+ * Detect whether content is already well-structured HTML (multiple block elements).
+ * If so, return as-is. Otherwise, treat as plain text or markdown and convert to HTML.
+ */
 function normalizeContent(content: string): string {
-  if (!content) return content;
-  // If content already contains HTML block tags, assume it's HTML
-  if (/<(?:p|h[1-6]|ul|ol|li|blockquote|pre|div|table|hr)\b/i.test(content)) {
+  if (!content || !content.trim()) return "";
+
+  // Count existing block-level HTML elements
+  const blockTags = content.match(/<(?:p|h[1-6]|ul|ol|blockquote|pre|hr|div|table)\b/gi);
+  if (blockTags && blockTags.length > 1) {
+    // Already has multiple block elements — well-structured HTML
     return content;
   }
-  // Plain text: split by blank lines (or single newlines) into paragraphs
-  const paragraphs = content.split(/\n{2,}/);
-  return paragraphs
-    .map((p) => {
-      const trimmed = p.trim();
-      if (!trimmed) return "";
-      // Convert remaining single newlines within a paragraph to <br>
-      const html = trimmed.replace(/\n/g, "<br>");
-      return `<p>${html}</p>`;
-    })
-    .filter(Boolean)
-    .join("");
+
+  // Extract raw text: strip all HTML, convert <br> and closing block tags to \n
+  let text = content;
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  text = text.replace(/<\/(?:p|div|h[1-6])>/gi, "\n");
+  text = text.replace(/<[^>]+>/g, "");
+  // Decode common HTML entities
+  text = text
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+  text = text.trim();
+
+  if (!text) return "";
+
+  text = text.replace(/\r\n?/g, "\n");
+
+  // Check if text has any line breaks to split on
+  const hasLineBreaks = /\n/.test(text);
+
+  if (hasLineBreaks) {
+    if (looksLikeMarkdown(text)) {
+      // Use marked when the source contains actual markdown syntax.
+      const html = marked.parse(text) as string;
+      return html.trim();
+    }
+
+    return wrapPlainTextParagraphs(text);
+  }
+
+  // No line breaks at all — single continuous text block.
+  // Wrap in a single <p>.
+  return `<p>${escapeHtml(text)}</p>`;
+}
+
+/**
+ * Handle paste: convert plain text clipboard content into properly paragraphed HTML.
+ * This ensures pasting from external sources preserves line breaks.
+ */
+function handlePaste(
+  view: any,
+  event: ClipboardEvent,
+): boolean {
+  const clipboardData = event.clipboardData;
+  if (!clipboardData) return false;
+
+  // If there's HTML content, let TipTap handle it natively
+  const html = clipboardData.getData("text/html");
+  if (html) return false;
+
+  // Get plain text
+  const text = clipboardData.getData("text/plain");
+  if (!text) return false;
+
+  // Check if text has paragraph-like structure (multiple lines)
+  if (!text.includes("\n")) return false;
+
+  // Convert text to the same normalized structure used for initial/appended content.
+  const converted = normalizeContent(text);
+  if (!converted.trim()) return false;
+
+  // Insert converted HTML
+  event.preventDefault();
+
+  // Use TipTap's insertContent which handles HTML parsing
+  const editor = (view as any).__tiptapEditor;
+  if (editor) {
+    editor.commands.insertContent(converted);
+    return true;
+  }
+
+  return false;
 }
 
 export interface NovelEditorProps {
@@ -59,8 +160,6 @@ export function NovelEditor({
   onUpdateRef.current = onUpdate;
   const contentRef = useRef(content);
   contentRef.current = content;
-  // Tracks the latest editor HTML from user edits only (not from prop sync).
-  // Used to flush pending saves on unmount.
   const dirtyHtmlRef = useRef<string | null>(null);
 
   const debouncedUpdate = useCallback(
@@ -74,7 +173,7 @@ export function NovelEditor({
     [autoSaveMs],
   );
 
-  const normalizedContent = normalizeContent(content);
+  const initialContent = useMemo(() => normalizeContent(content), []);
 
   const editor = useEditor({
     extensions: [
@@ -83,7 +182,7 @@ export function NovelEditor({
       Typography,
       Underline,
     ],
-    content: normalizedContent,
+    content: initialContent,
     editable,
     onUpdate: ({ editor: ed }) => {
       isInternalUpdate.current = true;
@@ -95,27 +194,37 @@ export function NovelEditor({
     editorProps: {
       attributes: {
         class:
-          "tiptap focus:outline-none px-6 py-4 leading-relaxed text-gray-800 text-lg",
+          "tiptap h-full overflow-y-auto box-border focus:outline-none px-6 py-4 leading-relaxed text-gray-800 text-lg",
       },
+      handlePaste,
     },
   });
 
-  // Compute word/char counts whenever the editor document changes
+  // Store editor reference on the ProseMirror view for paste handler
+  useEffect(() => {
+    if (editor?.view) {
+      (editor.view as any).__tiptapEditor = editor;
+    }
+  }, [editor]);
+
+  // Word/char count
   useEffect(() => {
     if (!editor) return;
 
     const updateStats = () => {
-      const text = editor.state.doc.textBetween(0, editor.state.doc.content.size, " ", " ");
+      const text = editor.state.doc.textBetween(
+        0,
+        editor.state.doc.content.size,
+        " ",
+        " ",
+      );
       const c = text.length;
       const w = text.split(/\s+/).filter((s) => s.length > 0).length;
       setWords(w);
       setChars(c);
     };
 
-    // Initial count
     updateStats();
-
-    // Listen to every transaction
     editor.on("transaction", updateStats);
     return () => {
       editor.off("transaction", updateStats);
@@ -128,38 +237,41 @@ export function NovelEditor({
     }
   }, [editor, editable]);
 
+  // Sync content from props (e.g., when server data updates)
   useEffect(() => {
     if (!editor) return;
     if (isInternalUpdate.current) {
       isInternalUpdate.current = false;
       return;
     }
-    const currentHTML = editor.getHTML();
     const normalized = normalizeContent(content);
+    const currentHTML = editor.getHTML();
     if (normalized !== currentHTML) {
       editor.commands.setContent(normalized, false);
     }
   }, [content, editor]);
 
+  // Append text from agent
   const prevAppendText = useRef<string | undefined>(undefined);
-
   useEffect(() => {
     if (!editor || !appendText) return;
     if (appendText === prevAppendText.current) return;
     prevAppendText.current = appendText;
 
-    editor.chain().focus("end").insertContent(appendText).run();
+    // Convert appended text through normalizeContent too
+    const html = normalizeContent(appendText);
+    editor.chain().focus("end").insertContent(html).run();
 
-    const html = editor.getHTML();
-    contentRef.current = html;
-    onUpdateRef.current(html);
+    const editorHtml = editor.getHTML();
+    contentRef.current = editorHtml;
+    onUpdateRef.current(editorHtml);
   }, [appendText, editor]);
 
+  // Flush pending save on unmount
   useEffect(() => {
     return () => {
       if (debounceTimer.current) {
         clearTimeout(debounceTimer.current);
-        // Flush pending save on unmount so edits aren't lost on chapter switch
         if (dirtyHtmlRef.current !== null) {
           onUpdateRef.current(dirtyHtmlRef.current);
           dirtyHtmlRef.current = null;
@@ -170,12 +282,16 @@ export function NovelEditor({
 
   return (
     <div
-      className={`flex flex-col border border-gray-200 rounded-lg bg-white ${className ?? ""}`}
+      className={`flex min-h-0 flex-col border border-gray-200 rounded-lg bg-white ${className ?? ""}`}
     >
-      <EditorToolbar editor={editor} onDelete={onDelete} deleteTitle={deleteTitle} />
+      <EditorToolbar
+        editor={editor}
+        onDelete={onDelete}
+        deleteTitle={deleteTitle}
+      />
 
       <div
-        className="flex-1 overflow-y-auto cursor-text"
+        className="flex-1 min-h-0 cursor-text overflow-hidden"
         onClick={(e) => {
           if (!editor) return;
           const target = e.target as HTMLElement;
@@ -183,12 +299,16 @@ export function NovelEditor({
           editor.chain().focus("end").run();
         }}
       >
-        <EditorContent editor={editor} />
+        <EditorContent editor={editor} className="h-full" />
       </div>
 
-      <div className="flex items-center justify-end gap-4 border-t border-gray-200 px-4 py-1.5 text-xs text-gray-400">
-        <span>{words} {words === 1 ? "word" : "words"}</span>
-        <span>{chars} {chars === 1 ? "character" : "characters"}</span>
+      <div className="flex items-center justify-end gap-4 border-t border-gray-200 px-4 py-1.5 text-xs text-gray-400 shrink-0">
+        <span>
+          {words} {words === 1 ? "word" : "words"}
+        </span>
+        <span>
+          {chars} {chars === 1 ? "character" : "characters"}
+        </span>
       </div>
     </div>
   );
