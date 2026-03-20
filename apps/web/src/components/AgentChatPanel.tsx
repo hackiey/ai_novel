@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { BotMessageSquare, Check, ChevronRight, History, Loader2, Pencil, Plus, RotateCcw, X } from "lucide-react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { BotMessageSquare, History, Loader2, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import { getToken } from "../lib/auth.js";
+import { AgentEvent, AssistantMessageContent } from "./AgentMessageDisplay.js";
 
 const API_BASE = "http://localhost:3001";
 
@@ -24,17 +23,6 @@ const MUTATION_TOOL_INVALIDATIONS: Record<string, string[][]> = {
   delete_draft: [["draft"]],
 };
 
-interface AgentEvent {
-  type: "text" | "tool_use" | "tool_result" | "done" | "error" | "session";
-  text?: string;
-  toolName?: string;
-  toolInput?: any;
-  result?: any;
-  fullResponse?: string;
-  error?: string;
-  sessionId?: string;
-}
-
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -46,177 +34,6 @@ interface Props {
   projectId?: string;
   worldId?: string;
   onAgentAppend?: (text: string) => void;
-}
-
-type Segment =
-  | { type: "text"; content: string }
-  | { type: "tools"; calls: Array<{ toolName: string; toolInput?: any; result?: string; pending?: boolean }> };
-
-/** Split flat event list into ordered text/tool segments */
-function buildSegments(events: AgentEvent[] | undefined, content: string, isStreaming: boolean): Segment[] {
-  if (!events || events.length === 0) {
-    return content ? [{ type: "text", content }] : [];
-  }
-
-  const segments: Segment[] = [];
-  let textAcc = "";
-  let currentToolGroup: Segment & { type: "tools" } | null = null;
-  // Track tool_use count and tool_result count to match them
-  const toolUseList: Array<{ toolName: string; toolInput?: any; result?: string; pending?: boolean }> = [];
-  let resultIdx = 0;
-
-  for (const ev of events) {
-    if (ev.type === "text") {
-      // Flush any pending tool group
-      if (currentToolGroup) {
-        segments.push(currentToolGroup);
-        currentToolGroup = null;
-      }
-      textAcc += ev.text || "";
-    } else if (ev.type === "tool_use") {
-      // Flush accumulated text
-      if (textAcc.trim()) {
-        segments.push({ type: "text", content: textAcc });
-        textAcc = "";
-      }
-      if (!currentToolGroup) {
-        currentToolGroup = { type: "tools", calls: [] };
-      }
-      const call = { toolName: ev.toolName || "unknown", toolInput: ev.toolInput, pending: true };
-      currentToolGroup.calls.push(call);
-      toolUseList.push(call);
-    } else if (ev.type === "tool_result") {
-      // Match result to the corresponding tool_use by order
-      if (resultIdx < toolUseList.length) {
-        toolUseList[resultIdx].result = ev.result;
-        toolUseList[resultIdx].pending = false;
-        resultIdx++;
-      }
-    }
-  }
-
-  // If streaming and there are pending tool calls with no result yet, mark them
-  if (isStreaming) {
-    for (const call of toolUseList) {
-      if (call.pending && call.result === undefined) {
-        call.pending = true;
-      }
-    }
-  } else {
-    // Not streaming — nothing is pending
-    for (const call of toolUseList) {
-      call.pending = false;
-    }
-  }
-
-  // Flush remaining
-  if (currentToolGroup) {
-    segments.push(currentToolGroup);
-  }
-  if (textAcc.trim()) {
-    segments.push({ type: "text", content: textAcc });
-  }
-
-  return segments;
-}
-
-function ToolCallBlock({ toolName, toolInput, result, pending }: {
-  toolName: string;
-  toolInput?: any;
-  result?: string;
-  pending?: boolean;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const { t } = useTranslation();
-  const label = t(`tool.${toolName}`, toolName);
-
-  // Try to parse result for display
-  let parsedResult: any = null;
-  if (result) {
-    try {
-      parsedResult = JSON.parse(result);
-    } catch {
-      parsedResult = result;
-    }
-  }
-
-  return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 text-xs overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-gray-100 transition-colors text-left"
-      >
-        {pending ? (
-          <Loader2 className="w-3.5 h-3.5 text-teal-500 shrink-0 animate-spin" strokeWidth={2} />
-        ) : (
-          <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" strokeWidth={2} />
-        )}
-        <span className="text-gray-600 font-medium">{label}</span>
-        <span className="text-gray-400 font-mono text-[10px]">{toolName}</span>
-        <ChevronRight className={`w-3 h-3 text-gray-400 ml-auto shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`} />
-      </button>
-      {expanded && (
-        <div className="border-t border-gray-200 px-3 py-2 space-y-2 max-h-60 overflow-y-auto">
-          {toolInput && (
-            <div>
-              <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{t("chat.parameters")}</div>
-              <pre className="text-[11px] text-gray-600 bg-white rounded p-2 border border-gray-100 overflow-x-auto whitespace-pre-wrap break-all">
-                {JSON.stringify(toolInput, null, 2)}
-              </pre>
-            </div>
-          )}
-          {parsedResult !== null && (
-            <div>
-              <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{t("chat.results")}</div>
-              <pre className="text-[11px] text-gray-600 bg-white rounded p-2 border border-gray-100 overflow-x-auto whitespace-pre-wrap break-all max-h-40 overflow-y-auto">
-                {typeof parsedResult === "string" ? parsedResult : JSON.stringify(parsedResult, null, 2)}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AssistantMessageContent({ events, content, isStreaming }: {
-  events?: AgentEvent[];
-  content: string;
-  isStreaming: boolean;
-}) {
-  const { t } = useTranslation();
-  const segments = buildSegments(events, content, isStreaming);
-
-  if (segments.length === 0 && isStreaming) {
-    return (
-      <div className="flex items-center gap-2 text-xs text-teal-600">
-        <Loader2 className="w-4 h-4 animate-spin" />
-        <span>{t("chat.thinking")}</span>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {segments.map((seg, i) => {
-        if (seg.type === "text") {
-          return (
-            <div key={i} className="max-w-[90%] px-3 py-2 rounded-xl bg-white border border-gray-200 text-gray-800 text-sm shadow-sm agent-markdown">
-              <Markdown remarkPlugins={[remarkGfm]}>{seg.content}</Markdown>
-            </div>
-          );
-        }
-        // tools segment
-        return (
-          <div key={i} className="space-y-1 max-w-[90%]">
-            {seg.calls.map((call, j) => (
-              <ToolCallBlock key={j} {...call} />
-            ))}
-          </div>
-        );
-      })}
-    </>
-  );
 }
 
 export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Props) {
@@ -506,28 +323,27 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 shrink-0">
+      <div className="flex items-center justify-between px-4 py-1.5 border-b border-gray-200 shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-gray-700">{t("chat.aiAssistant")}</span>
           <button
             onClick={() => setShowHistory((v) => !v)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+            className={`p-1.5 rounded-md transition-colors ${
               showHistory
-                ? "bg-gray-100 text-gray-900 hover:bg-gray-200"
-                : "bg-white text-gray-600 border border-gray-200 shadow-sm hover:bg-gray-50"
+                ? "text-gray-900 hover:bg-gray-200"
+                : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
             }`}
-            title={t("chat.history")}
+            title={showHistory ? t("chat.close") : t("chat.history")}
           >
-            {showHistory ? <X className="w-3.5 h-3.5" /> : <History className="w-3.5 h-3.5" />}
-            {showHistory ? t("chat.close") : t("chat.history")}
+            {showHistory ? <X className="w-4 h-4" /> : <History className="w-4 h-4" />}
           </button>
         </div>
         <button
           onClick={handleNewSession}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white shadow-sm hover:bg-teal-500 transition-colors"
+          className="p-1.5 rounded-md bg-teal-600 text-white shadow-sm hover:bg-teal-500 transition-colors"
+          title={t("chat.newChat")}
         >
-          <Plus className="w-3.5 h-3.5" />
-          {t("chat.newChat")}
+          <Plus className="w-4 h-4" />
         </button>
       </div>
 

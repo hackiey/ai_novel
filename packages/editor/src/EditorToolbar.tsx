@@ -10,10 +10,13 @@ import {
   Minus,
   Undo,
   Redo,
+  Trash2,
 } from "lucide-react";
 
 interface EditorToolbarProps {
   editor: Editor | null;
+  onDelete?: () => void;
+  deleteTitle?: string;
 }
 
 interface ToolbarButtonProps {
@@ -56,7 +59,7 @@ function Separator() {
   return <div className="w-px h-6 bg-gray-200 mx-1" />;
 }
 
-export function EditorToolbar({ editor }: EditorToolbarProps) {
+export function EditorToolbar({ editor, onDelete, deleteTitle }: EditorToolbarProps) {
   if (!editor) {
     return null;
   }
@@ -188,6 +191,20 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       >
         <Redo className="w-4 h-4" strokeWidth={2} />
       </ToolbarButton>
+
+      {onDelete && (
+        <>
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={onDelete}
+            title={deleteTitle ?? "Delete"}
+            className="px-2 py-1 rounded text-sm font-medium transition-colors text-gray-400 hover:bg-red-50 hover:text-red-600"
+          >
+            <Trash2 className="w-4 h-4" strokeWidth={2} />
+          </button>
+        </>
+      )}
     </div>
   );
 }

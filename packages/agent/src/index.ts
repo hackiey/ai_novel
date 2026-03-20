@@ -5,5 +5,5 @@ export type { VectorSearchFn, OnDocumentChangedFn, OnWorldSummaryStaleFn } from 
 export { NovelAgentSession } from "./session.js";
 export type { AgentEvent } from "./session.js";
 export { buildWorldSummary, getOrRefreshWorldSummary } from "./worldSummary.js";
-export { resolveLocale } from "./i18n.js";
+export { resolveLocale, t } from "./i18n.js";
 export type { Locale } from "./i18n.js";

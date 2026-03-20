@@ -1,12 +1,14 @@
 import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
 import { fastifyTRPCPlugin, FastifyTRPCPluginOptions } from "@trpc/server/adapters/fastify";
 import { connectDb, disconnectDb } from "./db.js";
 import { createContext } from "./trpc.js";
 import { appRouter, AppRouter } from "./routers/index.js";
 import { initEmbeddingService } from "./services/embeddingService.js";
 import { registerAgentRoutes } from "./routes/agentStream.js";
+import { registerFileImportRoutes } from "./routes/fileImport.js";
 
 const PORT = Number(process.env.PORT) || 3001;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/ai_novel";
@@ -20,6 +22,11 @@ async function main() {
   // Register CORS
   await fastify.register(cors, {
     origin: true,
+  });
+
+  // Register multipart for file uploads (50MB limit)
+  await fastify.register(multipart, {
+    limits: { fileSize: 50 * 1024 * 1024 },
   });
 
   // Connect to MongoDB
@@ -58,6 +65,9 @@ async function main() {
 
   // Register Agent SSE routes (outside tRPC)
   registerAgentRoutes(fastify);
+
+  // Register file import routes
+  registerFileImportRoutes(fastify);
 
   // Health check endpoint
   fastify.get("/health", async () => {

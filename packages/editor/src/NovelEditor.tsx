@@ -6,6 +6,27 @@ import Underline from "@tiptap/extension-underline";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { EditorToolbar } from "./EditorToolbar";
 
+/** Convert plain text (no HTML tags) to <p>-wrapped paragraphs for TipTap */
+function normalizeContent(content: string): string {
+  if (!content) return content;
+  // If content already contains HTML block tags, assume it's HTML
+  if (/<(?:p|h[1-6]|ul|ol|li|blockquote|pre|div|table|hr)\b/i.test(content)) {
+    return content;
+  }
+  // Plain text: split by blank lines (or single newlines) into paragraphs
+  const paragraphs = content.split(/\n{2,}/);
+  return paragraphs
+    .map((p) => {
+      const trimmed = p.trim();
+      if (!trimmed) return "";
+      // Convert remaining single newlines within a paragraph to <br>
+      const html = trimmed.replace(/\n/g, "<br>");
+      return `<p>${html}</p>`;
+    })
+    .filter(Boolean)
+    .join("");
+}
+
 export interface NovelEditorProps {
   content: string;
   onUpdate: (content: string) => void;
@@ -14,6 +35,8 @@ export interface NovelEditorProps {
   autoSaveMs?: number;
   className?: string;
   appendText?: string;
+  onDelete?: () => void;
+  deleteTitle?: string;
 }
 
 export function NovelEditor({
@@ -24,6 +47,8 @@ export function NovelEditor({
   autoSaveMs = 2000,
   className,
   appendText,
+  onDelete,
+  deleteTitle,
 }: NovelEditorProps) {
   const [words, setWords] = useState(0);
   const [chars, setChars] = useState(0);
@@ -49,6 +74,8 @@ export function NovelEditor({
     [autoSaveMs],
   );
 
+  const normalizedContent = normalizeContent(content);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
@@ -56,7 +83,7 @@ export function NovelEditor({
       Typography,
       Underline,
     ],
-    content,
+    content: normalizedContent,
     editable,
     onUpdate: ({ editor: ed }) => {
       isInternalUpdate.current = true;
@@ -108,8 +135,9 @@ export function NovelEditor({
       return;
     }
     const currentHTML = editor.getHTML();
-    if (content !== currentHTML) {
-      editor.commands.setContent(content, false);
+    const normalized = normalizeContent(content);
+    if (normalized !== currentHTML) {
+      editor.commands.setContent(normalized, false);
     }
   }, [content, editor]);
 
@@ -144,7 +172,7 @@ export function NovelEditor({
     <div
       className={`flex flex-col border border-gray-200 rounded-lg bg-white ${className ?? ""}`}
     >
-      <EditorToolbar editor={editor} />
+      <EditorToolbar editor={editor} onDelete={onDelete} deleteTitle={deleteTitle} />
 
       <div
         className="flex-1 overflow-y-auto cursor-text"

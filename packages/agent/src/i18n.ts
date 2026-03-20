@@ -162,6 +162,28 @@ const zh = {
     generate_synopsis: "获取章节内容，用于生成章节梗概。返回章节全文供AI总结。",
     generate_synopsis_chapterId: "章节ID",
   },
+
+  // ── File import ──
+  fileImport: {
+    extractionPrompt: (chunkIndex: number, totalChunks: number) =>
+      `你正在帮助用户从上传的文件中提取角色和世界观设定。这是文件的第 ${chunkIndex + 1}/${totalChunks} 段。
+
+请仔细阅读以下文本，从中提取：
+1. **角色** — 提取明确出现的角色，包括名称(name)、角色类型(role)、重要性(importance)、一句话简介(summary)、以及详细信息(profile: appearance/personality/background/goals)
+2. **世界观设定** — 提取明确描述的世界观设定，包括分类(category)、标题(title)、内容(content)、重要性(importance)、一句话简介(summary)
+
+**重要规则：**
+- 开始前请先查看世界观概览（使用 semantic_search），了解已有的角色和设定，避免重复创建
+- 如果某个角色或设定已存在，使用 update 而非 create，将新信息合并到已有条目中
+- 只提取文本中明确提到的信息，不要推测或编造
+- 忽略模糊泛指的角色（如"路人"、"众人"、"士兵们"等）
+- 根据角色在故事中的重要程度设置 importance：主角/核心角色用 core，重要配角用 major，一般角色用 minor
+- 世界观设定的 category 请使用合理的分类（如：地理、历史、政治、魔法体系、科技、文化、组织等）
+
+完成提取后，请简要总结本段提取了哪些角色和设定。`,
+    chunkLabel: (chunkIndex: number, totalChunks: number) =>
+      `以下是文件第 ${chunkIndex + 1}/${totalChunks} 段的内容：`,
+  },
 };
 
 const en: typeof zh = {
@@ -318,6 +340,28 @@ const en: typeof zh = {
 
     generate_synopsis: "Retrieve chapter content for generating a chapter synopsis. Returns the full chapter text for AI summarization.",
     generate_synopsis_chapterId: "Chapter ID",
+  },
+
+  // ── File import ──
+  fileImport: {
+    extractionPrompt: (chunkIndex: number, totalChunks: number) =>
+      `You are helping the user extract characters and world settings from an uploaded file. This is chunk ${chunkIndex + 1}/${totalChunks} of the file.
+
+Please carefully read the following text and extract:
+1. **Characters** — Extract explicitly mentioned characters, including name, role, importance, summary, and profile details (appearance/personality/background/goals)
+2. **World Settings** — Extract explicitly described world settings, including category, title, content, importance, and summary
+
+**Important rules:**
+- Before starting, review the world overview (use semantic_search) to understand existing characters and settings, and avoid creating duplicates
+- If a character or setting already exists, use update instead of create, merging new information into the existing entry
+- Only extract information explicitly stated in the text — do not speculate or fabricate
+- Ignore vague/generic character references (e.g., "passersby", "the crowd", "soldiers")
+- Set importance based on the character's role in the story: core for protagonists/key characters, major for important supporting characters, minor for others
+- Use reasonable categories for world settings (e.g., Geography, History, Politics, Magic System, Technology, Culture, Organizations)
+
+After extraction, briefly summarize what characters and settings were extracted from this chunk.`,
+    chunkLabel: (chunkIndex: number, totalChunks: number) =>
+      `Below is chunk ${chunkIndex + 1}/${totalChunks} of the file:`,
   },
 };
 

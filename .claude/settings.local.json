@@ -58,7 +58,10 @@
       "Bash(pnpm:*)",
       "Bash(npx tsc:*)",
       "Bash(npx expo:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(curl:*)",
+      "Bash(gtimeout:*)",
+      "Bash(cat:*)"
     ]
   }
 }

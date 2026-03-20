@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Upload } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import CharactersTab from "../components/CharactersTab.js";
 import WorldSettingsTab from "../components/WorldSettingsTab.js";
 import DraftsTab from "../components/DraftsTab.js";
 import AgentChatPanel from "../components/AgentChatPanel.js";
+import FileImportDialog from "../components/FileImportDialog.js";
 
 type Tab = "characters" | "worldSettings" | "drafts";
 
@@ -18,6 +19,7 @@ export default function WorldPage() {
   // Project creation form
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [projectName, setProjectName] = useState("");
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
   // Queries
   const worldQuery = trpc.world.getById.useQuery({ id: worldId });
@@ -77,7 +79,16 @@ export default function WorldPage() {
             <Link to="/" className="text-xs text-gray-400 hover:text-gray-600 mb-2 inline-block">
               &larr; {t("world.backToHome")}
             </Link>
-            <h1 className="text-2xl font-bold text-gray-900">{world.name}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-gray-900">{world.name}</h1>
+              <button
+                onClick={() => setShowImportDialog(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-teal-600 border border-gray-300 hover:border-teal-300 rounded-lg transition-colors"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                {t("import.button")}
+              </button>
+            </div>
             {world.description && (
               <p className="text-sm text-gray-500 mt-1 max-w-2xl">{world.description}</p>
             )}
@@ -200,6 +211,18 @@ export default function WorldPage() {
       <div className="w-1/3 min-w-[320px] border-l border-gray-200 bg-gray-50/50 shrink-0">
         <AgentChatPanel worldId={worldId} />
       </div>
+
+      {/* File Import Dialog */}
+      {showImportDialog && (
+        <FileImportDialog
+          worldId={worldId}
+          onClose={() => {
+            setShowImportDialog(false);
+            charactersQuery.refetch();
+            worldSettingsQuery.refetch();
+          }}
+        />
+      )}
     </div>
   );
 }

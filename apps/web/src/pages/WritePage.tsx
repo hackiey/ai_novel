@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { FileEdit } from "lucide-react";
+import { FileEdit, Plus } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import { NovelEditor } from "@ai-novel/editor";
 import AgentChatPanel from "../components/AgentChatPanel.js";
 import EditableText from "../components/EditableText.js";
+import { useBreadcrumb } from "../contexts/BreadcrumbContext.js";
 
 export default function WritePage() {
   const { projectId } = useParams({ strict: false }) as { projectId: string };
@@ -20,6 +21,12 @@ export default function WritePage() {
   const contentCache = useRef<Map<string, string>>(new Map());
 
   const projectQuery = trpc.project.getById.useQuery({ id: projectId });
+  const project = projectQuery.data as any;
+  const worldQuery = trpc.world.getById.useQuery(
+    { id: project?.worldId },
+    { enabled: !!project?.worldId },
+  );
+  const world = worldQuery.data as any;
   const chaptersQuery = trpc.chapter.list.useQuery({ projectId });
   const chapterQuery = trpc.chapter.getById.useQuery(
     { id: selectedChapterId },
@@ -35,11 +42,27 @@ export default function WritePage() {
     onError: () => setSaveStatus("idle"),
   });
 
-  const updateProject = trpc.project.update.useMutation({
-    onSuccess: () => projectQuery.refetch(),
+  const createChapter = trpc.chapter.create.useMutation({
+    onSuccess: (newChapter: any) => {
+      chaptersQuery.refetch();
+      handleChapterSelect(newChapter._id);
+    },
   });
 
-  const project = projectQuery.data;
+  const deleteChapter = trpc.chapter.delete.useMutation({
+    onSuccess: () => {
+      contentCache.current.delete(selectedChapterId);
+      setSelectedChapterId("");
+      chaptersQuery.refetch();
+      void navigate({
+        to: "/project/$projectId/write",
+        params: { projectId },
+        search: { chapterId: undefined },
+        replace: true,
+      });
+    },
+  });
+
   const chapters = (chaptersQuery.data ?? []) as any[];
   const sorted = [...chapters].sort((a, b) => a.order - b.order);
   const chapter = chapterQuery.data as any;
@@ -74,6 +97,12 @@ export default function WritePage() {
     setAppendText(text);
   }, []);
 
+  const handleDeleteChapter = useCallback(() => {
+    if (!selectedChapterId || !chapter) return;
+    if (!window.confirm(t("write.deleteChapterConfirm", { name: chapter.title }))) return;
+    deleteChapter.mutate({ id: selectedChapterId });
+  }, [selectedChapterId, chapter, deleteChapter, t]);
+
   const handleChapterSelect = useCallback((nextChapterId: string) => {
     setSelectedChapterId(nextChapterId);
     setSaveStatus("idle");
@@ -85,42 +114,53 @@ export default function WritePage() {
     });
   }, [navigate, projectId]);
 
-  return (
-    <div className="h-[calc(100vh-53px)] flex flex-col overflow-hidden">
-      {/* Toolbar */}
-      <div className="flex items-center px-4 py-2 border-b border-gray-200 bg-white/60 backdrop-blur-sm shrink-0">
-        <Link
-          to={project?.worldId ? "/world/$worldId" : "/"}
-          params={project?.worldId ? { worldId: project.worldId } : {}}
-          className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          &larr; {t("write.back")}
-        </Link>
-        <span className="text-gray-300 mx-3">|</span>
-        {project ? (
-          <EditableText
-            value={project.name}
-            onSave={(name) => updateProject.mutate({ id: projectId, data: { name } })}
-            className="text-sm font-medium text-gray-700"
-            inputClassName="text-sm font-medium text-gray-700"
-          />
+  // Set breadcrumb in the global header
+  const { setBreadcrumb } = useBreadcrumb();
+  useEffect(() => {
+    setBreadcrumb(
+      <div className="flex items-center gap-1.5 text-sm min-w-0">
+        {project?.worldId ? (
+          <Link
+            to="/world/$worldId"
+            params={{ worldId: project.worldId }}
+            className="text-gray-400 hover:text-teal-600 transition-colors truncate"
+          >
+            {world?.name ?? "..."}
+          </Link>
         ) : (
-          <span className="text-sm text-gray-400">{t("write.loading")}</span>
+          <span className="text-gray-400">...</span>
         )}
+        <span className="text-gray-300 shrink-0">/</span>
+        <span className="font-medium text-gray-700 truncate">
+          {project?.name ?? "..."}
+        </span>
         {saveStatus === "saving" && (
-          <span className="text-[10px] text-amber-500 ml-3">{t("write.saving")}</span>
+          <span className="text-[10px] text-amber-500 ml-2">{t("write.saving")}</span>
         )}
         {saveStatus === "saved" && (
-          <span className="text-[10px] text-emerald-500 ml-3">{t("write.saved")}</span>
+          <span className="text-[10px] text-emerald-500 ml-2">{t("write.saved")}</span>
         )}
       </div>
+    );
+    return () => setBreadcrumb(null);
+  }, [project, world, saveStatus, setBreadcrumb, t]);
 
+  return (
+    <div className="h-[calc(100vh-53px)] flex flex-col overflow-hidden">
       {/* Three-column layout: sidebar | editor | chat */}
       <div className="flex-1 flex min-h-0">
         {/* Left: Chapter sidebar */}
         <div className="w-56 border-r border-gray-200 bg-gray-50/80 flex flex-col shrink-0">
-          <div className="px-3 py-3 border-b border-gray-200">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t("write.chapters")}</span>
+          <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+            <span className="text-sm font-semibold text-gray-500">{t("write.chapters")}</span>
+            <button
+              onClick={() => createChapter.mutate({ projectId, title: t("write.newChapter") })}
+              disabled={createChapter.isPending}
+              className="p-1 rounded-md text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors disabled:opacity-50"
+              title={t("write.addChapter")}
+            >
+              <Plus className="w-4 h-4" />
+            </button>
           </div>
           <div className="flex-1 overflow-y-auto py-1">
             {sorted.length === 0 ? (
@@ -138,7 +178,6 @@ export default function WritePage() {
                       : "text-gray-600 hover:bg-gray-100"
                   }`}
                 >
-                  <span className="text-xs text-gray-400 mr-1.5">{ch.order + 1}.</span>
                   <EditableText
                     value={ch.title}
                     onSave={(title) =>
@@ -165,6 +204,8 @@ export default function WritePage() {
               placeholder={t("write.editorPlaceholder")}
               appendText={appendText}
               className="flex-1 border-0 rounded-none"
+              onDelete={handleDeleteChapter}
+              deleteTitle={t("write.deleteChapter")}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center">
@@ -182,7 +223,7 @@ export default function WritePage() {
         </div>
 
         {/* Right: AI Chat */}
-        <div className="w-1/3 min-w-[320px] border-l border-gray-200 bg-gray-50/50">
+        <div className="w-1/3 min-w-[320px] border-l border-gray-200 bg-gray-50/50 overflow-hidden">
           <AgentChatPanel
             projectId={projectId}
             worldId={(project as any)?.worldId}

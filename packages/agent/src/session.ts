@@ -99,15 +99,21 @@ export class NovelAgentSession {
       for await (const message of q) {
         // Skip system init messages
         if (message.type === "system") {
+          console.log("[AgentSession] system message received");
           continue;
         }
+        console.log("[AgentSession] message type:", message.type, message.type === "assistant" ? `content blocks: ${JSON.stringify(message.message.content.map((b: any) => ({ type: b.type, len: b.text?.length })))}` : message.type === "result" ? `subtype: ${(message as any).subtype}` : "");
 
         // Handle assistant messages (text + tool_use blocks)
         if (message.type === "assistant") {
+          console.log("[AgentSession] processing assistant, blocks:", message.message.content.length);
           for (const block of message.message.content) {
+            console.log("[AgentSession] block type:", block.type);
             if (block.type === "text") {
               fullResponse += block.text;
+              console.log("[AgentSession] yielding text event:", block.text.substring(0, 50));
               yield { type: "text", text: block.text };
+              console.log("[AgentSession] text event yielded successfully");
             } else if (block.type === "tool_use") {
               yield {
                 type: "tool_use",
@@ -119,24 +125,34 @@ export class NovelAgentSession {
           continue;
         }
 
-        // Handle synthetic user messages (tool results)
+        // Handle user messages (tool results)
         if (message.type === "user") {
           const userMsg = message as any;
-          if (userMsg.isSynthetic && userMsg.message?.content) {
-            const content = userMsg.message.content;
-            if (Array.isArray(content)) {
-              for (const block of content) {
-                if (block.type === "tool_result") {
-                  const resultContent = Array.isArray(block.content)
-                    ? block.content.map((c: any) => c.text || "").join("")
-                    : typeof block.content === "string" ? block.content : JSON.stringify(block.content);
-                  yield {
-                    type: "tool_result" as const,
-                    result: resultContent,
-                  };
-                }
+          // Check message content for tool_result blocks
+          let yielded = false;
+          const content = userMsg.message?.content;
+          if (Array.isArray(content)) {
+            for (const block of content) {
+              if (block.type === "tool_result") {
+                const resultContent = Array.isArray(block.content)
+                  ? block.content.map((c: any) => c.text || "").join("")
+                  : typeof block.content === "string" ? block.content : JSON.stringify(block.content);
+                yield {
+                  type: "tool_result" as const,
+                  result: resultContent,
+                };
+                yielded = true;
               }
             }
+          }
+          // Fallback: use tool_use_result from SDK if no blocks found
+          if (!yielded && userMsg.tool_use_result !== undefined) {
+            yield {
+              type: "tool_result" as const,
+              result: typeof userMsg.tool_use_result === "string"
+                ? userMsg.tool_use_result
+                : JSON.stringify(userMsg.tool_use_result),
+            };
           }
           continue;
         }
@@ -160,6 +176,7 @@ export class NovelAgentSession {
     } catch (err) {
       this.abortController = undefined;
       const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error("[AgentSession] chat error:", errorMessage);
       yield { type: "error", error: errorMessage };
     }
   }

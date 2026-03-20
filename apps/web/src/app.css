@@ -144,8 +144,8 @@ a {
 
 .agent-markdown p,
 .world-setting-markdown p {
-  margin-top: 0.35em;
-  margin-bottom: 0.35em;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
 }
 
 .agent-markdown p:first-child,
