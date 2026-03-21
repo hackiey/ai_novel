@@ -5,11 +5,16 @@ import type { HistoryMessage, HistoryToolCall, VectorSearchFn, Locale } from "@a
 import { getDb } from "../db.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 import { verifyToken, type JwtPayload } from "../auth/jwt.js";
+import { getUserAllowedModels } from "../auth/permissionGroups.js";
 
 // Store active sessions in memory (shared with router)
 export const sessions = new Map<string, NovelAgentSession>();
 
 const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "claude-sonnet-4-6-20250514";
+const AVAILABLE_MODELS = (process.env.AVAILABLE_MODELS || DEFAULT_MODEL)
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 
 function extractUser(request: { headers: { authorization?: string } }): JwtPayload | null {
   const auth = request.headers.authorization;
@@ -49,20 +54,17 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
 
     const db = getDb();
     const sessionId = inputSessionId || crypto.randomUUID();
+    const allowedModels = await getUserAllowedModels(db, user.userId, AVAILABLE_MODELS);
+
+    if (allowedModels.length === 0) {
+      return reply.status(403).send({ error: "AI access is disabled for your permission group" });
+    }
+
+    const selectedModel = model || allowedModels[0];
 
     // Validate model against user's permission group
-    if (model) {
-      const userDoc = await db.collection("users").findOne({ _id: new ObjectId(user.userId) });
-      if (userDoc?.permissionGroupId) {
-        const group = await db.collection("permission_groups").findOne({
-          _id: new ObjectId(userDoc.permissionGroupId as string),
-        });
-        if (group?.allowedModels && (group.allowedModels as string[]).length > 0) {
-          if (!(group.allowedModels as string[]).includes(model)) {
-            return reply.status(403).send({ error: "Model not allowed for your permission group" });
-          }
-        }
-      }
+    if (!allowedModels.includes(selectedModel)) {
+      return reply.status(403).send({ error: "Model not allowed for your permission group" });
     }
 
     // Build vector search function if embedding service is available
@@ -86,7 +88,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       session = new NovelAgentSession({
         apiKey: process.env.ANTHROPIC_API_KEY || "",
         baseURL: process.env.ANTHROPIC_BASE_URL || undefined,
-        model: model || DEFAULT_MODEL,
+        model: selectedModel,
         db,
         projectId,
         worldId,
@@ -203,7 +205,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       {
         $set: {
           worldId: worldId || "",
-          model: model || DEFAULT_MODEL,
+          model: selectedModel,
           updatedAt: new Date(),
         },
         $setOnInsert: {

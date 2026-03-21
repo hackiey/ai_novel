@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { ObjectId } from "mongodb";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { objectIdSchema } from "@ai-novel/types";
 import { sessions } from "../routes/agentStream.js";
+import { getUserAllowedModels } from "../auth/permissionGroups.js";
 
 const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "claude-sonnet-4-6-20250514";
 const AVAILABLE_MODELS = (process.env.AVAILABLE_MODELS || DEFAULT_MODEL)
@@ -12,18 +12,8 @@ const AVAILABLE_MODELS = (process.env.AVAILABLE_MODELS || DEFAULT_MODEL)
 
 export const agentRouter = router({
   getModels: protectedProcedure.query(async ({ ctx }) => {
-    // Filter models by user's permission group
-    const user = await ctx.db.collection("users").findOne({ _id: new ObjectId(ctx.user.userId) });
-    if (user?.permissionGroupId) {
-      const group = await ctx.db.collection("permission_groups").findOne({
-        _id: new ObjectId(user.permissionGroupId as string),
-      });
-      if (group?.allowedModels && (group.allowedModels as string[]).length > 0) {
-        const allowed = AVAILABLE_MODELS.filter((m) => (group.allowedModels as string[]).includes(m));
-        return { available: allowed.length > 0 ? allowed : AVAILABLE_MODELS, default: allowed[0] || DEFAULT_MODEL };
-      }
-    }
-    return { available: AVAILABLE_MODELS, default: DEFAULT_MODEL };
+    const allowed = await getUserAllowedModels(ctx.db, ctx.user.userId, AVAILABLE_MODELS);
+    return { available: allowed, default: allowed[0] };
   }),
 
   listSessions: protectedProcedure

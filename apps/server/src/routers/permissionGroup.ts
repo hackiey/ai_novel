@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { createPermissionGroupSchema, updatePermissionGroupSchema, objectIdSchema } from "@ai-novel/types";
 import { router, adminProcedure } from "../trpc.js";
 import { TRPCError } from "@trpc/server";
+import { isDefaultPermissionGroup } from "../auth/permissionGroups.js";
 
 function serializeDoc(doc: any) {
   if (!doc) return null;
@@ -46,6 +47,14 @@ export const permissionGroupRouter = router({
   update: adminProcedure
     .input(z.object({ id: objectIdSchema, data: updatePermissionGroupSchema }))
     .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.db.collection("permission_groups").findOne({ _id: new ObjectId(input.id) });
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Permission group not found" });
+      }
+      if (isDefaultPermissionGroup(existing)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Default permission group cannot be modified" });
+      }
+
       const updateFields: Record<string, any> = { updatedAt: new Date() };
       if (input.data.name !== undefined) updateFields.name = input.data.name;
       if (input.data.allowedModels !== undefined) updateFields.allowedModels = input.data.allowedModels;
@@ -63,6 +72,14 @@ export const permissionGroupRouter = router({
   delete: adminProcedure
     .input(z.object({ id: objectIdSchema }))
     .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.db.collection("permission_groups").findOne({ _id: new ObjectId(input.id) });
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Permission group not found" });
+      }
+      if (isDefaultPermissionGroup(existing)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Default permission group cannot be deleted" });
+      }
+
       // Remove permissionGroupId from users who have this group
       await ctx.db.collection("users").updateMany(
         { permissionGroupId: input.id },

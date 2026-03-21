@@ -135,7 +135,16 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
       });
 
       if (!response.ok || !response.body) {
-        throw new Error(`HTTP ${response.status}`);
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorBody = await response.json();
+          if (typeof errorBody?.error === "string" && errorBody.error) {
+            errorMessage = errorBody.error;
+          }
+        } catch {
+          // ignore invalid error body
+        }
+        throw new Error(errorMessage);
       }
 
       const reader = response.body.getReader();

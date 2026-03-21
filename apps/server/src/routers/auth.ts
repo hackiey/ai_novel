@@ -4,6 +4,7 @@ import { registerSchema, loginSchema } from "@ai-novel/types";
 import { router, publicProcedure, protectedProcedure } from "../trpc.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 import { signToken } from "../auth/jwt.js";
+import { ensureDefaultPermissionGroup, getPermissionGroupById } from "../auth/permissionGroups.js";
 import { TRPCError } from "@trpc/server";
 
 function serializeUser(doc: any) {
@@ -24,6 +25,10 @@ export const authRouter = router({
       // First user becomes admin
       const userCount = await ctx.db.collection("users").countDocuments();
       const role = userCount === 0 ? "admin" : "user";
+      const defaultPermissionGroup = await ensureDefaultPermissionGroup(ctx.db);
+      if (!defaultPermissionGroup) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to initialize default permission group" });
+      }
 
       const now = new Date();
       const passwordHash = await hashPassword(input.password);
@@ -32,6 +37,7 @@ export const authRouter = router({
         passwordHash,
         displayName: input.displayName,
         role,
+        permissionGroupId: defaultPermissionGroup._id.toHexString(),
         createdAt: now,
         updatedAt: now,
       };
@@ -73,9 +79,7 @@ export const authRouter = router({
 
       let permissionGroup = null;
       if (user.permissionGroupId) {
-        permissionGroup = await ctx.db.collection("permission_groups").findOne({
-          _id: new ObjectId(user.permissionGroupId as string),
-        });
+        permissionGroup = await getPermissionGroupById(ctx.db, user.permissionGroupId);
         if (permissionGroup) {
           const { _id: pgId, ...pgRest } = permissionGroup;
           permissionGroup = { _id: pgId.toHexString(), ...pgRest };
