@@ -1,163 +1,169 @@
-# AI Novel — AI 辅助小说写作应用
+# AI Novel — AI 辅助小说创作工作台
 
 [English](./README.md)
 
-一个跨平台的 AI 辅助小说创作工具。核心交互模式为 **写作编辑器 + AI 对话面板** 两栏布局，用户通过自然语言与 AI Agent 交互，驱动角色管理、世界观设定、续写、语义搜索等操作。
+AI Novel 是一个面向长篇小说创作的跨平台工作台。项目按 `世界观 -> 小说（Project）-> 章节` 组织，提供 Web 写作界面、移动端伴随应用和 Electron 桌面壳。内置 AI Agent 可以管理设定数据、续写章节、导入参考资料，并在你的创作知识库中做语义搜索。
+
+## 亮点
+
+- 世界观优先：先创建世界观，再在其下管理多部小说，最后按章节写作。
+- 结构化资料：角色、世界观条目、草稿都支持摘要和重要性字段。
+- 写作工作区：章节侧栏 + TipTap 编辑器 + 流式 AI 对话三栏布局。
+- Agent 自动化：内置 24 个 MCP 工具，覆盖 CRUD、语义搜索、记忆、摘要生成和续写。
+- 文件导入：支持上传 `.txt`、`.md`、`.docx`、`.pdf`，由 Agent 抽取为结构化设定。
+- 多端共享：Web、Electron、Expo Mobile 共用同一套后端和类型定义。
 
 ## 技术栈
 
 | 层级 | 技术 |
 |------|------|
 | Monorepo | Turborepo + pnpm workspaces |
-| 前端 | React 19 + Vite + TailwindCSS v4 + TanStack Router / Query |
-| 编辑器 | TipTap (富文本, 自动保存, AI 续写插入) |
-| 后端 | Fastify + tRPC v11 (端到端类型安全) |
-| 数据库 | MongoDB (原生驱动, Atlas Vector Search) |
-| AI Agent | Anthropic Claude API + 自定义 tool use 循环 (24 个工具) |
-| Embedding | OpenAI `text-embedding-3-small` (1536 维) |
+| Web | React 19 + Vite + Tailwind CSS v4 + TanStack Router / Query |
+| 移动端 | Expo Router + React Native + TanStack Query |
 | 桌面端 | Electron |
-| 移动端 | Expo / React Native |
+| 编辑器 | TipTap 富文本编辑器，支持自动保存 |
+| 后端 | Fastify + tRPC v11 |
+| 数据库 | MongoDB 原生驱动 |
+| AI Agent | Anthropic Claude Agent SDK + 自定义 MCP 工具 |
+| Embedding | OpenAI 兼容的 embedding 服务，模型和维度可配置 |
+| 共享类型 | `packages/types` 中的 Zod Schema |
 
-## 项目结构
+## 仓库结构
 
-```
+```text
 ai_novel/
 ├── apps/
-│   ├── server/          # Fastify + tRPC 后端
-│   ├── web/             # Vite + React 前端
-│   ├── desktop/         # Electron 桌面端
-│   └── mobile/          # Expo 移动端
+│   ├── server/     # Fastify + tRPC 后端、SSE 路由、鉴权、embedding
+│   ├── web/        # React Web 应用，主写作工作区
+│   ├── desktop/    # Web 应用的 Electron 外壳
+│   └── mobile/     # Expo 移动端
 └── packages/
-    ├── types/           # Zod schemas + TypeScript 类型
-    ├── agent/           # AI Agent 核心 (工具定义 + 会话管理)
-    ├── editor/          # TipTap 富文本编辑器组件
-    └── core/            # Embedding 工具 (OpenAI)
+    ├── agent/      # NovelAgentSession、i18n 提示词、MCP 工具
+    ├── core/       # Embedding 服务与文本分块工具
+    ├── editor/     # 可复用的 TipTap 编辑器包
+    └── types/      # 共享 Zod Schema 与 TypeScript 类型
 ```
 
 ## 快速开始
 
-### 前置要求
+### 环境要求
 
 - Node.js >= 20
 - pnpm >= 9
-- MongoDB (本地或 Atlas)
+- MongoDB（本地或 Atlas）
 
-### 安装与启动
+### 安装与运行
 
 ```bash
-# 安装依赖
 pnpm install
-
-# 配置环境变量
 cp apps/server/.env.example apps/server/.env
-# 编辑 .env，填入：
-#   MONGODB_URI      — MongoDB 连接字符串
-#   ANTHROPIC_API_KEY — Claude API 密钥 (Agent 对话)
-#   OPENAI_API_KEY    — OpenAI 密钥 (可选, 用于 embedding 语义搜索)
 
-# 构建所有包
+# 首次开发前先构建所有 workspace
 pnpm build
 
-# 同时启动后端 + 前端
+# 启动后端（3001）和 Web（5173）
 pnpm dev:all
 ```
 
 启动后访问：
-- 前端：http://localhost:5173
-- 后端：http://localhost:3001
 
-### 桌面端 (Electron)
+- Web：`http://localhost:5173`
+- API：`http://localhost:3001`
+- 健康检查：`http://localhost:3001/health`
+
+### 必填环境变量
+
+在 `apps/server/.env` 中至少配置：
+
+- `MONGODB_URI`
+- `ANTHROPIC_API_KEY`
+- `JWT_SECRET`
+
+常用可选变量：
+
+- `OPENAI_API_KEY` 或 `EMBEDDING_API_KEY`
+- `EMBEDDING_BASE_URL`
+- `EMBEDDING_MODEL`
+- `EMBEDDING_DIMENSIONS`
+- `ANTHROPIC_BASE_URL`
+- `AVAILABLE_MODELS`
+- `DEFAULT_MODEL`
+- `PORT`
+- `JWT_EXPIRES_IN`
+
+### 桌面端与移动端
 
 ```bash
-# 先启动 web dev server，再启动 Electron
-pnpm dev:web &
-cd apps/desktop && pnpm dev
+# 桌面端：先启动 Web dev server，再启动 Electron
+pnpm dev:web
+pnpm --filter @ai-novel/desktop dev
+
+# 移动端：启动 Expo
+pnpm --filter @ai-novel/mobile dev
 ```
 
-### 移动端 (Expo)
+## 核心流程
 
-```bash
-cd apps/mobile && pnpm dev
-```
+### 世界观工作区
 
-## 功能概览
+- 创建世界观并填写描述，每个用户的数据彼此隔离。
+- 在世界观下管理角色、世界观设定和草稿。
+- 在世界观页面里按当前标签页执行语义搜索或正则回退搜索。
 
-### 项目管理
-创建小说项目，设置类型和目标字数。
+### 写作工作区
 
-### 角色人设
-管理角色的外貌、性格、背景、目标、人物关系等信息，支持自定义字段。
+- 一个世界观下可以挂多部小说 / Project。
+- 每部小说包含有序章节，在主写作界面中编辑。
+- 编辑器采用防抖自动保存，并在请求进行中保留本地未落盘内容。
+- AI 续写结果可以直接追加到当前章节。
 
-### 世界观设定
-按分类（地理、魔法体系、历史等）管理世界观条目，支持标签。
+### Agent 与流式响应
 
-### 章节管理
-创建章节、排序、追踪字数和状态（草稿/修订/定稿）。
+- `POST /api/agent/chat` 通过 SSE 流式返回 Agent 事件。
+- 会话历史保存在 MongoDB 中，并按 `sessionId` 复用。
+- Agent 记忆按世界观存储，世界摘要在过期后按 locale 重建。
+- 可通过权限组限制用户可选的模型。
 
-### 富文本编辑器
-基于 TipTap 的写作编辑器，支持：
-- 格式化：加粗、斜体、下划线、删除线、标题 (H1-H3)、列表、引用
-- 自动保存（防抖 2 秒）
-- AI 续写内容自动插入
-- 实时字数/字符统计
+### 文件导入
 
-### 草稿笔记
-记录创作灵感、草稿构思，可关联角色和世界观条目。
+- `POST /api/world/import-file` 支持 `.txt`、`.md`、`.docx`、`.pdf`。
+- 大文件会先分块，再由 Agent 逐块处理，并流式返回进度事件。
+- 导入目标是把参考资料整理成结构化设定，而不是简单塞入原文。
 
-### AI Agent 对话
-在写作页面右侧与 AI 助手对话。Agent 内置 24 个工具：
+### 鉴权与管理
 
-| 类别 | 工具 | 说明 |
-|------|------|------|
-| 搜索 | `semantic_search` | 语义/关键词搜索角色、世界观、草稿、章节 |
-| 角色 | `list_characters` / `get_character` | 查询角色信息 |
-| | `create_character` / `update_character` | 创建或修改角色 |
-| | `delete_character` | 删除角色 |
-| 世界观 | `list_world_settings` / `get_world_setting` | 查询世界观 |
-| | `create_world_setting` / `update_world_setting` | 创建或修改世界观 |
-| | `delete_world_setting` | 删除世界观条目 |
-| 章节 | `list_chapters` / `get_chapter` | 查询章节 |
-| | `create_chapter` / `update_chapter` | 创建或修改章节 |
-| | `continue_writing` | AI 续写章节内容 |
-| | `delete_chapter` | 删除章节 |
-| | `generate_synopsis` | 为章节生成摘要 |
-| 草稿 | `get_draft` / `create_draft` | 查询或创建草稿 |
-| | `delete_draft` | 删除草稿 |
-| 记忆 | `get_memory` / `update_memory` | 读取/保存用户偏好记忆 |
+- Web 和移动端都使用 JWT 登录 / 注册。
+- 管理后台支持用户角色和权限组管理。
+- 权限组可限制用户能选择的 Claude 模型列表。
 
-Agent 会自动调用工具获取上下文，确保回答和续写内容符合已有设定。续写结果自动同步到左侧编辑器。
+### 国际化
 
-### 语义搜索
-- 基于 OpenAI embedding 的向量搜索（需配置 OPENAI_API_KEY 和 Atlas Vector Search 索引）
-- 未配置时自动降级为正则文本搜索
-- 支持按范围筛选（角色/世界观/草稿/章节）
-
-### Embedding 管线
-- 文档创建/更新时自动入队生成 embedding（去抖 3 秒）
-- 长文档自动分块（chunk=1000, overlap=200）
-- 变更检测：embeddingText 未变化则跳过
-- 支持全量重建索引
+- Web 端通过 `i18next` 支持中英文。
+- Agent 提示词、工具描述、世界摘要都会跟随 locale。
+- 移动端内置简体中文文案。
 
 ## 开发命令
 
 ```bash
-pnpm dev:all        # 同时启动 server + web
-pnpm dev:server     # 仅启动后端
-pnpm dev:web        # 仅启动前端
-pnpm build          # 构建所有包
+pnpm dev:all
+pnpm dev:server
+pnpm dev:web
+pnpm build
 ```
 
-## Atlas Vector Search 索引配置
+当前没有单独的自动化测试套件，建议用 `pnpm build` 验证 TypeScript 和各包构建是否正常。
 
-在 MongoDB Atlas 中为以下 collection 创建 vector search 索引（索引名 `vector_index`）：
+## Atlas Vector Search
 
-- `characters` — path: `embedding`, dimensions: 1536, similarity: cosine
-- `world_settings` — path: `embedding`, dimensions: 1536, similarity: cosine
-- `drafts` — path: `embedding`, dimensions: 1536, similarity: cosine
-- `chapters` — path: `embedding`, dimensions: 1536, similarity: cosine
-- `embedding_chunks` — path: `embedding`, dimensions: 1536, similarity: cosine
+如果启用 embedding 语义搜索，请在下面这些 collection 的 `embedding` 字段上创建名为 `vector_index` 的向量索引：
 
-每个索引添加 `projectId` 字段作为 filter。
+- `characters`
+- `world_settings`
+- `drafts`
+- `chapters`
+- `embedding_chunks`
+
+索引维度需要与 `EMBEDDING_DIMENSIONS`（或你的 embedding 服务默认维度）保持一致。如果你依赖元数据过滤，也请把对应 collection 使用的归属字段一并加入索引过滤能力，通常是 `worldId` 或 `projectId`。
 
 ## License
 
