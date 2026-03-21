@@ -81,6 +81,9 @@
   "world.characters": "Characters",
   "world.worldSettings": "World Settings",
   "world.drafts": "Drafts",
+  "world.createCharacter": "Add Character",
+  "world.createWorldSetting": "Add Setting",
+  "world.createDraft": "Add Draft",
   "world.loading": "Loading world...",
   "world.notFound": "World not found.",
   "world.draftsCount": "Drafts ({{count}})",
@@ -252,6 +255,14 @@
   "import.doneWithErrors": "Import completed with some errors",
   "import.close": "Close",
   "import.chunkError": "Chunk {{index}} error",
+
+  "search.placeholder": "Search current tab...",
+  "search.clear": "Clear search",
+  "search.searching": "Searching...",
+  "search.results": "{{count}} results for \"{{query}}\"",
+  "search.noResults": "No results found for \"{{query}}\".",
+  "search.semanticBadge": "Semantic search",
+  "search.keywordBadge": "Keyword fallback",
 
   "language.zh-CN": "中文",
   "language.en": "English"

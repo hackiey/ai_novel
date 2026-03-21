@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Link } from "@tanstack/react-router";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -19,10 +18,21 @@ function useAutoResizeTextarea(value: string) {
 
 interface WorldSettingsTabProps {
   worldId: string;
-  worldLink?: boolean;
+  createRequestKey?: number;
+  searchQuery?: string;
+  searchResultIds?: string[];
+  searchMethod?: "vector" | "regex" | null;
+  isSearching?: boolean;
 }
 
-export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTabProps) {
+export default function WorldSettingsTab({
+  worldId,
+  createRequestKey = 0,
+  searchQuery = "",
+  searchResultIds = [],
+  searchMethod = null,
+  isSearching = false,
+}: WorldSettingsTabProps) {
   const { t } = useTranslation();
   const [showWorldForm, setShowWorldForm] = useState(false);
   const [worldCategory, setWorldCategory] = useState("");
@@ -49,6 +59,20 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
   });
 
   const worldSettings = (worldSettingsQuery.data ?? []) as any[];
+  const hasSearch = searchQuery.length > 0;
+  const visibleWorldSettings = useMemo(() => {
+    if (!hasSearch) return worldSettings;
+    const byId = new Map(worldSettings.map((ws) => [ws._id, ws]));
+    return searchResultIds
+      .map((id) => byId.get(id))
+      .filter((ws): ws is any => Boolean(ws));
+  }, [worldSettings, hasSearch, searchResultIds]);
+
+  useEffect(() => {
+    if (createRequestKey > 0) {
+      setShowWorldForm(true);
+    }
+  }, [createRequestKey]);
 
   const openEditMode = useCallback((ws: any) => {
     setExpandedWorldSettingId(ws._id);
@@ -60,22 +84,18 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
-          {t("worldSetting.count", { count: worldSettings.length })}
-          {worldLink && (
-            <Link to="/world/$worldId" params={{ worldId }} className="ml-2 text-[10px] text-teal-500 hover:text-teal-600 normal-case font-normal">
-              {t("worldSetting.fromWorld")}
-            </Link>
-          )}
-        </h3>
-        <button
-          onClick={() => setShowWorldForm(true)}
-          className="text-xs px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-500 transition-colors"
-        >
-          {t("worldSetting.addSetting")}
-        </button>
-      </div>
+      {hasSearch && (
+        <div className="mb-4 flex items-center gap-2 text-xs text-gray-500">
+          <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-1 text-teal-700">
+            {searchMethod === "vector" ? t("search.semanticBadge") : t("search.keywordBadge")}
+          </span>
+          <span>
+            {isSearching
+              ? t("search.searching")
+              : t("search.results", { count: visibleWorldSettings.length, query: searchQuery })}
+          </span>
+        </div>
+      )}
 
       {showWorldForm && (
         <div className="mb-4 p-4 rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -134,13 +154,21 @@ export default function WorldSettingsTab({ worldId, worldLink }: WorldSettingsTa
         </div>
       )}
 
-      {worldSettings.length === 0 && !showWorldForm ? (
+      {isSearching ? (
+        <div className="text-center py-8 text-gray-400 text-sm">
+          {t("search.searching")}
+        </div>
+      ) : hasSearch && visibleWorldSettings.length === 0 && !showWorldForm ? (
+        <div className="text-center py-8 text-gray-400 text-sm">
+          {t("search.noResults", { query: searchQuery })}
+        </div>
+      ) : worldSettings.length === 0 && !showWorldForm ? (
         <div className="text-center py-8 text-gray-400 text-sm">
           {t("worldSetting.empty")}
         </div>
       ) : (
         <div className="space-y-2">
-          {worldSettings.map((ws: any) => {
+          {visibleWorldSettings.map((ws: any) => {
             const isExpanded = expandedWorldSettingId === ws._id;
             const isEditing = editingWorldSettingId === ws._id;
             return (

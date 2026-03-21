@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -18,9 +18,21 @@ function useAutoResizeTextarea(value: string) {
 
 interface DraftsTabProps {
   worldId: string;
+  createRequestKey?: number;
+  searchQuery?: string;
+  searchResultIds?: string[];
+  searchMethod?: "vector" | "regex" | null;
+  isSearching?: boolean;
 }
 
-export default function DraftsTab({ worldId }: DraftsTabProps) {
+export default function DraftsTab({
+  worldId,
+  createRequestKey = 0,
+  searchQuery = "",
+  searchResultIds = [],
+  searchMethod = null,
+  isSearching = false,
+}: DraftsTabProps) {
   const { t } = useTranslation();
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
@@ -45,6 +57,20 @@ export default function DraftsTab({ worldId }: DraftsTabProps) {
   });
 
   const drafts = (draftsQuery.data ?? []) as any[];
+  const hasSearch = searchQuery.length > 0;
+  const visibleDrafts = useMemo(() => {
+    if (!hasSearch) return drafts;
+    const byId = new Map(drafts.map((draft) => [draft._id, draft]));
+    return searchResultIds
+      .map((id) => byId.get(id))
+      .filter((draft): draft is any => Boolean(draft));
+  }, [drafts, hasSearch, searchResultIds]);
+
+  useEffect(() => {
+    if (createRequestKey > 0) {
+      setShowForm(true);
+    }
+  }, [createRequestKey]);
 
   const openEditMode = useCallback((draft: any) => {
     setExpandedId(draft._id);
@@ -55,17 +81,18 @@ export default function DraftsTab({ worldId }: DraftsTabProps) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
-          {t("draft.count", { count: drafts.length })}
-        </h3>
-        <button
-          onClick={() => setShowForm(true)}
-          className="text-xs px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-500 transition-colors"
-        >
-          {t("draft.addDraft")}
-        </button>
-      </div>
+      {hasSearch && (
+        <div className="mb-4 flex items-center gap-2 text-xs text-gray-500">
+          <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-1 text-teal-700">
+            {searchMethod === "vector" ? t("search.semanticBadge") : t("search.keywordBadge")}
+          </span>
+          <span>
+            {isSearching
+              ? t("search.searching")
+              : t("search.results", { count: visibleDrafts.length, query: searchQuery })}
+          </span>
+        </div>
+      )}
 
       {showForm && (
         <div className="mb-4 p-4 rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -116,13 +143,21 @@ export default function DraftsTab({ worldId }: DraftsTabProps) {
         </div>
       )}
 
-      {drafts.length === 0 && !showForm ? (
+      {isSearching ? (
+        <div className="text-center py-8 text-gray-400 text-sm">
+          {t("search.searching")}
+        </div>
+      ) : hasSearch && visibleDrafts.length === 0 && !showForm ? (
+        <div className="text-center py-8 text-gray-400 text-sm">
+          {t("search.noResults", { query: searchQuery })}
+        </div>
+      ) : drafts.length === 0 && !showForm ? (
         <div className="text-center py-8 text-gray-400 text-sm">
           {t("draft.empty")}
         </div>
       ) : (
         <div className="space-y-2">
-          {drafts.map((draft: any) => {
+          {visibleDrafts.map((draft: any) => {
             const isExpanded = expandedId === draft._id;
             const isEditing = editingId === draft._id;
             return (

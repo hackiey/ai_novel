@@ -67,9 +67,6 @@ export default function WorldDetailScreen() {
     return (
       <View style={[base.flex1, base.bgDark, base.center]}>
         <Text style={base.textMuted}>{t("world.notFound")}</Text>
-        <TouchableOpacity onPress={() => router.back()} style={base.mt3}>
-          <Text style={base.textTeal}>{t("world.backToHome")}</Text>
-        </TouchableOpacity>
       </View>
     );
   }

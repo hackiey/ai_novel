@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { Plus, Trash2, Upload } from "lucide-react";
+import { Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import CharactersTab from "../components/CharactersTab.js";
 import WorldSettingsTab from "../components/WorldSettingsTab.js";
@@ -15,11 +15,22 @@ export default function WorldPage() {
   const { worldId } = useParams({ strict: false }) as { worldId: string };
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<Tab>("characters");
+  const [createRequestKey, setCreateRequestKey] = useState(0);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Project creation form
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [showImportDialog, setShowImportDialog] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
   // Queries
   const worldQuery = trpc.world.getById.useQuery({ id: worldId });
@@ -27,6 +38,23 @@ export default function WorldPage() {
   const charactersQuery = trpc.character.list.useQuery({ worldId });
   const worldSettingsQuery = trpc.worldSetting.list.useQuery({ worldId });
   const draftsQuery = trpc.draft.list.useQuery({ worldId });
+  const searchScope =
+    activeTab === "characters"
+      ? ["characters"]
+      : activeTab === "worldSettings"
+        ? ["world_settings"]
+        : ["drafts"];
+  const semanticSearchQuery = trpc.search.search.useQuery(
+    {
+      worldId,
+      query: searchQuery,
+      scope: searchScope,
+      limit: 20,
+    },
+    {
+      enabled: searchQuery.length > 0,
+    }
+  );
   // Mutations
   const createProjectMut = trpc.project.create.useMutation({
     onSuccess: () => {
@@ -43,6 +71,11 @@ export default function WorldPage() {
   const characters = (charactersQuery.data ?? []) as any[];
   const worldSettings = (worldSettingsQuery.data ?? []) as any[];
   const drafts = (draftsQuery.data ?? []) as any[];
+  const searchResultIds = useMemo(
+    () => semanticSearchQuery.data?.results.map((result) => result.id) ?? [],
+    [semanticSearchQuery.data]
+  );
+  const isSearchActive = searchQuery.length > 0;
 
   if (worldQuery.isLoading) {
     return (
@@ -57,9 +90,6 @@ export default function WorldPage() {
     return (
       <div className="text-center py-20">
         <p className="text-gray-500">{t("world.notFound")}</p>
-        <Link to="/" className="text-sm text-teal-600 hover:text-teal-500 mt-2 inline-block">
-          {t("world.backToHome")}
-        </Link>
       </div>
     );
   }
@@ -70,28 +100,25 @@ export default function WorldPage() {
     { key: "drafts", label: t("world.drafts"), count: drafts.length },
   ];
 
+  const activeTabCreateLabel =
+    activeTab === "characters"
+      ? t("world.createCharacter")
+      : activeTab === "worldSettings"
+        ? t("world.createWorldSetting")
+        : t("world.createDraft");
+
   return (
     <div className="flex h-[calc(100vh-53px)]">
       <div className="flex-1 overflow-y-auto">
-        <div className="px-6 py-6">
-          {/* Header */}
-          <div className="mb-6">
-            <Link to="/" className="text-xs text-gray-400 hover:text-gray-600 mb-2 inline-block">
-              &larr; {t("world.backToHome")}
-            </Link>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">{world.name}</h1>
-              <button
-                onClick={() => setShowImportDialog(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-teal-600 border border-gray-300 hover:border-teal-300 rounded-lg transition-colors"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                {t("import.button")}
-              </button>
-            </div>
-            {world.description && (
-              <p className="text-sm text-gray-500 mt-1 max-w-2xl">{world.description}</p>
-            )}
+          <div className="px-6 py-6">
+            {/* Header */}
+            <div className="mb-6">
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-gray-900">{world.name}</h1>
+              </div>
+              {world.description && (
+                <p className="text-sm text-gray-500 mt-1 max-w-2xl">{world.description}</p>
+              )}
           </div>
 
           {/* Projects Bar */}
@@ -177,32 +204,96 @@ export default function WorldPage() {
           </div>
 
           {/* Tabs */}
-          <div className="border-b border-gray-200 mb-6">
-            <div className="flex gap-1">
-              {tabs.map((tab) => (
+          <div className="mb-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex gap-1 overflow-x-auto rounded-xl bg-gray-100 p-1">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+                      activeTab === tab.key
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700 hover:bg-white/70"
+                    }`}
+                  >
+                    {tab.label}
+                    {tab.count !== undefined && <span className="ml-1.5 text-xs text-gray-400">{tab.count}</span>}
+                  </button>
+                ))}
+              </div>
+              <div className="shrink-0 flex items-center gap-2">
+                <div className="relative w-72">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                  <input
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    placeholder={t("search.placeholder")}
+                    className="w-full rounded-lg border border-gray-300 bg-white py-1.5 pl-9 pr-9 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  />
+                  {searchInput && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchInput("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                      aria-label={t("search.clear")}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
                 <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                    activeTab === tab.key
-                      ? "bg-white text-gray-900 border border-gray-200 border-b-white -mb-px"
-                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                  }`}
+                  onClick={() => setShowImportDialog(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-teal-600 border border-gray-300 hover:border-teal-300 rounded-lg transition-colors"
                 >
-                  {tab.label}
-                  {tab.count !== undefined && <span className="ml-1.5 text-xs text-gray-400">{tab.count}</span>}
+                  <Upload className="w-3.5 h-3.5" />
+                  {t("import.button")}
                 </button>
-              ))}
+                <button
+                  onClick={() => setCreateRequestKey((value) => value + 1)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-xs text-white hover:bg-teal-500 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {activeTabCreateLabel}
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Tab Content */}
           <div>
-            {activeTab === "characters" && <CharactersTab worldId={worldId} />}
+            {activeTab === "characters" && (
+              <CharactersTab
+                worldId={worldId}
+                createRequestKey={createRequestKey}
+                searchQuery={searchQuery}
+                searchResultIds={searchResultIds}
+                searchMethod={semanticSearchQuery.data?.method ?? null}
+                isSearching={semanticSearchQuery.isFetching && isSearchActive}
+              />
+            )}
 
-            {activeTab === "worldSettings" && <WorldSettingsTab worldId={worldId} />}
+            {activeTab === "worldSettings" && (
+              <WorldSettingsTab
+                worldId={worldId}
+                createRequestKey={createRequestKey}
+                searchQuery={searchQuery}
+                searchResultIds={searchResultIds}
+                searchMethod={semanticSearchQuery.data?.method ?? null}
+                isSearching={semanticSearchQuery.isFetching && isSearchActive}
+              />
+            )}
 
-            {activeTab === "drafts" && <DraftsTab worldId={worldId} />}
+            {activeTab === "drafts" && (
+              <DraftsTab
+                worldId={worldId}
+                createRequestKey={createRequestKey}
+                searchQuery={searchQuery}
+                searchResultIds={searchResultIds}
+                searchMethod={semanticSearchQuery.data?.method ?? null}
+                isSearching={semanticSearchQuery.isFetching && isSearchActive}
+              />
+            )}
           </div>
         </div>
       </div>

@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Link } from "@tanstack/react-router";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -29,10 +28,21 @@ const profileFields = ["appearance", "personality", "background", "goals"] as co
 
 interface CharactersTabProps {
   worldId: string;
-  worldLink?: boolean;
+  createRequestKey?: number;
+  searchQuery?: string;
+  searchResultIds?: string[];
+  searchMethod?: "vector" | "regex" | null;
+  isSearching?: boolean;
 }
 
-export default function CharactersTab({ worldId, worldLink }: CharactersTabProps) {
+export default function CharactersTab({
+  worldId,
+  createRequestKey = 0,
+  searchQuery = "",
+  searchResultIds = [],
+  searchMethod = null,
+  isSearching = false,
+}: CharactersTabProps) {
   const { t } = useTranslation();
   const [showCharForm, setShowCharForm] = useState(false);
   const [charName, setCharName] = useState("");
@@ -60,6 +70,20 @@ export default function CharactersTab({ worldId, worldLink }: CharactersTabProps
   });
 
   const characters = (charactersQuery.data ?? []) as any[];
+  const hasSearch = searchQuery.length > 0;
+  const visibleCharacters = useMemo(() => {
+    if (!hasSearch) return characters;
+    const byId = new Map(characters.map((char) => [char._id, char]));
+    return searchResultIds
+      .map((id) => byId.get(id))
+      .filter((char): char is any => Boolean(char));
+  }, [characters, hasSearch, searchResultIds]);
+
+  useEffect(() => {
+    if (createRequestKey > 0) {
+      setShowCharForm(true);
+    }
+  }, [createRequestKey]);
 
   const openEditMode = useCallback((char: any) => {
     setExpandedId(char._id);
@@ -84,22 +108,18 @@ export default function CharactersTab({ worldId, worldLink }: CharactersTabProps
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
-          {t("character.count", { count: characters.length })}
-          {worldLink && (
-            <Link to="/world/$worldId" params={{ worldId }} className="ml-2 text-[10px] text-teal-500 hover:text-teal-600 normal-case font-normal">
-              {t("character.fromWorld")}
-            </Link>
-          )}
-        </h3>
-        <button
-          onClick={() => setShowCharForm(true)}
-          className="text-xs px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-500 transition-colors"
-        >
-          {t("character.addCharacter")}
-        </button>
-      </div>
+      {hasSearch && (
+        <div className="mb-4 flex items-center gap-2 text-xs text-gray-500">
+          <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-1 text-teal-700">
+            {searchMethod === "vector" ? t("search.semanticBadge") : t("search.keywordBadge")}
+          </span>
+          <span>
+            {isSearching
+              ? t("search.searching")
+              : t("search.results", { count: visibleCharacters.length, query: searchQuery })}
+          </span>
+        </div>
+      )}
 
       {showCharForm && (
         <div className="mb-4 p-4 rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -151,13 +171,21 @@ export default function CharactersTab({ worldId, worldLink }: CharactersTabProps
         </div>
       )}
 
-      {characters.length === 0 && !showCharForm ? (
+      {isSearching ? (
+        <div className="text-center py-8 text-gray-400 text-sm">
+          {t("search.searching")}
+        </div>
+      ) : hasSearch && visibleCharacters.length === 0 && !showCharForm ? (
+        <div className="text-center py-8 text-gray-400 text-sm">
+          {t("search.noResults", { query: searchQuery })}
+        </div>
+      ) : characters.length === 0 && !showCharForm ? (
         <div className="text-center py-8 text-gray-400 text-sm">
           {t("character.empty")}
         </div>
       ) : (
         <div className="space-y-2">
-          {characters.map((char: any) => {
+          {visibleCharacters.map((char: any) => {
             const isExpanded = expandedId === char._id;
             const isEditing = editingId === char._id;
             const badgeClass = roleBadgeColors[char.role] ?? roleBadgeColors.other;

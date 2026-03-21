@@ -81,6 +81,9 @@
   "world.characters": "角色",
   "world.worldSettings": "世界设定",
   "world.drafts": "草稿",
+  "world.createCharacter": "添加角色",
+  "world.createWorldSetting": "添加设定",
+  "world.createDraft": "添加草稿",
   "world.loading": "加载世界中...",
   "world.notFound": "世界未找到。",
   "world.draftsCount": "草稿 ({{count}})",
@@ -252,6 +255,14 @@
   "import.doneWithErrors": "导入完成，但部分段落处理时出错",
   "import.close": "关闭",
   "import.chunkError": "第 {{index}} 段出错",
+
+  "search.placeholder": "搜索当前标签页...",
+  "search.clear": "清除搜索",
+  "search.searching": "搜索中...",
+  "search.results": "“{{query}}” 共找到 {{count}} 条结果",
+  "search.noResults": "没有找到与“{{query}}”相关的结果。",
+  "search.semanticBadge": "语义搜索",
+  "search.keywordBadge": "关键词回退",
 
   "language.zh-CN": "中文",
   "language.en": "English"
