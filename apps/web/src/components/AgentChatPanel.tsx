@@ -366,6 +366,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
     t("chat.suggestion.plotTwist"),
   ];
 
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -565,6 +566,9 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                     </button>
                   ))}
                 </div>
+                <p className="mt-3 text-xs text-gray-400 max-w-xs mx-auto">
+                  {t("chat.memoryHint")}
+                </p>
               </div>
             )}
 

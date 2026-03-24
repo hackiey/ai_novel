@@ -108,6 +108,7 @@
   "chat.suggestion.listCharacters": "List all characters",
   "chat.suggestion.continueWriting": "Continue writing",
   "chat.suggestion.plotTwist": "Suggest a plot twist",
+  "chat.memoryHint": "You can ask me to remember your worldview details or writing rules for this novel, and I'll refer to them in future chats.",
   "chat.cancel": "Cancel",
   "chat.saveAndSend": "Save & Send",
   "chat.editTooltip": "Edit",

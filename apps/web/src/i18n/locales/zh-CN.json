@@ -111,6 +111,7 @@
   "chat.suggestion.listCharacters": "列出所有角色",
   "chat.suggestion.continueWriting": "继续写作",
   "chat.suggestion.plotTwist": "建议一个情节转折",
+  "chat.memoryHint": "你可以让我记住你强调的世界观设定或这部小说的写作要求，我会在后续对话中参考。",
   "chat.cancel": "取消",
   "chat.saveAndSend": "保存并发送",
   "chat.editTooltip": "编辑",

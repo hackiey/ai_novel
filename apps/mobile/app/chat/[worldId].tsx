@@ -165,6 +165,7 @@ export default function ChatScreen() {
     t("chat.suggestion.plotTwist"),
   ];
 
+
   return (
     <View style={[base.flex1, base.bgDark]}>
       <Stack.Screen
@@ -224,6 +225,9 @@ export default function ChatScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
+              <Text style={[styles.emptySubtitle, { marginTop: 8 }]}>
+                {t("chat.memoryHint")}
+              </Text>
             </View>
           }
         />
