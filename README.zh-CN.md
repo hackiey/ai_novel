@@ -9,7 +9,7 @@ AI Novel 是一个面向长篇小说创作的跨平台工作台。项目按 `世
 - 世界观优先：先创建世界观，再在其下管理多部小说，最后按章节写作。
 - 结构化资料：角色、世界观条目、草稿都支持摘要和重要性字段。
 - 写作工作区：章节侧栏 + TipTap 编辑器 + 流式 AI 对话三栏布局。
-- Agent 自动化：内置 24 个 MCP 工具，覆盖 CRUD、语义搜索、记忆、摘要生成和续写。
+- Agent 自动化：内置 18 个工具，覆盖 CRUD、语义搜索、记忆、摘要生成和续写。
 - 文件导入：支持上传 `.txt`、`.md`、`.docx`、`.pdf`，由 Agent 抽取为结构化设定。
 - 多端共享：Web、Electron、Expo Mobile 共用同一套后端和类型定义。
 
@@ -24,7 +24,7 @@ AI Novel 是一个面向长篇小说创作的跨平台工作台。项目按 `世
 | 编辑器 | TipTap 富文本编辑器，支持自动保存 |
 | 后端 | Fastify + tRPC v11 |
 | 数据库 | MongoDB 原生驱动 |
-| AI Agent | Anthropic Claude Agent SDK + 自定义 MCP 工具 |
+| AI Agent | 多模型供应商（OpenAI、Anthropic、Google 等）via pi-ai + pi-agent-core |
 | Embedding | OpenAI 兼容的 embedding 服务，模型和维度可配置 |
 | 共享类型 | `packages/types` 中的 Zod Schema |
 
@@ -76,18 +76,15 @@ pnpm dev:all
 在 `apps/server/.env` 中至少配置：
 
 - `MONGODB_URI`
-- `ANTHROPIC_API_KEY`
 - `JWT_SECRET`
+- 至少一个 LLM API Key：`LLM_API_KEY`（通用回退），或按供应商配置：`ANTHROPIC_API_KEY`、`OPENAI_API_KEY`、`GOOGLE_API_KEY`
 
 常用可选变量：
 
-- `OPENAI_API_KEY` 或 `EMBEDDING_API_KEY`
-- `EMBEDDING_BASE_URL`
-- `EMBEDDING_MODEL`
-- `EMBEDDING_DIMENSIONS`
-- `ANTHROPIC_BASE_URL`
-- `AVAILABLE_MODELS`
-- `DEFAULT_MODEL`
+- `AVAILABLE_MODELS` — 逗号分隔，格式为 `provider:modelId`（如 `openai:gpt-4o,anthropic:claude-sonnet-4-6`）
+- `DEFAULT_MODEL` — 默认模型，格式为 `provider:modelId`
+- `DEFAULT_REASONING` — 推理级别：`minimal`、`low`、`medium`、`high`、`xhigh`
+- `EMBEDDING_API_KEY`、`EMBEDDING_BASE_URL`、`EMBEDDING_MODEL`、`EMBEDDING_DIMENSIONS`
 - `PORT`
 - `JWT_EXPIRES_IN`
 
@@ -134,7 +131,7 @@ pnpm --filter @ai-novel/mobile dev
 
 - Web 和移动端都使用 JWT 登录 / 注册。
 - 管理后台支持用户角色和权限组管理。
-- 权限组可限制用户能选择的 Claude 模型列表。
+- 权限组可限制用户能选择的 LLM 模型列表。
 
 ### 国际化
 

@@ -9,7 +9,7 @@ AI Novel is a cross-platform writing studio for long-form fiction. It organizes 
 - World-first workflow: create a world, attach one or more novels to it, then write chapter by chapter.
 - Structured story data: manage characters, world settings, and loose drafts with summaries and importance levels.
 - Writing workspace: chapter sidebar + TipTap editor + streaming AI chat in a three-pane layout.
-- Agent automation: 24 built-in MCP tools for CRUD, semantic search, memory, synopsis generation, and continuation.
+- Agent automation: 18 built-in tools for CRUD, semantic search, memory, synopsis generation, and continuation.
 - Import pipeline: upload `.txt`, `.md`, `.docx`, or `.pdf` files and let the agent extract structured knowledge into a world.
 - Multi-platform access: web, Electron desktop, and Expo mobile clients share the same backend and types.
 
@@ -24,7 +24,7 @@ AI Novel is a cross-platform writing studio for long-form fiction. It organizes 
 | Editor | TipTap rich text editor with auto-save |
 | Backend | Fastify + tRPC v11 |
 | Database | MongoDB native driver |
-| AI Agent | Anthropic Claude Agent SDK + custom MCP tools |
+| AI Agent | Multi-provider LLM (OpenAI, Anthropic, Google, etc.) via pi-ai + pi-agent-core |
 | Embeddings | OpenAI-compatible embedding service (configurable model / dimensions) |
 | Shared Types | Zod schemas in `packages/types` |
 
@@ -76,18 +76,15 @@ Open:
 Set these in `apps/server/.env`:
 
 - `MONGODB_URI`
-- `ANTHROPIC_API_KEY`
 - `JWT_SECRET`
+- At least one LLM API key: `LLM_API_KEY` (generic fallback), or provider-specific: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`
 
 Useful optional variables:
 
-- `OPENAI_API_KEY` or `EMBEDDING_API_KEY`
-- `EMBEDDING_BASE_URL`
-- `EMBEDDING_MODEL`
-- `EMBEDDING_DIMENSIONS`
-- `ANTHROPIC_BASE_URL`
-- `AVAILABLE_MODELS`
-- `DEFAULT_MODEL`
+- `AVAILABLE_MODELS` — comma-separated list in `provider:modelId` format (e.g. `openai:gpt-4o,anthropic:claude-sonnet-4-6`)
+- `DEFAULT_MODEL` — default model in `provider:modelId` format
+- `DEFAULT_REASONING` — reasoning level: `minimal`, `low`, `medium`, `high`, `xhigh`
+- `EMBEDDING_API_KEY`, `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS`
 - `PORT`
 - `JWT_EXPIRES_IN`
 
@@ -134,7 +131,7 @@ pnpm --filter @ai-novel/mobile dev
 
 - JWT-based login and registration for web and mobile.
 - Admin page for user roles and permission-group management.
-- Permission groups can limit which Claude models a user may select.
+- Permission groups can limit which LLM models a user may select.
 
 ### Localization
 

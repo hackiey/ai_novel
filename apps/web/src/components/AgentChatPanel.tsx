@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { BotMessageSquare, History, Loader2, Pencil, Plus, RotateCcw, X } from "lucide-react";
+import { BotMessageSquare, ChevronDown, History, Loader2, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import { getToken } from "../lib/auth.js";
 import { AgentEvent, AssistantMessageContent } from "./AgentMessageDisplay.js";
@@ -43,6 +43,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string | undefined>();
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -50,6 +51,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
   const truncateMessagesMutation = trpc.agent.truncateMessages.useMutation();
+  const modelsQuery = trpc.agent.getModels.useQuery();
 
   // Auto-resize textarea
   useEffect(() => {
@@ -131,7 +133,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ projectId, worldId, message: text, sessionId, locale: i18n.language }),
+        body: JSON.stringify({ projectId, worldId, message: text, sessionId, locale: i18n.language, model: selectedModel }),
       });
 
       if (!response.ok || !response.body) {
@@ -347,13 +349,32 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
             {showHistory ? <X className="w-4 h-4" /> : <History className="w-4 h-4" />}
           </button>
         </div>
-        <button
-          onClick={handleNewSession}
-          className="p-1.5 rounded-md bg-teal-600 text-white shadow-sm hover:bg-teal-500 transition-colors"
-          title={t("chat.newChat")}
-        >
-          <Plus className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          {modelsQuery.data && modelsQuery.data.available.length >= 1 && (
+            <div className="relative">
+              <select
+                value={selectedModel || modelsQuery.data.default}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="appearance-none text-xs bg-gray-100 border border-gray-200 rounded-md pl-2 pr-6 py-1.5 text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer"
+                title={t("chat.selectModel")}
+              >
+                {modelsQuery.data.available.map((m: string) => (
+                  <option key={m} value={m}>
+                    {m.includes(":") ? m.split(":")[1] : m}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+          )}
+          <button
+            onClick={handleNewSession}
+            className="p-1.5 rounded-md bg-teal-600 text-white shadow-sm hover:bg-teal-500 transition-colors"
+            title={t("chat.newChat")}
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* History sidebar overlay */}

@@ -117,6 +117,7 @@
   "chat.results": "Results",
   "chat.inputPlaceholder": "Ask the AI assistant...",
   "chat.send": "Send",
+  "chat.selectModel": "Select model",
 
   "tool.semantic_search": "Search",
   "tool.get_character": "View Character",

@@ -10,11 +10,21 @@ import { getUserAllowedModels } from "../auth/permissionGroups.js";
 // Store active sessions in memory (shared with router)
 export const sessions = new Map<string, NovelAgentSession>();
 
-const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "claude-sonnet-4-6-20250514";
+// Model format: "provider:modelId" (e.g. "openai:gpt-4o", "anthropic:claude-sonnet-4-6-20250514")
+const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "openai:gpt-4o";
 const AVAILABLE_MODELS = (process.env.AVAILABLE_MODELS || DEFAULT_MODEL)
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
+
+function parseModelSpec(spec: string): { provider: string; modelId: string } {
+  const idx = spec.indexOf(":");
+  if (idx === -1) {
+    // Legacy format: assume anthropic provider for bare model IDs
+    return { provider: "anthropic", modelId: spec };
+  }
+  return { provider: spec.slice(0, idx), modelId: spec.slice(idx + 1) };
+}
 
 function extractUser(request: { headers: { authorization?: string } }): JwtPayload | null {
   const auth = request.headers.authorization;
@@ -34,7 +44,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       return reply.status(401).send({ error: "Unauthorized" });
     }
 
-    const { projectId, worldId, message, sessionId: inputSessionId, model, locale: rawLocale } =
+    const { projectId, worldId, message, sessionId: inputSessionId, model, locale: rawLocale, reasoning: rawReasoning } =
       request.body as {
         projectId: string;
         worldId?: string;
@@ -42,6 +52,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
         sessionId?: string;
         model?: string;
         locale?: string;
+        reasoning?: string;
       };
     const locale: Locale = resolveLocale(rawLocale);
 
@@ -67,6 +78,23 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       return reply.status(403).send({ error: "Model not allowed for your permission group" });
     }
 
+    const { provider, modelId } = parseModelSpec(selectedModel);
+
+    // Resolve API key and base URL per provider
+    const providerEnvPrefix = provider.toUpperCase().replace(/-/g, "_");
+    const apiKey = process.env[`${providerEnvPrefix}_API_KEY`]
+      || process.env.LLM_API_KEY
+      || "";
+    const baseURL = process.env[`${providerEnvPrefix}_BASE_URL`] || undefined;
+
+    // Resolve reasoning level: request > env var > undefined (let pi-ai decide)
+    const VALID_REASONING = ["minimal", "low", "medium", "high", "xhigh"] as const;
+    type ReasoningLevel = typeof VALID_REASONING[number];
+    const reasoningRaw = rawReasoning || process.env.DEFAULT_REASONING || undefined;
+    const reasoning = reasoningRaw && VALID_REASONING.includes(reasoningRaw as ReasoningLevel)
+      ? (reasoningRaw as ReasoningLevel)
+      : undefined;
+
     // Build vector search function if embedding service is available
     const embeddingService = getEmbeddingService();
     let vectorSearchFn: VectorSearchFn | undefined;
@@ -86,9 +114,11 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     if (!session) {
       const embeddingSvc = getEmbeddingService();
       session = new NovelAgentSession({
-        apiKey: process.env.ANTHROPIC_API_KEY || "",
-        baseURL: process.env.ANTHROPIC_BASE_URL || undefined,
-        model: selectedModel,
+        apiKey,
+        provider,
+        modelId,
+        baseURL,
+        reasoning,
         db,
         projectId,
         worldId,

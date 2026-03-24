@@ -7,7 +7,15 @@ import { getEmbeddingService } from "../services/embeddingService.js";
 import { verifyToken, type JwtPayload } from "../auth/jwt.js";
 import mammoth from "mammoth";
 
-const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "claude-sonnet-4-6-20250514";
+const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "openai:gpt-4o";
+
+function parseModelSpec(spec: string): { provider: string; modelId: string } {
+  const idx = spec.indexOf(":");
+  if (idx === -1) {
+    return { provider: "anthropic", modelId: spec };
+  }
+  return { provider: spec.slice(0, idx), modelId: spec.slice(idx + 1) };
+}
 const IMPORT_CHUNK_SIZE_CHARS = Number(process.env.IMPORT_CHUNK_SIZE_CHARS) || 10000;
 const IMPORT_CHUNK_SIZE_WORDS = Number(process.env.IMPORT_CHUNK_SIZE_WORDS) || 10000;
 
@@ -210,10 +218,19 @@ async function handleImportStream(
         console.error("[FileImport] Failed to get world summary:", err);
       }
 
+      const selectedModel = model || DEFAULT_MODEL;
+      const { provider, modelId } = parseModelSpec(selectedModel);
+      const providerEnvPrefix = provider.toUpperCase().replace(/-/g, "_");
+      const apiKey = process.env[`${providerEnvPrefix}_API_KEY`]
+        || process.env.LLM_API_KEY
+        || "";
+      const baseURL = process.env[`${providerEnvPrefix}_BASE_URL`] || undefined;
+
       const session = new NovelAgentSession({
-        apiKey: process.env.ANTHROPIC_API_KEY || "",
-        baseURL: process.env.ANTHROPIC_BASE_URL || undefined,
-        model: model || DEFAULT_MODEL,
+        apiKey,
+        provider,
+        modelId,
+        baseURL,
         db,
         projectId: worldId,
         worldId,

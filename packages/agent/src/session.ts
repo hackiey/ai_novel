@@ -1,12 +1,11 @@
-import { query } from "@anthropic-ai/claude-agent-sdk";
+import { getModel, type Model, type Api, type UserMessage, type Message, type SimpleStreamOptions, type ThinkingLevel } from "@mariozechner/pi-ai";
+import { runAgentLoop, type AgentContext, type AgentEvent as PiAgentEvent, type AgentLoopConfig, type AgentMessage } from "@mariozechner/pi-agent-core";
 import type { Db } from "mongodb";
 import { buildSystemPromptWithHistory } from "./systemPrompt.js";
 import type { HistoryMessage } from "./systemPrompt.js";
-import { createNovelToolsServer } from "./tools/index.js";
+import { createNovelTools } from "./tools/index.js";
 import type { VectorSearchFn, OnDocumentChangedFn, OnWorldSummaryStaleFn } from "./tools/index.js";
 import type { Locale } from "./i18n.js";
-
-const DEFAULT_MODEL = "claude-sonnet-4-6-20250514";
 
 export type AgentEvent =
   | { type: "text"; text: string }
@@ -15,14 +14,19 @@ export type AgentEvent =
   | { type: "done"; fullResponse: string }
   | { type: "error"; error: string };
 
+export interface SessionModelConfig {
+  provider: string;
+  modelId: string;
+}
+
 export class NovelAgentSession {
-  private model: string;
+  private model: Model<any>;
   private db: Db;
   private projectId: string;
   private worldId?: string;
   private userId?: string;
   private apiKey: string;
-  private baseURL?: string;
+  private reasoning?: "minimal" | "low" | "medium" | "high" | "xhigh";
   private abortController?: AbortController;
   private vectorSearchFn?: VectorSearchFn;
   private onDocumentChanged?: OnDocumentChangedFn;
@@ -30,8 +34,10 @@ export class NovelAgentSession {
 
   constructor(options: {
     apiKey: string;
+    provider: string;
+    modelId: string;
     baseURL?: string;
-    model?: string;
+    reasoning?: "minimal" | "low" | "medium" | "high" | "xhigh";
     db: Db;
     projectId: string;
     worldId?: string;
@@ -41,8 +47,12 @@ export class NovelAgentSession {
     onWorldSummaryStale?: OnWorldSummaryStaleFn;
   }) {
     this.apiKey = options.apiKey;
-    this.baseURL = options.baseURL;
-    this.model = options.model || DEFAULT_MODEL;
+    const model = getModel(options.provider as any, options.modelId as any);
+    if (options.baseURL) {
+      model.baseUrl = options.baseURL;
+    }
+    this.model = model;
+    this.reasoning = options.reasoning;
     this.db = options.db;
     this.projectId = options.projectId;
     this.worldId = options.worldId;
@@ -53,14 +63,6 @@ export class NovelAgentSession {
   }
 
   async *chat(userMessage: string, history?: HistoryMessage[], memory?: string, worldSummary?: string, locale: Locale = "zh"): AsyncGenerator<AgentEvent> {
-    const env: Record<string, string | undefined> = {
-      ...process.env,
-      ANTHROPIC_API_KEY: this.apiKey,
-    };
-    if (this.baseURL) {
-      env.ANTHROPIC_BASE_URL = this.baseURL;
-    }
-
     const systemPrompt = buildSystemPromptWithHistory(
       this.projectId,
       this.worldId,
@@ -70,105 +72,116 @@ export class NovelAgentSession {
       locale,
     );
 
-    const novelToolsServer = createNovelToolsServer(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale, locale, this.worldId, this.projectId);
+    const tools = createNovelTools(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale, locale, this.worldId, this.projectId);
+
     const abortController = new AbortController();
     this.abortController = abortController;
 
     let fullResponse = "";
 
+    // Collect events from the agent loop via the emit callback
+    const eventQueue: PiAgentEvent[] = [];
+    let resolveWaiting: (() => void) | null = null;
+    let loopDone = false;
+    let loopError: Error | null = null;
+
+    const userMsg: UserMessage = {
+      role: "user",
+      content: userMessage,
+      timestamp: Date.now(),
+    };
+
+    const context: AgentContext = {
+      systemPrompt,
+      messages: [],
+      tools,
+    };
+
+    const apiKey = this.apiKey;
+    const config: AgentLoopConfig = {
+      model: this.model,
+      apiKey,
+      maxTokens: 8192,
+      reasoning: this.reasoning,
+      convertToLlm: (messages: AgentMessage[]) => {
+        return messages.filter((m): m is Message =>
+          typeof m === "object" && m !== null && "role" in m &&
+          (m.role === "user" || m.role === "assistant" || m.role === "toolResult")
+        );
+      },
+    };
+
+    const emit = (event: PiAgentEvent) => {
+      eventQueue.push(event);
+      if (resolveWaiting) {
+        resolveWaiting();
+        resolveWaiting = null;
+      }
+    };
+
+    // Start the agent loop in the background
+    const loopPromise = runAgentLoop(
+      [userMsg],
+      context,
+      config,
+      emit,
+      abortController.signal,
+    ).then(() => {
+      loopDone = true;
+      if (resolveWaiting) {
+        resolveWaiting();
+        resolveWaiting = null;
+      }
+    }).catch((err) => {
+      loopError = err instanceof Error ? err : new Error(String(err));
+      loopDone = true;
+      if (resolveWaiting) {
+        resolveWaiting();
+        resolveWaiting = null;
+      }
+    });
+
     try {
-      const q = query({
-        prompt: userMessage,
-        options: {
-          model: this.model,
-          systemPrompt,
-          permissionMode: "bypassPermissions",
-          allowDangerouslySkipPermissions: true,
-          mcpServers: {
-            "novel-tools": novelToolsServer,
-          },
-          tools: [],
-          allowedTools: ["mcp__novel-tools__*"],
-          maxTurns: 20,
-          env,
-          abortController,
-          persistSession: false,
-        },
-      });
+      while (true) {
+        // Process all queued events
+        while (eventQueue.length > 0) {
+          const event = eventQueue.shift()!;
 
-      for await (const message of q) {
-        // Skip system init messages
-        if (message.type === "system") {
-          console.log("[AgentSession] system message received");
-          continue;
-        }
-        console.log("[AgentSession] message type:", message.type, message.type === "assistant" ? `content blocks: ${JSON.stringify(message.message.content.map((b: any) => ({ type: b.type, len: b.text?.length })))}` : message.type === "result" ? `subtype: ${(message as any).subtype}` : "");
-
-        // Handle assistant messages (text + tool_use blocks)
-        if (message.type === "assistant") {
-          console.log("[AgentSession] processing assistant, blocks:", message.message.content.length);
-          for (const block of message.message.content) {
-            console.log("[AgentSession] block type:", block.type);
-            if (block.type === "text") {
-              fullResponse += block.text;
-              console.log("[AgentSession] yielding text event:", block.text.substring(0, 50));
-              yield { type: "text", text: block.text };
-              console.log("[AgentSession] text event yielded successfully");
-            } else if (block.type === "tool_use") {
-              yield {
-                type: "tool_use",
-                toolName: block.name,
-                toolInput: block.input,
-              };
+          if (event.type === "message_update") {
+            const ame = event.assistantMessageEvent;
+            if (ame.type === "text_delta") {
+              fullResponse += ame.delta;
+              yield { type: "text", text: ame.delta };
             }
+          } else if (event.type === "tool_execution_start") {
+            yield {
+              type: "tool_use",
+              toolName: event.toolName,
+              toolInput: event.args,
+            };
+          } else if (event.type === "tool_execution_end") {
+            yield {
+              type: "tool_result",
+              toolName: event.toolName,
+              result: event.result,
+            };
+          } else if (event.type === "agent_end") {
+            // Agent loop completed
           }
-          continue;
         }
 
-        // Handle user messages (tool results)
-        if (message.type === "user") {
-          const userMsg = message as any;
-          // Check message content for tool_result blocks
-          let yielded = false;
-          const content = userMsg.message?.content;
-          if (Array.isArray(content)) {
-            for (const block of content) {
-              if (block.type === "tool_result") {
-                const resultContent = Array.isArray(block.content)
-                  ? block.content.map((c: any) => c.text || "").join("")
-                  : typeof block.content === "string" ? block.content : JSON.stringify(block.content);
-                yield {
-                  type: "tool_result" as const,
-                  result: resultContent,
-                };
-                yielded = true;
-              }
-            }
-          }
-          // Fallback: use tool_use_result from SDK if no blocks found
-          if (!yielded && userMsg.tool_use_result !== undefined) {
-            yield {
-              type: "tool_result" as const,
-              result: typeof userMsg.tool_use_result === "string"
-                ? userMsg.tool_use_result
-                : JSON.stringify(userMsg.tool_use_result),
-            };
-          }
-          continue;
-        }
+        if (loopDone) break;
 
-        // Handle result messages
-        if (message.type === "result") {
-          const resultMsg = message as { type: "result"; subtype: string; errors?: string[] };
-          if (resultMsg.subtype !== "success") {
-            const errorDetail = resultMsg.errors ? resultMsg.errors.join("; ") : resultMsg.subtype;
-            yield {
-              type: "error",
-              error: `Agent ended with status: ${resultMsg.subtype} - ${errorDetail}`,
-            };
-          }
-          break;
-        }
+        // Wait for more events
+        await new Promise<void>((resolve) => {
+          resolveWaiting = resolve;
+        });
+      }
+
+      if (loopError) {
+        const err = loopError as Error;
+        console.error("[AgentSession] chat error:", err.message);
+        yield { type: "error", error: err.message };
       }
 
       this.abortController = undefined;

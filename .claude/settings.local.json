@@ -61,7 +61,10 @@
       "Bash(ls:*)",
       "Bash(curl:*)",
       "Bash(gtimeout:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:deepwiki.com)"
     ]
   }
 }

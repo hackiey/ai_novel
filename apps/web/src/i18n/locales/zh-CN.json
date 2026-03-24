@@ -117,6 +117,7 @@
   "chat.results": "结果",
   "chat.inputPlaceholder": "向 AI 助手提问...",
   "chat.send": "发送",
+  "chat.selectModel": "选择模型",
 
   "tool.semantic_search": "搜索",
   "tool.get_character": "查看角色",
