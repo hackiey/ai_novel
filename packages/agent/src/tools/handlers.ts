@@ -5,7 +5,10 @@ function toObjectId(id: string): ObjectId {
   return new ObjectId(id);
 }
 
-// Helper to serialize MongoDB documents (convert ObjectId to string)
+// Fields that should never be sent to the LLM (large embedding vectors waste tokens)
+const EXCLUDED_FIELDS = new Set(["embedding", "embeddingText", "embeddingUpdatedAt"]);
+
+// Helper to serialize MongoDB documents (convert ObjectId to string, strip embedding fields)
 function serialize(doc: unknown): unknown {
   if (doc === null || doc === undefined) return doc;
   if (doc instanceof ObjectId) return doc.toHexString();
@@ -14,6 +17,7 @@ function serialize(doc: unknown): unknown {
   if (typeof doc === "object") {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(doc as Record<string, unknown>)) {
+      if (EXCLUDED_FIELDS.has(key)) continue;
       result[key] = serialize(value);
     }
     return result;
