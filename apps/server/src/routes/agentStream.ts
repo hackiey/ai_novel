@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { ObjectId } from "mongodb";
 import { NovelAgentSession, getOrRefreshWorldSummary, resolveLocale } from "@ai-novel/agent";
-import type { HistoryMessage, HistoryToolCall, VectorSearchFn, Locale } from "@ai-novel/agent";
+import type { VectorSearchFn, Locale, Message } from "@ai-novel/agent";
 import { getDb } from "../db.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 import { verifyToken, type JwtPayload } from "../auth/jwt.js";
@@ -177,27 +177,27 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       createdAt: now,
     });
 
-    // Load conversation history from DB (exclude the message we just inserted)
+    // Load conversation history as structured Message[] from DB
     const historyDocs = await db
       .collection("agent_messages")
       .find({ sessionId, createdAt: { $lt: now } })
       .sort({ createdAt: 1 })
       .toArray();
 
-    const history: HistoryMessage[] = historyDocs.map((doc) => {
-      const msg: HistoryMessage = {
-        role: doc.role as "user" | "assistant",
-        content: (doc.content as string) || "",
-      };
-      if (doc.role === "assistant" && Array.isArray(doc.events)) {
-        const toolCalls: HistoryToolCall[] = doc.events
-          .filter((e: any) => e.type === "tool_use" && e.toolName)
-          .map((e: any) => ({ toolName: e.toolName, toolInput: e.toolInput }));
-        if (toolCalls.length > 0) {
-          msg.toolCalls = toolCalls;
-        }
+    const historyMessages: Message[] = historyDocs.flatMap((doc) => {
+      // New format: assistant messages store full Message[] in `messages` field
+      if (doc.role === "assistant" && Array.isArray(doc.messages)) {
+        return doc.messages as Message[];
       }
-      return msg;
+      // User messages: reconstruct UserMessage
+      if (doc.role === "user") {
+        return [{
+          role: "user" as const,
+          content: (doc.content as string) || "",
+          timestamp: new Date(doc.createdAt).getTime(),
+        }];
+      }
+      return [];
     });
 
     // Load agent memory for this world
@@ -265,9 +265,23 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     // Stream agent events
     const allEvents: any[] = [];
     let fullText = "";
+    let turnMessages: Message[] = [];
 
     try {
-      for await (const event of session.chat(message, history, memoryContent, worldSummary, locale, projectMemoryContent, workingEnvironment)) {
+      for await (const event of session.chat(message, {
+        historyMessages,
+        memory: memoryContent,
+        worldSummary,
+        locale,
+        projectMemory: projectMemoryContent,
+        workingEnvironment,
+      })) {
+        if (event.type === "messages") {
+          // Capture structured messages but don't send to client
+          turnMessages = event.messages;
+          continue;
+        }
+
         reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
         allEvents.push(event);
 
@@ -280,13 +294,14 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       reply.raw.write(`data: ${JSON.stringify({ type: "error", error: errorMsg })}\n\n`);
     }
 
-    // Save assistant message to DB
+    // Save assistant message to DB with structured messages for history replay
     await db.collection("agent_messages").insertOne({
       sessionId,
       userId: user.userId,
       role: "assistant",
       content: fullText,
       events: allEvents,
+      messages: turnMessages,
       createdAt: new Date(),
     });
 

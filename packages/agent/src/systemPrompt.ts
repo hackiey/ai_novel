@@ -18,21 +18,9 @@ ${texts.interaction}
 ${texts.notes}`;
 }
 
-export interface HistoryToolCall {
-  toolName: string;
-  toolInput?: unknown;
-}
-
-export interface HistoryMessage {
-  role: "user" | "assistant";
-  content: string;
-  toolCalls?: HistoryToolCall[];
-}
-
-export function buildSystemPromptWithHistory(
+export function buildSystemPromptWithContext(
   projectId: string,
   worldId?: string,
-  history?: HistoryMessage[],
   memory?: string,
   worldSummary?: string,
   locale: Locale = "zh",
@@ -56,29 +44,6 @@ export function buildSystemPromptWithHistory(
 
   if (projectMemory) {
     prompt += `\n\n${texts.projectMemoryHeading}\n\n${texts.projectMemoryIntro}\n\n${projectMemory}\n\n${texts.memoryFooter}`;
-  }
-
-  if (history && history.length > 0) {
-    prompt += `\n\n${texts.historyHeading}\n\n${texts.historyIntro}\n\n`;
-    for (const msg of history) {
-      if (msg.role === "user") {
-        prompt += `${texts.historyUser} ${msg.content}\n\n`;
-      } else {
-        if (msg.toolCalls && msg.toolCalls.length > 0) {
-          const toolSummary = msg.toolCalls
-            .map((tc) => {
-              const inputStr = tc.toolInput ? ` ${JSON.stringify(tc.toolInput)}` : "";
-              return `  - ${tc.toolName}${inputStr}`;
-            })
-            .join("\n");
-          prompt += `${texts.historyAssistantTool}\n${toolSummary}\n\n`;
-        }
-        if (msg.content) {
-          prompt += `${texts.historyAssistant} ${msg.content}\n\n`;
-        }
-      }
-    }
-    prompt += texts.historyFooter;
   }
 
   return prompt;

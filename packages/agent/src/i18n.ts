@@ -64,14 +64,6 @@ const zh = {
   projectMemoryHeading: "## 小说项目偏好记忆",
   projectMemoryIntro: "以下是用户之前要求你记住的本小说项目级别的行为偏好和工作方式指导，请严格遵守：",
 
-  // ── History section ──
-  historyHeading: "## 对话历史",
-  historyIntro: "以下是本次会话的历史对话记录（包含工具调用），你已经获取过的数据不需要重复查询：",
-  historyUser: "**用户：**",
-  historyAssistantTool: "**助手（已调用工具）：**",
-  historyAssistant: "**助手：**",
-  historyFooter: "---\n请基于以上对话历史继续回答用户的新消息。不要重复查询已经获取过的数据，除非用户明确要求刷新。",
-
   // ── Tool descriptions ──
   tools: {
     semantic_search: "搜索角色、世界观设定、草稿、章节中的相关内容。支持语义搜索（向量匹配）和关键词搜索。projectId 和 worldId 已自动注入。",
@@ -258,14 +250,6 @@ const en: typeof zh = {
   // ── Project memory section ──
   projectMemoryHeading: "## Project Preference Memory",
   projectMemoryIntro: "Below are the user's previously saved project-level behavior preferences and workflow guidelines for this novel. Follow them strictly:",
-
-  // ── History section ──
-  historyHeading: "## Conversation History",
-  historyIntro: "Below is the conversation history for this session (including tool calls). You do not need to re-query data you have already fetched:",
-  historyUser: "**User:**",
-  historyAssistantTool: "**Assistant (tool calls made):**",
-  historyAssistant: "**Assistant:**",
-  historyFooter: "---\nContinue answering the user's new message based on the conversation history above. Do not re-query data already fetched, unless the user explicitly requests a refresh.",
 
   // ── Tool descriptions ──
   tools: {

@@ -1,8 +1,7 @@
 import { getModel, type Model, type Api, type UserMessage, type Message, type SimpleStreamOptions, type ThinkingLevel } from "@mariozechner/pi-ai";
 import { runAgentLoop, type AgentContext, type AgentEvent as PiAgentEvent, type AgentLoopConfig, type AgentMessage } from "@mariozechner/pi-agent-core";
 import type { Db } from "mongodb";
-import { buildSystemPromptWithHistory } from "./systemPrompt.js";
-import type { HistoryMessage } from "./systemPrompt.js";
+import { buildSystemPromptWithContext } from "./systemPrompt.js";
 import { createNovelTools } from "./tools/index.js";
 import type { VectorSearchFn, OnDocumentChangedFn, OnWorldSummaryStaleFn } from "./tools/index.js";
 import type { Locale } from "./i18n.js";
@@ -11,6 +10,7 @@ export type AgentEvent =
   | { type: "text"; text: string }
   | { type: "tool_use"; toolName: string; toolInput: unknown }
   | { type: "tool_result"; toolName?: string; result: unknown }
+  | { type: "messages"; messages: Message[] }
   | { type: "done"; fullResponse: string }
   | { type: "error"; error: string };
 
@@ -62,11 +62,18 @@ export class NovelAgentSession {
     this.onWorldSummaryStale = options.onWorldSummaryStale;
   }
 
-  async *chat(userMessage: string, history?: HistoryMessage[], memory?: string, worldSummary?: string, locale: Locale = "zh", projectMemory?: string, workingEnvironment?: string): AsyncGenerator<AgentEvent> {
-    const systemPrompt = buildSystemPromptWithHistory(
+  async *chat(userMessage: string, options: {
+    historyMessages?: Message[];
+    memory?: string;
+    worldSummary?: string;
+    locale?: Locale;
+    projectMemory?: string;
+    workingEnvironment?: string;
+  } = {}): AsyncGenerator<AgentEvent> {
+    const { historyMessages, memory, worldSummary, locale = "zh", projectMemory, workingEnvironment } = options;
+    const systemPrompt = buildSystemPromptWithContext(
       this.projectId,
       this.worldId,
-      history,
       memory,
       worldSummary,
       locale,
@@ -95,7 +102,7 @@ export class NovelAgentSession {
 
     const context: AgentContext = {
       systemPrompt,
-      messages: [],
+      messages: historyMessages ? [...historyMessages] : [],
       tools,
     };
 
@@ -106,10 +113,25 @@ export class NovelAgentSession {
       maxTokens: 8192,
       reasoning: this.reasoning,
       convertToLlm: (messages: AgentMessage[]) => {
-        return messages.filter((m): m is Message =>
+        const llmMessages = messages.filter((m): m is Message =>
           typeof m === "object" && m !== null && "role" in m &&
           (m.role === "user" || m.role === "assistant" || m.role === "toolResult")
         );
+        console.log("[AgentSession] convertToLlm: %d messages -> %d LLM messages", messages.length, llmMessages.length);
+        for (const m of llmMessages) {
+          if (m.role === "user") {
+            const text = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+            console.log("  [%s] %s", m.role, text.slice(0, 200));
+          } else if (m.role === "assistant") {
+            const textParts = m.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+            const toolCalls = m.content.filter((c: any) => c.type === "toolCall").map((c: any) => c.name);
+            console.log("  [%s] text=%s toolCalls=%s", m.role, textParts.slice(0, 150), toolCalls.join(",") || "none");
+          } else if (m.role === "toolResult") {
+            const text = m.content.map((c: any) => c.type === "text" ? c.text : `[${c.type}]`).join("").slice(0, 150);
+            console.log("  [%s] tool=%s error=%s result=%s", m.role, m.toolName, m.isError, text);
+          }
+        }
+        return llmMessages;
       },
     };
 
@@ -168,7 +190,13 @@ export class NovelAgentSession {
               result: event.result,
             };
           } else if (event.type === "agent_end") {
-            // Agent loop completed
+            // Yield the new messages from this turn for the caller to store
+            const newMessages = event.messages.filter(
+              (m): m is Message =>
+                typeof m === "object" && m !== null && "role" in m &&
+                (m.role === "user" || m.role === "assistant" || m.role === "toolResult")
+            );
+            yield { type: "messages", messages: newMessages };
           }
         }
 

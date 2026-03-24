@@ -54,6 +54,41 @@ async function main() {
     await db.collection(col).createIndex({ userId: 1 });
   }
 
+  // Ensure vector search indexes (Atlas Search)
+  if (embeddingApiKey) {
+    const dimensions = process.env.EMBEDDING_DIMENSIONS ? Number(process.env.EMBEDDING_DIMENSIONS) : 1536;
+    const vectorCollections = [
+      { name: "characters", filters: ["worldId"] },
+      { name: "world_settings", filters: ["worldId"] },
+      { name: "drafts", filters: ["worldId", "projectId"] },
+      { name: "chapters", filters: ["projectId"] },
+    ];
+    for (const { name, filters } of vectorCollections) {
+      try {
+        const col = db.collection(name);
+        const existing = await col.listSearchIndexes("vector_index").toArray();
+        if (existing.length === 0) {
+          await col.createSearchIndex({
+            name: "vector_index",
+            type: "vectorSearch",
+            definition: {
+              fields: [
+                { type: "vector", path: "embedding", numDimensions: dimensions, similarity: "cosine" },
+                ...filters.map((f) => ({ type: "filter" as const, path: f })),
+              ],
+            },
+          });
+          console.log(`Created vector_index on ${name}`);
+        }
+      } catch (err: any) {
+        // Not on Atlas or index already exists — skip silently
+        if (!err.message?.includes("already exists")) {
+          console.warn(`Could not create vector_index on ${name}: ${err.message}`);
+        }
+      }
+    }
+  }
+
   // Register tRPC
   await fastify.register(fastifyTRPCPlugin, {
     prefix: "/trpc",

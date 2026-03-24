@@ -253,7 +253,7 @@ async function handleImportStream(
 
       console.log(`[FileImport] Chunk ${i}: starting chat, message length: ${message.length}`);
       let eventCount = 0;
-      const chatGen = session.chat(message, [], undefined, worldSummary, locale);
+      const chatGen = session.chat(message, { worldSummary, locale });
       try {
         for await (const event of chatGen) {
           if (cancelled) break;
