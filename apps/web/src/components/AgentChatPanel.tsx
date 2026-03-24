@@ -416,11 +416,21 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                 className="appearance-none text-xs bg-gray-100 border border-gray-200 rounded-md pl-2 pr-6 py-1.5 text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer"
                 title={t("chat.selectModel")}
               >
-                {modelsQuery.data.available.map((m: string) => (
-                  <option key={m} value={m}>
-                    {m.includes(":") ? m.split(":")[1] : m}
-                  </option>
-                ))}
+                {modelsQuery.data.available.map((m: string) => {
+                  // Format: "provider:modelId/reasoning" → display "modelId (reasoning)"
+                  const afterColon = m.includes(":") ? m.split(":")[1] : m;
+                  const slashIdx = afterColon.lastIndexOf("/");
+                  const reasoningLevels = ["minimal", "low", "medium", "high", "xhigh"];
+                  let display = afterColon;
+                  if (slashIdx !== -1 && reasoningLevels.includes(afterColon.slice(slashIdx + 1))) {
+                    display = `${afterColon.slice(0, slashIdx)} (${afterColon.slice(slashIdx + 1)})`;
+                  }
+                  return (
+                    <option key={m} value={m}>
+                      {display}
+                    </option>
+                  );
+                })}
               </select>
               <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>

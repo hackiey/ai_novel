@@ -17,13 +17,33 @@ const AVAILABLE_MODELS = (process.env.AVAILABLE_MODELS || DEFAULT_MODEL)
   .map((value) => value.trim())
   .filter(Boolean);
 
-function parseModelSpec(spec: string): { provider: string; modelId: string } {
+const VALID_REASONING = ["minimal", "low", "medium", "high", "xhigh"] as const;
+type ReasoningLevel = typeof VALID_REASONING[number];
+
+function parseModelSpec(spec: string): { provider: string; modelId: string; reasoning?: ReasoningLevel } {
+  // Format: provider:modelId/reasoning (reasoning is optional)
+  // e.g. "openai:gpt-5.4/medium", "anthropic:claude-opus-4-6/high", "openai:gpt-4o"
   const idx = spec.indexOf(":");
+  let provider: string;
+  let rest: string;
   if (idx === -1) {
     // Legacy format: assume anthropic provider for bare model IDs
-    return { provider: "anthropic", modelId: spec };
+    provider = "anthropic";
+    rest = spec;
+  } else {
+    provider = spec.slice(0, idx);
+    rest = spec.slice(idx + 1);
   }
-  return { provider: spec.slice(0, idx), modelId: spec.slice(idx + 1) };
+
+  const slashIdx = rest.lastIndexOf("/");
+  if (slashIdx !== -1) {
+    const maybReasoning = rest.slice(slashIdx + 1);
+    if (VALID_REASONING.includes(maybReasoning as ReasoningLevel)) {
+      return { provider, modelId: rest.slice(0, slashIdx), reasoning: maybReasoning as ReasoningLevel };
+    }
+  }
+
+  return { provider, modelId: rest };
 }
 
 function extractUser(request: { headers: { authorization?: string } }): JwtPayload | null {
@@ -44,7 +64,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       return reply.status(401).send({ error: "Unauthorized" });
     }
 
-    const { projectId, worldId, message, sessionId: inputSessionId, model, locale: rawLocale, reasoning: rawReasoning, currentChapterId } =
+    const { projectId, worldId, message, sessionId: inputSessionId, model, locale: rawLocale, currentChapterId } =
       request.body as {
         projectId: string;
         worldId?: string;
@@ -52,7 +72,6 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
         sessionId?: string;
         model?: string;
         locale?: string;
-        reasoning?: string;
         currentChapterId?: string;
       };
     const locale: Locale = resolveLocale(rawLocale);
@@ -79,7 +98,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       return reply.status(403).send({ error: "Model not allowed for your permission group" });
     }
 
-    const { provider, modelId } = parseModelSpec(selectedModel);
+    const { provider, modelId, reasoning: modelReasoning } = parseModelSpec(selectedModel);
 
     // Resolve API key and base URL per provider
     const providerEnvPrefix = provider.toUpperCase().replace(/-/g, "_");
@@ -88,13 +107,12 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       || "";
     const baseURL = process.env[`${providerEnvPrefix}_BASE_URL`] || undefined;
 
-    // Resolve reasoning level: request > env var > undefined (let pi-ai decide)
-    const VALID_REASONING = ["minimal", "low", "medium", "high", "xhigh"] as const;
-    type ReasoningLevel = typeof VALID_REASONING[number];
-    const reasoningRaw = rawReasoning || process.env.DEFAULT_REASONING || undefined;
-    const reasoning = reasoningRaw && VALID_REASONING.includes(reasoningRaw as ReasoningLevel)
-      ? (reasoningRaw as ReasoningLevel)
+    // Resolve reasoning level: model spec > env var > undefined (let pi-ai decide)
+    const defaultReasoningRaw = process.env.DEFAULT_REASONING;
+    const defaultReasoning = defaultReasoningRaw && VALID_REASONING.includes(defaultReasoningRaw as ReasoningLevel)
+      ? (defaultReasoningRaw as ReasoningLevel)
       : undefined;
+    const reasoning = modelReasoning ?? defaultReasoning;
 
     // Build vector search function if embedding service is available
     const embeddingService = getEmbeddingService();
