@@ -9,6 +9,7 @@ import { AgentEvent, AssistantMessageContent } from "./AgentMessageDisplay.js";
 const API_BASE = "";
 
 // Tools that mutate data — map tool names to the tRPC query keys to invalidate
+// tRPC v11 query keys are double-nested: [["router", "procedure"], ...]
 const MUTATION_TOOL_INVALIDATIONS: Record<string, string[][]> = {
   create_character: [["character"]],
   update_character: [["character"]],
@@ -271,7 +272,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
         }
       }
       for (const keyStr of keysToInvalidate) {
-        queryClient.invalidateQueries({ queryKey: JSON.parse(keyStr) });
+        queryClient.invalidateQueries({ queryKey: [JSON.parse(keyStr)] });
       }
 
       // Refresh session list
