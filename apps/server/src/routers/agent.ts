@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ObjectId } from "mongodb";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { objectIdSchema } from "@ai-novel/types";
 import { sessions } from "../routes/agentStream.js";
@@ -74,6 +75,51 @@ export const agentRouter = router({
         sessions.delete(input.sessionId);
       }
 
+      return { success: true };
+    }),
+
+  getMemory: protectedProcedure
+    .input(z.object({
+      worldId: objectIdSchema.optional(),
+      projectId: objectIdSchema.optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const result: { worldMemory?: string; projectMemory?: string } = {};
+      if (input.worldId) {
+        const doc = await ctx.db.collection("agent_memory").findOne({ worldId: new ObjectId(input.worldId) });
+        if (doc?.content) result.worldMemory = doc.content as string;
+      }
+      if (input.projectId) {
+        const doc = await ctx.db.collection("agent_memory").findOne({ projectId: new ObjectId(input.projectId) });
+        if (doc?.content) result.projectMemory = doc.content as string;
+      }
+      return result;
+    }),
+
+  updateMemory: protectedProcedure
+    .input(z.object({
+      scope: z.enum(["world", "project"]),
+      worldId: objectIdSchema.optional(),
+      projectId: objectIdSchema.optional(),
+      content: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const now = new Date();
+      if (input.scope === "project" && input.projectId) {
+        await ctx.db.collection("agent_memory").updateOne(
+          { projectId: new ObjectId(input.projectId) },
+          { $set: { content: input.content, updatedAt: now } },
+          { upsert: true },
+        );
+      } else if (input.scope === "world" && input.worldId) {
+        await ctx.db.collection("agent_memory").updateOne(
+          { worldId: new ObjectId(input.worldId) },
+          { $set: { content: input.content, updatedAt: now } },
+          { upsert: true },
+        );
+      } else {
+        throw new Error("Invalid scope or missing ID");
+      }
       return { success: true };
     }),
 

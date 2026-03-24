@@ -53,9 +53,13 @@ const zh = {
   uncategorized: "其他",
 
   // ── Memory section ──
-  memoryHeading: "## 用户偏好记忆",
-  memoryIntro: "以下是用户之前要求你记住的行为偏好和工作方式指导，请严格遵守：",
-  memoryFooter: "> 当用户要求你记住新的偏好时，将新偏好与上方已有的记忆内容合并后，用 update_memory 保存完整内容。",
+  memoryHeading: "## 世界观偏好记忆",
+  memoryIntro: "以下是用户之前要求你记住的世界观级别行为偏好和工作方式指导，请严格遵守：",
+  memoryFooter: "> 当用户要求你记住新的偏好时，将新偏好与上方已有的记忆内容合并后，用 update_memory 保存完整内容。使用 scope 参数指定保存到世界观(world)还是小说项目(project)级别。",
+
+  // ── Project memory section ──
+  projectMemoryHeading: "## 小说项目偏好记忆",
+  projectMemoryIntro: "以下是用户之前要求你记住的本小说项目级别的行为偏好和工作方式指导，请严格遵守：",
 
   // ── History section ──
   historyHeading: "## 对话历史",
@@ -156,8 +160,9 @@ const zh = {
     delete_draft: "删除指定草稿。此操作不可撤销。",
     delete_draft_id: "要删除的草稿ID",
 
-    update_memory: "更新用户偏好记忆。整体覆盖 content 字段。当用户要求你记住某些做事方式、行为偏好时调用此工具保存。worldId 已自动注入。",
+    update_memory: "更新用户偏好记忆。整体覆盖 content 字段。当用户要求你记住某些做事方式、行为偏好时调用此工具保存。worldId 和 projectId 已自动注入。可通过 scope 参数选择保存到世界观级别(world)还是小说项目级别(project)。在编辑页面默认保存到 project 级别，在世界页面默认保存到 world 级别。",
     update_memory_content: "完整的记忆内容（会整体覆盖旧内容，请先读取再追加）",
+    update_memory_scope: "记忆范围：world（世界观级别，跨项目共享）或 project（小说项目级别，仅当前项目）。编辑页面默认 project，世界页面默认 world。",
 
     generate_synopsis: "获取章节内容，用于生成章节梗概。返回章节全文供AI总结。",
     generate_synopsis_chapterId: "章节ID",
@@ -232,9 +237,13 @@ const en: typeof zh = {
   uncategorized: "Other",
 
   // ── Memory section ──
-  memoryHeading: "## User Preference Memory",
-  memoryIntro: "Below are the user's previously saved behavior preferences and workflow guidelines. Follow them strictly:",
-  memoryFooter: "> When the user asks you to remember a new preference, merge it with the existing memory shown above, then use update_memory to save the complete content.",
+  memoryHeading: "## World Preference Memory",
+  memoryIntro: "Below are the user's previously saved world-level behavior preferences and workflow guidelines. Follow them strictly:",
+  memoryFooter: "> When the user asks you to remember a new preference, merge it with the existing memory shown above, then use update_memory to save the complete content. Use the scope parameter to specify whether to save at world or project level.",
+
+  // ── Project memory section ──
+  projectMemoryHeading: "## Project Preference Memory",
+  projectMemoryIntro: "Below are the user's previously saved project-level behavior preferences and workflow guidelines for this novel. Follow them strictly:",
 
   // ── History section ──
   historyHeading: "## Conversation History",
@@ -335,8 +344,9 @@ const en: typeof zh = {
     delete_draft: "Delete a draft. This action is irreversible.",
     delete_draft_id: "Draft ID to delete",
 
-    update_memory: "Update user preference memory. Overwrites the entire content field. Call this when the user asks you to remember certain work styles or behavior preferences. worldId is auto-injected.",
+    update_memory: "Update user preference memory. Overwrites the entire content field. Call this when the user asks you to remember certain work styles or behavior preferences. worldId and projectId are auto-injected. Use the scope parameter to choose between world-level (shared across projects) or project-level (this novel only). Defaults to project when in editor, world when in world page.",
     update_memory_content: "Complete memory content (will overwrite old content entirely; read first, then append)",
+    update_memory_scope: "Memory scope: world (world-level, shared across projects) or project (project-level, this novel only). Defaults to project in editor, world in world page.",
 
     generate_synopsis: "Retrieve chapter content for generating a chapter synopsis. Returns the full chapter text for AI summarization.",
     generate_synopsis_chapterId: "Chapter ID",

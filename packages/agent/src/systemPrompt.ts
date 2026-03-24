@@ -36,6 +36,7 @@ export function buildSystemPromptWithHistory(
   memory?: string,
   worldSummary?: string,
   locale: Locale = "zh",
+  projectMemory?: string,
 ): string {
   const texts = t(locale);
   let prompt = buildSystemPrompt(projectId, worldId, locale);
@@ -46,6 +47,10 @@ export function buildSystemPromptWithHistory(
 
   if (memory) {
     prompt += `\n\n${texts.memoryHeading}\n\n${texts.memoryIntro}\n\n${memory}\n\n${texts.memoryFooter}`;
+  }
+
+  if (projectMemory) {
+    prompt += `\n\n${texts.projectMemoryHeading}\n\n${texts.projectMemoryIntro}\n\n${projectMemory}\n\n${texts.memoryFooter}`;
   }
 
   if (history && history.length > 0) {

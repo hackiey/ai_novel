@@ -118,6 +118,13 @@
   "chat.inputPlaceholder": "向 AI 助手提问...",
   "chat.send": "发送",
   "chat.selectModel": "选择模型",
+  "chat.memory": "记忆",
+  "chat.memoryWorld": "世界观",
+  "chat.memoryProject": "当前小说",
+  "chat.memoryEmpty": "暂无记忆",
+  "chat.memorySave": "保存",
+  "chat.memorySaving": "保存中...",
+  "chat.memorySaved": "已保存",
 
   "tool.semantic_search": "搜索",
   "tool.get_character": "查看角色",

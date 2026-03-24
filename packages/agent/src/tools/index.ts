@@ -341,9 +341,14 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       description: d.update_memory,
       parameters: Type.Object({
         content: Type.String({ description: d.update_memory_content }),
+        scope: Type.Optional(StringEnum(
+          ["world", "project"] as const,
+          { description: d.update_memory_scope },
+        )),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.updateMemory({ ...args, worldId: worldId! }, db);
+        const scope = args.scope ?? (projectId ? "project" : "world");
+        const result = await handlers.updateMemory({ content: args.content, scope, worldId, projectId }, db);
         return textResult(result);
       },
     },

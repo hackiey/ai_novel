@@ -528,27 +528,47 @@ export async function deleteDraft(
 // ============ Agent Memory ============
 
 export async function getMemory(
-  args: { worldId: string },
+  args: { worldId?: string; projectId?: string },
   db: Db
 ): Promise<unknown> {
-  const doc = await db
-    .collection("agent_memory")
-    .findOne({ worldId: new ObjectId(args.worldId) });
-  if (!doc) return { content: "" };
-  return { content: doc.content ?? "" };
+  if (args.projectId) {
+    const doc = await db
+      .collection("agent_memory")
+      .findOne({ projectId: new ObjectId(args.projectId) });
+    if (!doc) return { content: "" };
+    return { content: doc.content ?? "" };
+  }
+  if (args.worldId) {
+    const doc = await db
+      .collection("agent_memory")
+      .findOne({ worldId: new ObjectId(args.worldId) });
+    if (!doc) return { content: "" };
+    return { content: doc.content ?? "" };
+  }
+  return { content: "" };
 }
 
 export async function updateMemory(
-  args: { worldId: string; content: string },
+  args: { worldId?: string; projectId?: string; content: string; scope?: "world" | "project" },
   db: Db
 ): Promise<unknown> {
   const now = new Date();
-  await db.collection("agent_memory").updateOne(
-    { worldId: new ObjectId(args.worldId) },
-    { $set: { content: args.content, updatedAt: now } },
-    { upsert: true }
-  );
-  return { success: true, updatedAt: now.toISOString() };
+  if (args.scope === "project" && args.projectId) {
+    await db.collection("agent_memory").updateOne(
+      { projectId: new ObjectId(args.projectId) },
+      { $set: { content: args.content, updatedAt: now } },
+      { upsert: true }
+    );
+  } else if (args.worldId) {
+    await db.collection("agent_memory").updateOne(
+      { worldId: new ObjectId(args.worldId) },
+      { $set: { content: args.content, updatedAt: now } },
+      { upsert: true }
+    );
+  } else {
+    return { error: "worldId or projectId is required" };
+  }
+  return { success: true, scope: args.scope ?? "world", updatedAt: now.toISOString() };
 }
 
 // ============ Generate Synopsis ============

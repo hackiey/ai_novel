@@ -190,6 +190,15 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       }
     }
 
+    // Load project-level memory
+    let projectMemoryContent: string | undefined;
+    if (projectId) {
+      const projectMemoryDoc = await db.collection("agent_memory").findOne({ projectId: new ObjectId(projectId) });
+      if (projectMemoryDoc?.content) {
+        projectMemoryContent = projectMemoryDoc.content as string;
+      }
+    }
+
     // Get world summary
     let worldSummary: string | undefined;
     if (worldId) {
@@ -205,7 +214,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     let fullText = "";
 
     try {
-      for await (const event of session.chat(message, history, memoryContent, worldSummary, locale)) {
+      for await (const event of session.chat(message, history, memoryContent, worldSummary, locale, projectMemoryContent)) {
         reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
         allEvents.push(event);
 
