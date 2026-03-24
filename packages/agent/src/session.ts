@@ -62,7 +62,7 @@ export class NovelAgentSession {
     this.onWorldSummaryStale = options.onWorldSummaryStale;
   }
 
-  async *chat(userMessage: string, history?: HistoryMessage[], memory?: string, worldSummary?: string, locale: Locale = "zh", projectMemory?: string): AsyncGenerator<AgentEvent> {
+  async *chat(userMessage: string, history?: HistoryMessage[], memory?: string, worldSummary?: string, locale: Locale = "zh", projectMemory?: string, workingEnvironment?: string): AsyncGenerator<AgentEvent> {
     const systemPrompt = buildSystemPromptWithHistory(
       this.projectId,
       this.worldId,
@@ -71,6 +71,7 @@ export class NovelAgentSession {
       worldSummary,
       locale,
       projectMemory,
+      workingEnvironment,
     );
 
     const tools = createNovelTools(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale, locale, this.worldId, this.projectId);

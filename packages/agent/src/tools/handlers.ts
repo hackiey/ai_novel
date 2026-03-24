@@ -426,29 +426,50 @@ export async function continueWriting(
   return context;
 }
 
+const CHAPTER_EDITABLE_FIELDS = ["title", "content", "synopsis"];
+
 export async function updateChapter(
-  args: { id: string; title?: string; content?: string; synopsis?: string; status?: string; order?: number },
+  args: { id: string; old_string?: string; new_string: string; field?: string; append?: boolean; prepend?: boolean },
   db: Db
 ): Promise<unknown> {
-  const { id, ...updates } = args;
-  const setFields: Record<string, unknown> = { updatedAt: new Date() };
-  if (updates.title !== undefined) setFields.title = updates.title;
-  if (updates.content !== undefined) {
-    setFields.content = updates.content;
-    setFields.wordCount = updates.content.length;
-  }
-  if (updates.synopsis !== undefined) setFields.synopsis = updates.synopsis;
-  if (updates.status !== undefined) setFields.status = updates.status;
-  if (updates.order !== undefined) setFields.order = updates.order;
+  const { id, old_string, new_string, append, prepend } = args;
+  const field = args.field ?? "content";
 
-  const result = await db
-    .collection("chapters")
-    .findOneAndUpdate(
-      { _id: toObjectId(id) },
-      { $set: setFields },
-      { returnDocument: "after" }
-    );
-  if (!result) return { error: `Chapter not found: ${id}` };
+  if (!CHAPTER_EDITABLE_FIELDS.includes(field)) {
+    return { error: `Invalid field "${field}" for chapter. Allowed: ${CHAPTER_EDITABLE_FIELDS.join(", ")}` };
+  }
+
+  const doc = await db.collection("chapters").findOne({ _id: toObjectId(id) });
+  if (!doc) return { error: `Chapter not found: ${id}` };
+
+  const currentValue = typeof doc[field] === "string" ? doc[field] : "";
+
+  let newValue: string;
+
+  if (append) {
+    newValue = currentValue + new_string;
+  } else if (prepend) {
+    newValue = new_string + currentValue;
+  } else {
+    // Find-and-replace mode: old_string is required
+    if (!old_string) {
+      return { error: "old_string is required for find-and-replace mode. Use append or prepend to add content without old_string." };
+    }
+    if (!currentValue.includes(old_string)) {
+      return { error: `old_string not found in field "${field}". Current value (first 200 chars): ${currentValue.slice(0, 200)}` };
+    }
+    newValue = currentValue.replace(old_string, new_string);
+  }
+
+  const setFields: Record<string, unknown> = { [field]: newValue, updatedAt: new Date() };
+  if (field === "content") {
+    setFields.wordCount = newValue.length;
+  }
+  const result = await db.collection("chapters").findOneAndUpdate(
+    { _id: toObjectId(id) },
+    { $set: setFields },
+    { returnDocument: "after" }
+  );
   return serialize(result);
 }
 
@@ -592,65 +613,6 @@ export async function updateMemory(
     return { error: "worldId or projectId is required" };
   }
   return { success: true, scope: args.scope ?? "world", updatedAt: now.toISOString() };
-}
-
-// ============ Edit Chapter ============
-
-const CHAPTER_EDITABLE_FIELDS = ["title", "content", "synopsis"];
-
-export async function editChapter(
-  args: { id: string; field?: string; old_string: string; new_string: string },
-  db: Db
-): Promise<unknown> {
-  const { id, old_string, new_string } = args;
-
-  const doc = await db.collection("chapters").findOne({ _id: toObjectId(id) });
-  if (!doc) return { error: `Chapter not found: ${id}` };
-
-  // If field is specified, only edit that field
-  if (args.field) {
-    if (!CHAPTER_EDITABLE_FIELDS.includes(args.field)) {
-      return { error: `Invalid field "${args.field}" for chapter. Allowed: ${CHAPTER_EDITABLE_FIELDS.join(", ")}` };
-    }
-    const currentValue = typeof doc[args.field] === "string" ? doc[args.field] : undefined;
-    if (currentValue === undefined) {
-      return { error: `Field "${args.field}" is empty or not found in chapter ${id}` };
-    }
-    if (!currentValue.includes(old_string)) {
-      return { error: `old_string not found in field "${args.field}". Current value (first 200 chars): ${currentValue.slice(0, 200)}` };
-    }
-    const newValue = currentValue.replace(old_string, new_string);
-    const setFields: Record<string, unknown> = { [args.field]: newValue, updatedAt: new Date() };
-    if (args.field === "content") {
-      setFields.wordCount = newValue.length;
-    }
-    const result = await db.collection("chapters").findOneAndUpdate(
-      { _id: toObjectId(id) },
-      { $set: setFields },
-      { returnDocument: "after" }
-    );
-    return serialize(result);
-  }
-
-  // No field specified: auto-detect by searching all editable fields
-  for (const field of CHAPTER_EDITABLE_FIELDS) {
-    const currentValue = typeof doc[field] === "string" ? doc[field] : undefined;
-    if (currentValue && currentValue.includes(old_string)) {
-      const newValue = currentValue.replace(old_string, new_string);
-      const setFields: Record<string, unknown> = { [field]: newValue, updatedAt: new Date() };
-      if (field === "content") {
-        setFields.wordCount = newValue.length;
-      }
-      const result = await db.collection("chapters").findOneAndUpdate(
-        { _id: toObjectId(id) },
-        { $set: setFields },
-        { returnDocument: "after" }
-      );
-      return serialize(result);
-    }
-  }
-
-  return { error: `old_string not found in any editable field of chapter ${id}. Editable fields: ${CHAPTER_EDITABLE_FIELDS.join(", ")}` };
 }
 
 // ============ Generate Synopsis ============

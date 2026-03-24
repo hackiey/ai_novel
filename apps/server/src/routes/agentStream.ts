@@ -44,7 +44,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       return reply.status(401).send({ error: "Unauthorized" });
     }
 
-    const { projectId, worldId, message, sessionId: inputSessionId, model, locale: rawLocale, reasoning: rawReasoning } =
+    const { projectId, worldId, message, sessionId: inputSessionId, model, locale: rawLocale, reasoning: rawReasoning, currentChapterId } =
       request.body as {
         projectId: string;
         worldId?: string;
@@ -53,6 +53,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
         model?: string;
         locale?: string;
         reasoning?: string;
+        currentChapterId?: string;
       };
     const locale: Locale = resolveLocale(rawLocale);
 
@@ -209,12 +210,46 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       }
     }
 
+    // Build working environment context
+    let workingEnvironment: string | undefined;
+    try {
+      const envParts: string[] = [];
+
+      if (projectId) {
+        // Load chapter list for current project
+        const chapters = await db.collection("chapters")
+          .find({ projectId: new ObjectId(projectId) })
+          .sort({ order: 1 })
+          .project({ _id: 1, title: 1, order: 1, wordCount: 1 })
+          .toArray();
+
+        if (chapters.length > 0) {
+          const chapterLines = chapters.map((ch) => {
+            const isCurrent = currentChapterId && ch._id.toHexString() === currentChapterId;
+            const marker = isCurrent ? " ← 当前编辑" : "";
+            return `- ${ch.title} (id: ${ch._id.toHexString()}, ${ch.wordCount ?? 0}字)${marker}`;
+          });
+          envParts.push(`章节列表:\n${chapterLines.join("\n")}`);
+        }
+
+        if (currentChapterId) {
+          envParts.push(`用户当前正在编辑的章节ID: ${currentChapterId}`);
+        }
+      }
+
+      if (envParts.length > 0) {
+        workingEnvironment = envParts.join("\n\n");
+      }
+    } catch (err) {
+      console.error("[WorkingEnvironment] Failed to build:", err);
+    }
+
     // Stream agent events
     const allEvents: any[] = [];
     let fullText = "";
 
     try {
-      for await (const event of session.chat(message, history, memoryContent, worldSummary, locale, projectMemoryContent)) {
+      for await (const event of session.chat(message, history, memoryContent, worldSummary, locale, projectMemoryContent, workingEnvironment)) {
         reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
         allEvents.push(event);
 

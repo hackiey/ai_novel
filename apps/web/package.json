@@ -15,6 +15,7 @@
     "@tanstack/react-router": "^1.95.0",
     "@trpc/client": "^11.0.0",
     "@trpc/react-query": "^11.0.0",
+    "diff": "^8.0.4",
     "i18next": "^25.8.18",
     "i18next-browser-languagedetector": "^8.2.1",
     "lucide-react": "^0.577.0",
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "@types/diff": "^8.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",

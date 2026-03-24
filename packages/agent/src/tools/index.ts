@@ -262,14 +262,11 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       description: d.update_chapter,
       parameters: Type.Object({
         id: Type.String({ description: d.update_chapter_id }),
-        title: Type.Optional(Type.String({ description: d.update_chapter_title })),
-        content: Type.Optional(Type.String({ description: d.update_chapter_content })),
-        synopsis: Type.Optional(Type.String({ description: d.update_chapter_synopsis })),
-        status: Type.Optional(StringEnum(
-          ["draft", "revision", "final"] as const,
-          { description: d.update_chapter_status },
-        )),
-        order: Type.Optional(Type.Number({ description: d.update_chapter_order })),
+        new_string: Type.String({ description: d.update_chapter_new_string }),
+        old_string: Type.Optional(Type.String({ description: d.update_chapter_old_string })),
+        field: Type.Optional(Type.String({ description: d.update_chapter_field })),
+        append: Type.Optional(Type.Boolean({ description: d.update_chapter_append })),
+        prepend: Type.Optional(Type.Boolean({ description: d.update_chapter_prepend })),
       }),
       async execute(_toolCallId, args) {
         const result = await handlers.updateChapter(args, db);
@@ -350,23 +347,6 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       }),
       async execute(_toolCallId, args) {
         const result = await handlers.deleteDraft(args, db);
-        return textResult(result);
-      },
-    },
-
-    {
-      name: "edit_chapter",
-      label: "Edit Chapter",
-      description: d.edit_chapter,
-      parameters: Type.Object({
-        id: Type.String({ description: d.edit_chapter_id }),
-        field: Type.Optional(Type.String({ description: d.edit_chapter_field })),
-        old_string: Type.String({ description: d.edit_chapter_old_string }),
-        new_string: Type.String({ description: d.edit_chapter_new_string }),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await handlers.editChapter(args, db);
-        onDocumentChanged?.("chapters", args.id);
         return textResult(result);
       },
     },

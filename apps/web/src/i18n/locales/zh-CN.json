@@ -71,6 +71,9 @@
   "write.editorPlaceholder": "开始创作你的故事...",
   "write.deleteChapter": "删除本章节",
   "write.deleteChapterConfirm": "确定要删除章节 \"{{name}}\" 吗？",
+  "write.reviewTitle": "AI 修改审阅",
+  "write.accept": "接受",
+  "write.cancel": "取消",
 
   "world.backToHome": "返回首页",
   "world.novels": "小说",
@@ -140,7 +143,7 @@
   "tool.get_chapter": "查看章节",
   "tool.list_chapters": "列出章节",
   "tool.create_chapter": "创建章节",
-  "tool.update_chapter": "更新章节",
+  "tool.update_chapter": "编辑章节",
   "tool.delete_chapter": "删除章节",
   "tool.continue_writing": "续写",
   "tool.get_draft": "查看草稿",

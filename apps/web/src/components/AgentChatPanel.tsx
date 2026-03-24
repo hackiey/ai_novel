@@ -31,13 +31,18 @@ interface ChatMessage {
   createdAt?: string;
 }
 
+// Tools that edit chapter content — require review flow
+const CHAPTER_EDIT_TOOLS = new Set(["update_chapter"]);
+
 interface Props {
   projectId?: string;
   worldId?: string;
+  currentChapterId?: string;
   onAgentAppend?: (text: string) => void;
+  onChapterEdit?: (chapterId: string) => void;
 }
 
-export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Props) {
+export default function AgentChatPanel({ projectId, worldId, currentChapterId, onAgentAppend, onChapterEdit }: Props) {
   const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -146,7 +151,7 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ projectId, worldId, message: text, sessionId, locale: i18n.language, model: selectedModel }),
+        body: JSON.stringify({ projectId, worldId, message: text, sessionId, locale: i18n.language, model: selectedModel, currentChapterId }),
       });
 
       if (!response.ok || !response.body) {
@@ -263,9 +268,26 @@ export default function AgentChatPanel({ projectId, worldId, onAgentAppend }: Pr
         }
       }
 
+      // Check if any chapter-edit tools were used; if so, trigger review flow
+      let chapterEditHandled = false;
+      if (onChapterEdit) {
+        for (const e of allEvents) {
+          if (e.type === "tool_use" && e.toolName && CHAPTER_EDIT_TOOLS.has(e.toolName) && e.toolInput) {
+            const input = e.toolInput as Record<string, unknown>;
+            const chapterId = (input.chapter_id ?? input.id) as string | undefined;
+            if (chapterId) {
+              onChapterEdit(chapterId);
+              chapterEditHandled = true;
+            }
+          }
+        }
+      }
+
       // Invalidate queries for any data the agent mutated
       const keysToInvalidate = new Set<string>();
       for (const toolName of mutatedTools) {
+        // Skip chapter invalidation if we're handling it via review flow
+        if (chapterEditHandled && CHAPTER_EDIT_TOOLS.has(toolName)) continue;
         const keys = MUTATION_TOOL_INVALIDATIONS[toolName];
         if (keys) {
           for (const key of keys) keysToInvalidate.add(JSON.stringify(key));

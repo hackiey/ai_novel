@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { FileEdit, Plus } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { FileEdit, Plus, Check, X } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import { NovelEditor } from "@ai-novel/editor";
 import AgentChatPanel from "../components/AgentChatPanel.js";
+import DiffViewer from "../components/DiffViewer.js";
 import EditableText from "../components/EditableText.js";
 import { useBreadcrumb } from "../contexts/BreadcrumbContext.js";
 
@@ -16,6 +18,9 @@ export default function WritePage() {
   const [selectedChapterId, setSelectedChapterId] = useState<string>(chapterId ?? "");
   const [appendText, setAppendText] = useState<string>("");
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "idle">("idle");
+  const [pendingEdit, setPendingEdit] = useState<{ oldContent: string; newContent: string } | null>(null);
+  const queryClient = useQueryClient();
+  const trpcUtils = trpc.useUtils();
 
   // Local content cache: survives chapter switches while saves are in-flight
   const contentCache = useRef<Map<string, string>>(new Map());
@@ -96,6 +101,42 @@ export default function WritePage() {
   const handleAgentAppend = useCallback((text: string) => {
     setAppendText(text);
   }, []);
+
+  const handleChapterEdit = useCallback(async (chapterId: string) => {
+    if (chapterId !== selectedChapterId) {
+      // Not the currently open chapter — just invalidate normally
+      queryClient.invalidateQueries({ queryKey: [["chapter"]] });
+      return;
+    }
+    const oldContent = contentCache.current.get(selectedChapterId) ?? serverContent;
+    try {
+      const fresh = await trpcUtils.chapter.getById.fetch({ id: chapterId }, { staleTime: 0 }) as any;
+      const newContent = fresh?.content ?? "";
+      if (newContent !== oldContent) {
+        setPendingEdit({ oldContent, newContent });
+      } else {
+        queryClient.invalidateQueries({ queryKey: [["chapter"]] });
+      }
+    } catch {
+      queryClient.invalidateQueries({ queryKey: [["chapter"]] });
+    }
+  }, [selectedChapterId, serverContent, queryClient]);
+
+  const handleAcceptEdit = useCallback(() => {
+    if (!pendingEdit || !selectedChapterId) return;
+    contentCache.current.set(selectedChapterId, pendingEdit.newContent);
+    setPendingEdit(null);
+    queryClient.invalidateQueries({ queryKey: [["chapter"]] });
+  }, [pendingEdit, selectedChapterId, queryClient]);
+
+  const handleCancelEdit = useCallback(() => {
+    if (!pendingEdit || !selectedChapterId) return;
+    // Save the old content back to server
+    updateChapter.mutate({ id: selectedChapterId, data: { content: pendingEdit.oldContent } });
+    contentCache.current.set(selectedChapterId, pendingEdit.oldContent);
+    setPendingEdit(null);
+    queryClient.invalidateQueries({ queryKey: [["chapter"]] });
+  }, [pendingEdit, selectedChapterId, updateChapter, queryClient]);
 
   const handleDeleteChapter = useCallback(() => {
     if (!selectedChapterId || !chapter) return;
@@ -197,16 +238,42 @@ export default function WritePage() {
         {/* Center: Editor */}
         <div className="flex-1 flex flex-col overflow-hidden bg-white">
           {selectedChapterId && chapter ? (
-            <NovelEditor
-              key={selectedChapterId}
-              content={editorContent}
-              onUpdate={handleContentUpdate}
-              placeholder={t("write.editorPlaceholder")}
-              appendText={appendText}
-              className="flex-1 border-0 rounded-none"
-              onDelete={handleDeleteChapter}
-              deleteTitle={t("write.deleteChapter")}
-            />
+            pendingEdit ? (
+              <>
+                {/* Review toolbar */}
+                <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-amber-50 shrink-0">
+                  <span className="text-sm font-medium text-amber-800">{t("write.reviewTitle")}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleCancelEdit}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      {t("write.cancel")}
+                    </button>
+                    <button
+                      onClick={handleAcceptEdit}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium text-white bg-teal-600 hover:bg-teal-500 transition-colors"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      {t("write.accept")}
+                    </button>
+                  </div>
+                </div>
+                <DiffViewer oldContent={pendingEdit.oldContent} newContent={pendingEdit.newContent} />
+              </>
+            ) : (
+              <NovelEditor
+                key={selectedChapterId}
+                content={editorContent}
+                onUpdate={handleContentUpdate}
+                placeholder={t("write.editorPlaceholder")}
+                appendText={appendText}
+                className="flex-1 border-0 rounded-none"
+                onDelete={handleDeleteChapter}
+                deleteTitle={t("write.deleteChapter")}
+              />
+            )
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center max-w-md px-6">
@@ -227,7 +294,9 @@ export default function WritePage() {
           <AgentChatPanel
             projectId={projectId}
             worldId={(project as any)?.worldId}
+            currentChapterId={selectedChapterId || undefined}
             onAgentAppend={handleAgentAppend}
+            onChapterEdit={handleChapterEdit}
           />
         </div>
       </div>

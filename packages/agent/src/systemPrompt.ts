@@ -37,9 +37,14 @@ export function buildSystemPromptWithHistory(
   worldSummary?: string,
   locale: Locale = "zh",
   projectMemory?: string,
+  workingEnvironment?: string,
 ): string {
   const texts = t(locale);
   let prompt = buildSystemPrompt(projectId, worldId, locale);
+
+  if (workingEnvironment) {
+    prompt += `\n\n${texts.workingEnvironmentHeading}\n\n${workingEnvironment}`;
+  }
 
   if (worldSummary) {
     prompt += `\n\n${texts.worldOverviewHeading}\n\n${texts.worldOverviewIntro}\n\n${worldSummary}`;

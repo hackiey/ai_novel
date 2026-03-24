@@ -44,6 +44,9 @@ const zh = {
 
 - 续写章节时，先获取该章节及前文上下文，再进行创作`,
 
+  // ── Working environment ──
+  workingEnvironmentHeading: "## 当前工作环境",
+
   // ── World summary ──
   worldOverviewHeading: "## 世界观概览",
   worldOverviewIntro: "以下是当前世界观中所有角色和设定的概览。如需了解某个角色或设定的详细信息，请使用 semantic_search 工具搜索对应名称或关键词。",
@@ -136,13 +139,13 @@ const zh = {
     continue_writing_instructions: "续写指导说明，如情节方向、场景描写要求等",
     continue_writing_wordCount: "目标续写字数，默认500",
 
-    update_chapter: "更新章节内容、标题、状态等。",
+    update_chapter: "编辑章节内容。三种模式：1) 查找替换：传 old_string + new_string；2) 追加到末尾：传 append: true + new_string；3) 插入到开头：传 prepend: true + new_string。field 默认为 content。",
     update_chapter_id: "章节ID",
-    update_chapter_title: "章节标题",
-    update_chapter_content: "章节内容",
-    update_chapter_synopsis: "章节梗概",
-    update_chapter_status: "章节状态",
-    update_chapter_order: "章节排序",
+    update_chapter_new_string: "新文本内容（替换文本 / 追加内容 / 插入内容）",
+    update_chapter_old_string: "要被替换的原始文本片段（必须精确匹配）。查找替换模式下必填，append/prepend 模式下不需要。",
+    update_chapter_field: "目标字段：title, content, synopsis。默认 content。",
+    update_chapter_append: "设为 true 时，将 new_string 追加到字段末尾，无需 old_string",
+    update_chapter_prepend: "设为 true 时，将 new_string 插入到字段开头，无需 old_string",
 
     delete_chapter: "删除指定章节。此操作不可撤销，会同时删除相关的嵌入数据。",
     delete_chapter_id: "要删除的章节ID",
@@ -167,12 +170,6 @@ const zh = {
 
     delete_draft: "删除指定草稿。此操作不可撤销。",
     delete_draft_id: "要删除的草稿ID",
-
-    edit_chapter: "精确编辑章节中的文本片段。通过指定 old_string 和 new_string 进行查找替换。适用于小范围修改，避免重写整个字段。如不指定 field，会自动在所有可编辑字段中查找。",
-    edit_chapter_id: "章节ID",
-    edit_chapter_field: "要编辑的字段名，可选：title, content, synopsis。不指定则自动查找。",
-    edit_chapter_old_string: "要被替换的原始文本片段（必须精确匹配）",
-    edit_chapter_new_string: "替换后的新文本",
 
     update_memory: "更新用户偏好记忆。整体覆盖 content 字段。当用户要求你记住某些做事方式、行为偏好时调用此工具保存。worldId 和 projectId 已自动注入。可通过 scope 参数选择保存到世界观级别(world)还是小说项目级别(project)。在编辑页面默认保存到 project 级别，在世界页面默认保存到 world 级别。",
     update_memory_content: "完整的记忆内容（会整体覆盖旧内容，请先读取再追加）",
@@ -241,6 +238,9 @@ const en: typeof zh = {
   notes: `## Notes
 
 - When continuing a chapter, first retrieve the chapter and preceding context before writing`,
+
+  // ── Working environment ──
+  workingEnvironmentHeading: "## Current Working Environment",
 
   // ── World summary ──
   worldOverviewHeading: "## World Overview",
@@ -334,13 +334,13 @@ const en: typeof zh = {
     continue_writing_instructions: "Writing guidance, e.g. plot direction, scene description requirements",
     continue_writing_wordCount: "Target word count for continuation, default 500",
 
-    update_chapter: "Update chapter content, title, status, etc.",
+    update_chapter: "Edit chapter content. Three modes: 1) Find-replace: pass old_string + new_string; 2) Append to end: pass append: true + new_string; 3) Prepend to start: pass prepend: true + new_string. Field defaults to content.",
     update_chapter_id: "Chapter ID",
-    update_chapter_title: "Chapter title",
-    update_chapter_content: "Chapter content",
-    update_chapter_synopsis: "Chapter synopsis",
-    update_chapter_status: "Chapter status",
-    update_chapter_order: "Chapter order",
+    update_chapter_new_string: "New text content (replacement / appended / prepended text)",
+    update_chapter_old_string: "Original text fragment to replace (must match exactly). Required for find-replace mode, not needed for append/prepend.",
+    update_chapter_field: "Target field: title, content, or synopsis. Defaults to content.",
+    update_chapter_append: "Set to true to append new_string to the end of the field. No old_string needed.",
+    update_chapter_prepend: "Set to true to prepend new_string to the start of the field. No old_string needed.",
 
     delete_chapter: "Delete a chapter. This action is irreversible and will also delete related embedding data.",
     delete_chapter_id: "Chapter ID to delete",
@@ -365,12 +365,6 @@ const en: typeof zh = {
 
     delete_draft: "Delete a draft. This action is irreversible.",
     delete_draft_id: "Draft ID to delete",
-
-    edit_chapter: "Precisely edit a text fragment in a chapter. Uses old_string/new_string for find-and-replace. Ideal for small modifications without rewriting entire fields. If field is not specified, all editable fields are searched automatically.",
-    edit_chapter_id: "Chapter ID",
-    edit_chapter_field: "Field to edit: title, content, or synopsis. Auto-detected if omitted.",
-    edit_chapter_old_string: "Original text fragment to replace (must match exactly)",
-    edit_chapter_new_string: "New replacement text",
 
     update_memory: "Update user preference memory. Overwrites the entire content field. Call this when the user asks you to remember certain work styles or behavior preferences. worldId and projectId are auto-injected. Use the scope parameter to choose between world-level (shared across projects) or project-level (this novel only). Defaults to project when in editor, world when in world page.",
     update_memory_content: "Complete memory content (will overwrite old content entirely; read first, then append)",
