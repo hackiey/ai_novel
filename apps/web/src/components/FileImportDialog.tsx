@@ -5,7 +5,7 @@ import { Upload, X, FileText, Check, Loader2 } from "lucide-react";
 import { getToken } from "../lib/auth.js";
 import { AgentEvent, AssistantMessageContent } from "./AgentMessageDisplay.js";
 
-const API_BASE = "http://localhost:3001";
+const API_BASE = "";
 
 type Stage = "select" | "importing" | "done";
 

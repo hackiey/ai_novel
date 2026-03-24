@@ -6,7 +6,7 @@ import { trpc } from "../lib/trpc.js";
 import { getToken } from "../lib/auth.js";
 import { AgentEvent, AssistantMessageContent } from "./AgentMessageDisplay.js";
 
-const API_BASE = "http://localhost:3001";
+const API_BASE = "";
 
 // Tools that mutate data — map tool names to the tRPC query keys to invalidate
 const MUTATION_TOOL_INVALIDATIONS: Record<string, string[][]> = {

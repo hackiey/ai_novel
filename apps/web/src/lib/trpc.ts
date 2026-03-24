@@ -19,7 +19,7 @@ export const queryClient = new QueryClient({
 export const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "http://localhost:3001/trpc",
+      url: "/trpc",
       headers() {
         const token = getToken();
         return token ? { Authorization: `Bearer ${token}` } : {};
