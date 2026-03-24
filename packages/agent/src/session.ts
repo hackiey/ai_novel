@@ -117,20 +117,22 @@ export class NovelAgentSession {
           typeof m === "object" && m !== null && "role" in m &&
           (m.role === "user" || m.role === "assistant" || m.role === "toolResult")
         );
-        console.log("[AgentSession] convertToLlm: %d messages -> %d LLM messages", messages.length, llmMessages.length);
-        for (const m of llmMessages) {
+        console.log("\n========== [AgentSession] LLM Request ==========");
+        console.log("[System Prompt] (%d chars):\n%s", systemPrompt.length, systemPrompt);
+        console.log("\n[Messages] %d total:", llmMessages.length);
+        for (let i = 0; i < llmMessages.length; i++) {
+          const m = llmMessages[i];
+          console.log("\n--- Message %d [%s] ---", i, m.role);
           if (m.role === "user") {
-            const text = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
-            console.log("  [%s] %s", m.role, text.slice(0, 200));
+            console.log(typeof m.content === "string" ? m.content : JSON.stringify(m.content, null, 2));
           } else if (m.role === "assistant") {
-            const textParts = m.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
-            const toolCalls = m.content.filter((c: any) => c.type === "toolCall").map((c: any) => c.name);
-            console.log("  [%s] text=%s toolCalls=%s", m.role, textParts.slice(0, 150), toolCalls.join(",") || "none");
+            console.log(JSON.stringify(m.content, null, 2));
           } else if (m.role === "toolResult") {
-            const text = m.content.map((c: any) => c.type === "text" ? c.text : `[${c.type}]`).join("").slice(0, 150);
-            console.log("  [%s] tool=%s error=%s result=%s", m.role, m.toolName, m.isError, text);
+            console.log("toolName=%s isError=%s", m.toolName, m.isError);
+            console.log(JSON.stringify(m.content, null, 2));
           }
         }
+        console.log("========== [End LLM Request] ==========\n");
         return llmMessages;
       },
     };
