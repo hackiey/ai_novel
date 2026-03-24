@@ -323,6 +323,25 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
     },
 
     {
+      name: "update_draft",
+      label: "Update Draft",
+      description: d.update_draft,
+      parameters: Type.Object({
+        id: Type.String({ description: d.update_draft_id }),
+        title: Type.Optional(Type.String({ description: d.update_draft_title })),
+        content: Type.Optional(Type.String({ description: d.update_draft_content })),
+        tags: Type.Optional(Type.Array(Type.String(), { description: d.update_draft_tags })),
+        linkedCharacters: Type.Optional(Type.Array(Type.String(), { description: d.update_draft_linkedCharacters })),
+        linkedWorldSettings: Type.Optional(Type.Array(Type.String(), { description: d.update_draft_linkedWorldSettings })),
+      }),
+      async execute(_toolCallId, args) {
+        const result = await handlers.updateDraft(args, db);
+        onDocumentChanged?.("drafts", args.id);
+        return textResult(result);
+      },
+    },
+
+    {
       name: "delete_draft",
       label: "Delete Draft",
       description: d.delete_draft,
@@ -331,6 +350,23 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       }),
       async execute(_toolCallId, args) {
         const result = await handlers.deleteDraft(args, db);
+        return textResult(result);
+      },
+    },
+
+    {
+      name: "edit_chapter",
+      label: "Edit Chapter",
+      description: d.edit_chapter,
+      parameters: Type.Object({
+        id: Type.String({ description: d.edit_chapter_id }),
+        field: Type.Optional(Type.String({ description: d.edit_chapter_field })),
+        old_string: Type.String({ description: d.edit_chapter_old_string }),
+        new_string: Type.String({ description: d.edit_chapter_new_string }),
+      }),
+      async execute(_toolCallId, args) {
+        const result = await handlers.editChapter(args, db);
+        onDocumentChanged?.("chapters", args.id);
         return textResult(result);
       },
     },

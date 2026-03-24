@@ -157,8 +157,22 @@ const zh = {
     create_draft_linkedCharacters: "关联角色ID列表",
     create_draft_linkedWorldSettings: "关联世界观设定ID列表",
 
+    update_draft: "更新草稿内容、标题、标签或关联信息。",
+    update_draft_id: "草稿ID",
+    update_draft_title: "草稿标题",
+    update_draft_content: "草稿内容",
+    update_draft_tags: "标签",
+    update_draft_linkedCharacters: "关联角色ID列表",
+    update_draft_linkedWorldSettings: "关联世界观设定ID列表",
+
     delete_draft: "删除指定草稿。此操作不可撤销。",
     delete_draft_id: "要删除的草稿ID",
+
+    edit_chapter: "精确编辑章节中的文本片段。通过指定 old_string 和 new_string 进行查找替换。适用于小范围修改，避免重写整个字段。如不指定 field，会自动在所有可编辑字段中查找。",
+    edit_chapter_id: "章节ID",
+    edit_chapter_field: "要编辑的字段名，可选：title, content, synopsis。不指定则自动查找。",
+    edit_chapter_old_string: "要被替换的原始文本片段（必须精确匹配）",
+    edit_chapter_new_string: "替换后的新文本",
 
     update_memory: "更新用户偏好记忆。整体覆盖 content 字段。当用户要求你记住某些做事方式、行为偏好时调用此工具保存。worldId 和 projectId 已自动注入。可通过 scope 参数选择保存到世界观级别(world)还是小说项目级别(project)。在编辑页面默认保存到 project 级别，在世界页面默认保存到 world 级别。",
     update_memory_content: "完整的记忆内容（会整体覆盖旧内容，请先读取再追加）",
@@ -341,8 +355,22 @@ const en: typeof zh = {
     create_draft_linkedCharacters: "Linked character ID list",
     create_draft_linkedWorldSettings: "Linked world setting ID list",
 
+    update_draft: "Update draft content, title, tags, or linked items.",
+    update_draft_id: "Draft ID",
+    update_draft_title: "Draft title",
+    update_draft_content: "Draft content",
+    update_draft_tags: "Tags",
+    update_draft_linkedCharacters: "Linked character ID list",
+    update_draft_linkedWorldSettings: "Linked world setting ID list",
+
     delete_draft: "Delete a draft. This action is irreversible.",
     delete_draft_id: "Draft ID to delete",
+
+    edit_chapter: "Precisely edit a text fragment in a chapter. Uses old_string/new_string for find-and-replace. Ideal for small modifications without rewriting entire fields. If field is not specified, all editable fields are searched automatically.",
+    edit_chapter_id: "Chapter ID",
+    edit_chapter_field: "Field to edit: title, content, or synopsis. Auto-detected if omitted.",
+    edit_chapter_old_string: "Original text fragment to replace (must match exactly)",
+    edit_chapter_new_string: "New replacement text",
 
     update_memory: "Update user preference memory. Overwrites the entire content field. Call this when the user asks you to remember certain work styles or behavior preferences. worldId and projectId are auto-injected. Use the scope parameter to choose between world-level (shared across projects) or project-level (this novel only). Defaults to project when in editor, world when in world page.",
     update_memory_content: "Complete memory content (will overwrite old content entirely; read first, then append)",
