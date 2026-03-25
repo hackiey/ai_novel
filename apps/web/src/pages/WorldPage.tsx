@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { Plus, Search, Trash2, Upload, X, MessageSquare } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import CharactersTab from "../components/CharactersTab.js";
 import WorldSettingsTab from "../components/WorldSettingsTab.js";
@@ -23,6 +23,7 @@ export default function WorldPage() {
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showMobileChat, setShowMobileChat] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -108,9 +109,9 @@ export default function WorldPage() {
         : t("world.createDraft");
 
   return (
-    <div className="flex h-[calc(100vh-53px)]">
+    <div className="flex h-[calc(100vh-53px)] relative">
       <div className="flex-1 overflow-y-auto">
-          <div className="px-6 py-6">
+          <div className="px-4 sm:px-6 py-6">
             {/* Header */}
             <div className="mb-6">
               <div className="flex items-center gap-3">
@@ -205,7 +206,7 @@ export default function WorldPage() {
 
           {/* Tabs */}
           <div className="mb-6">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
               <div className="flex gap-1 overflow-x-auto rounded-xl bg-gray-100 p-1">
                 {tabs.map((tab) => (
                   <button
@@ -223,7 +224,7 @@ export default function WorldPage() {
                 ))}
               </div>
               <div className="shrink-0 flex items-center gap-2">
-                <div className="relative w-72">
+                <div className="relative w-full sm:w-72">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                   <input
                     value={searchInput}
@@ -244,17 +245,17 @@ export default function WorldPage() {
                 </div>
                 <button
                   onClick={() => setShowImportDialog(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-teal-600 border border-gray-300 hover:border-teal-300 rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-teal-600 border border-gray-300 hover:border-teal-300 rounded-lg transition-colors shrink-0"
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  {t("import.button")}
+                  <span className="hidden sm:inline">{t("import.button")}</span>
                 </button>
                 <button
                   onClick={() => setCreateRequestKey((value) => value + 1)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-xs text-white hover:bg-teal-500 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-xs text-white hover:bg-teal-500 transition-colors shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  {activeTabCreateLabel}
+                  <span className="hidden sm:inline">{activeTabCreateLabel}</span>
                 </button>
               </div>
             </div>
@@ -298,10 +299,36 @@ export default function WorldPage() {
         </div>
       </div>
 
-      {/* AI Chat Panel */}
-      <div className="w-1/3 min-w-[320px] border-l border-gray-200 bg-gray-50/50 shrink-0">
+      {/* AI Chat Panel — desktop sidebar */}
+      <div className="hidden md:block w-1/3 min-w-[320px] border-l border-gray-200 bg-gray-50/50 shrink-0">
         <AgentChatPanel worldId={worldId} />
       </div>
+
+      {/* AI Chat — mobile floating button */}
+      <button
+        onClick={() => setShowMobileChat(true)}
+        className="md:hidden fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-teal-600 text-white shadow-lg flex items-center justify-center hover:bg-teal-500 transition-colors"
+      >
+        <MessageSquare className="w-6 h-6" />
+      </button>
+
+      {/* AI Chat — mobile full-screen overlay */}
+      {showMobileChat && (
+        <div className="md:hidden fixed inset-0 z-50 bg-gray-50 flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white shrink-0">
+            <span className="text-sm font-semibold text-gray-700">AI Chat</span>
+            <button
+              onClick={() => setShowMobileChat(false)}
+              className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <AgentChatPanel worldId={worldId} />
+          </div>
+        </div>
+      )}
 
       {/* File Import Dialog */}
       {showImportDialog && (

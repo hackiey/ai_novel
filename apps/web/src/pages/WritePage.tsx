@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileEdit, Plus, Check, X } from "lucide-react";
+import { FileEdit, Plus, Check, X, List, MessageSquare } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import { NovelEditor } from "@ai-novel/editor";
 import AgentChatPanel from "../components/AgentChatPanel.js";
@@ -19,6 +19,7 @@ export default function WritePage() {
   const [appendText, setAppendText] = useState<string>("");
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "idle">("idle");
   const [pendingEdit, setPendingEdit] = useState<{ oldContent: string; newContent: string } | null>(null);
+  const [mobilePanel, setMobilePanel] = useState<"sidebar" | "editor" | "chat">("editor");
   const queryClient = useQueryClient();
   const trpcUtils = trpc.useUtils();
 
@@ -147,6 +148,7 @@ export default function WritePage() {
   const handleChapterSelect = useCallback((nextChapterId: string) => {
     setSelectedChapterId(nextChapterId);
     setSaveStatus("idle");
+    setMobilePanel("editor");
     void navigate({
       to: "/project/$projectId/write",
       params: { projectId },
@@ -191,7 +193,7 @@ export default function WritePage() {
       {/* Three-column layout: sidebar | editor | chat */}
       <div className="flex-1 flex min-h-0">
         {/* Left: Chapter sidebar */}
-        <div className="w-56 border-r border-gray-200 bg-gray-50/80 flex flex-col shrink-0">
+        <div className={`${mobilePanel === "sidebar" ? "flex" : "hidden"} md:flex w-full md:w-56 border-r border-gray-200 bg-gray-50/80 flex-col md:shrink-0`}>
           <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
             <span className="text-sm font-semibold text-gray-500">{t("write.chapters")}</span>
             <button
@@ -236,7 +238,7 @@ export default function WritePage() {
         </div>
 
         {/* Center: Editor */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-white">
+        <div className={`${mobilePanel === "editor" ? "flex" : "hidden"} md:flex flex-1 flex-col overflow-hidden bg-white`}>
           {selectedChapterId && chapter ? (
             pendingEdit ? (
               <>
@@ -290,7 +292,7 @@ export default function WritePage() {
         </div>
 
         {/* Right: AI Chat */}
-        <div className="w-1/3 min-w-[320px] border-l border-gray-200 bg-gray-50/50 overflow-hidden">
+        <div className={`${mobilePanel === "chat" ? "block" : "hidden"} md:block flex-1 md:flex-none w-full md:w-1/3 md:min-w-[320px] md:border-l border-gray-200 bg-gray-50/50 overflow-hidden`}>
           <AgentChatPanel
             projectId={projectId}
             worldId={(project as any)?.worldId}
@@ -299,6 +301,37 @@ export default function WritePage() {
             onChapterEdit={handleChapterEdit}
           />
         </div>
+      </div>
+
+      {/* Mobile bottom tab bar */}
+      <div className="md:hidden flex border-t border-gray-200 bg-white shrink-0">
+        <button
+          onClick={() => setMobilePanel("sidebar")}
+          className={`flex-1 flex flex-col items-center gap-1 py-2 text-xs transition-colors ${
+            mobilePanel === "sidebar" ? "text-teal-600" : "text-gray-400"
+          }`}
+        >
+          <List className="w-5 h-5" />
+          {t("write.chapters")}
+        </button>
+        <button
+          onClick={() => setMobilePanel("editor")}
+          className={`flex-1 flex flex-col items-center gap-1 py-2 text-xs transition-colors ${
+            mobilePanel === "editor" ? "text-teal-600" : "text-gray-400"
+          }`}
+        >
+          <FileEdit className="w-5 h-5" />
+          {t("write.editor", t("write.selectChapter"))}
+        </button>
+        <button
+          onClick={() => setMobilePanel("chat")}
+          className={`flex-1 flex flex-col items-center gap-1 py-2 text-xs transition-colors ${
+            mobilePanel === "chat" ? "text-teal-600" : "text-gray-400"
+          }`}
+        >
+          <MessageSquare className="w-5 h-5" />
+          {t("write.aiChat", "AI")}
+        </button>
       </div>
     </div>
   );

@@ -40,7 +40,7 @@ function RootInner() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="px-6 py-3 flex items-center justify-between">
+        <div className="px-3 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <Link
               to="/"
@@ -49,13 +49,13 @@ function RootInner() {
               {t("header.brand")}
             </Link>
             {breadcrumb && (
-              <>
+              <div className="hidden sm:flex items-center gap-3 min-w-0">
                 <span className="text-gray-300 shrink-0">/</span>
                 {breadcrumb}
-              </>
+              </div>
             )}
           </div>
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-2 sm:gap-4 text-sm">
             <LanguageSwitcher />
             {user && (
               <>
@@ -64,7 +64,7 @@ function RootInner() {
                     {t("header.admin")}
                   </Link>
                 )}
-                <span className="text-gray-500">{user.displayName}</span>
+                <span className="text-gray-500 hidden sm:inline">{user.displayName}</span>
                 <button
                   onClick={logout}
                   className="text-gray-400 hover:text-red-500 transition-colors"

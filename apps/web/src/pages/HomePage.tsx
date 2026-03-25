@@ -28,7 +28,7 @@ export default function HomePage() {
   const worlds = worldsQuery.data ?? [];
 
   return (
-    <div className="px-6 py-8 max-w-5xl mx-auto">
+    <div className="px-4 sm:px-6 py-8 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>

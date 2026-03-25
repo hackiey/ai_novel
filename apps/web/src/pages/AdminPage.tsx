@@ -13,7 +13,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-8">
       <h1 className="text-2xl font-bold">{t("admin.title")}</h1>
       <PermissionGroupSection />
       <UserSection />
