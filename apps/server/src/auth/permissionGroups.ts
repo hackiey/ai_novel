@@ -37,11 +37,11 @@ export async function getUserAllowedModels(db: Db, userId: string, availableMode
     return [];
   }
 
-  const allowedModels = new Set(
-    group.allowedModels.filter((model): model is string => typeof model === "string" && model.length > 0),
-  );
+  const availableSet = new Set(availableModels);
 
-  return availableModels.filter((model) => allowedModels.has(model));
+  return group.allowedModels.filter(
+    (model): model is string => typeof model === "string" && model.length > 0 && availableSet.has(model),
+  );
 }
 
 export function isDefaultPermissionGroup(group: { name?: unknown } | Record<string, unknown> | null | undefined) {
