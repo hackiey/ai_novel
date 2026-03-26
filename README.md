@@ -8,7 +8,7 @@ AI Novel is a cross-platform writing studio for long-form fiction. It organizes 
 
 - World-first workflow: create a world, attach one or more novels to it, then write chapter by chapter.
 - Structured story data: manage characters, world settings, and loose drafts with summaries and importance levels.
-- Writing workspace: chapter sidebar + TipTap editor + streaming AI chat in a three-pane layout.
+- Immersive writing workspace: full-screen WebGL shader backgrounds (rain / starfield), glassmorphism panels, floating controls, and 11 Chinese font choices.
 - Agent automation: 18 built-in tools for CRUD, semantic search, memory, synopsis generation, and continuation.
 - Import pipeline: upload `.txt`, `.md`, `.docx`, or `.pdf` files and let the agent extract structured knowledge into a world.
 - Multi-platform access: web, Electron desktop, and Expo mobile clients share the same backend and types.
@@ -21,7 +21,9 @@ AI Novel is a cross-platform writing studio for long-form fiction. It organizes 
 | Web | React 19 + Vite + Tailwind CSS v4 + TanStack Router / Query |
 | Mobile | Expo Router + React Native + TanStack Query |
 | Desktop | Electron |
-| Editor | TipTap rich text editor with auto-save |
+| Editor | TipTap rich text editor with auto-save, CJK-aware word/char counting |
+| Shader | WebGL2 full-screen fragment shaders (rain on glass, starfield) |
+| Fonts | LXGW WenKai, Long Cang, Ma Shan Zheng, ZCOOL XiaoWei, Xiaolai SC, and more (all SIL OFL) |
 | Backend | Fastify + tRPC v11 |
 | Database | MongoDB native driver |
 | AI Agent | Multi-provider LLM (OpenAI, Anthropic, Google, etc.) via pi-ai + pi-agent-core |
@@ -113,6 +115,10 @@ pnpm --filter @ai-novel/mobile dev
 - Each novel contains ordered chapters edited in the main writing view.
 - The editor auto-saves with a debounce and preserves unsaved content while requests are in flight.
 - AI continuation can append generated text directly into the active chapter.
+- Immersive mode: full-screen WebGL2 shader backgrounds (rain on glass / starfield) with glassmorphism UI panels.
+- Floating control bar at the bottom for chapter list, AI chat toggle, and theme switching.
+- 11 built-in Chinese/artistic fonts selectable from the editor toolbar, all open-source (SIL OFL).
+- CJK-aware statistics: automatically shows character count (字) for Chinese text and word count for English.
 
 ### Agent and Streaming
 

@@ -8,7 +8,7 @@ AI Novel 是一个面向长篇小说创作的跨平台工作台。项目按 `世
 
 - 世界观优先：先创建世界观，再在其下管理多部小说，最后按章节写作。
 - 结构化资料：角色、世界观条目、草稿都支持摘要和重要性字段。
-- 写作工作区：章节侧栏 + TipTap 编辑器 + 流式 AI 对话三栏布局。
+- 沉浸式写作：全屏 WebGL Shader 动态背景（雨夜 / 星空）、毛玻璃面板、浮动控制栏，内置 11 种中文字体可选。
 - Agent 自动化：内置 18 个工具，覆盖 CRUD、语义搜索、记忆、摘要生成和续写。
 - 文件导入：支持上传 `.txt`、`.md`、`.docx`、`.pdf`，由 Agent 抽取为结构化设定。
 - 多端共享：Web、Electron、Expo Mobile 共用同一套后端和类型定义。
@@ -21,7 +21,9 @@ AI Novel 是一个面向长篇小说创作的跨平台工作台。项目按 `世
 | Web | React 19 + Vite + Tailwind CSS v4 + TanStack Router / Query |
 | 移动端 | Expo Router + React Native + TanStack Query |
 | 桌面端 | Electron |
-| 编辑器 | TipTap 富文本编辑器，支持自动保存 |
+| 编辑器 | TipTap 富文本编辑器，自动保存，CJK 字数 / 英文词数智能统计 |
+| Shader | WebGL2 全屏片段着色器（雨滴玻璃、星空） |
+| 字体 | 霞鹜文楷、龙藏、马善政、站酷小薇、小赖等 11 种（均为 SIL OFL 开源） |
 | 后端 | Fastify + tRPC v11 |
 | 数据库 | MongoDB 原生驱动 |
 | AI Agent | 多模型供应商（OpenAI、Anthropic、Google 等）via pi-ai + pi-agent-core |
@@ -113,6 +115,10 @@ pnpm --filter @ai-novel/mobile dev
 - 每部小说包含有序章节，在主写作界面中编辑。
 - 编辑器采用防抖自动保存，并在请求进行中保留本地未落盘内容。
 - AI 续写结果可以直接追加到当前章节。
+- 沉浸模式：WebGL2 全屏 Shader 动态背景（雨夜玻璃 / 星空），毛玻璃 UI 面板。
+- 底部浮动控制栏：章节列表、AI 聊天开关、主题切换。
+- 编辑器工具栏内置 11 种中文 / 艺术字体，均为开源（SIL OFL），一键切换。
+- 智能字数统计：中文自动显示「字」数，英文显示 words 词数。
 
 ### Agent 与流式响应
 
