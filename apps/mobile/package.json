@@ -1,11 +1,13 @@
 {
   "name": "@ai-novel/mobile",
-  "version": "0.0.1",
+  "version": "0.2.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
     "dev": "expo start",
-    "build": "echo 'Mobile build configured'"
+    "build": "echo 'Mobile build configured'",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@expo/metro-runtime": "^6.1.2",
@@ -31,6 +33,7 @@
   },
   "devDependencies": {
     "@types/react": "^19.1.17",
+    "babel-preset-expo": "^55.0.12",
     "typescript": "^5.7.0"
   }
 }

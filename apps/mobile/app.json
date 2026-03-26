@@ -2,7 +2,7 @@
   "expo": {
     "name": "AI Novel",
     "slug": "ai-novel",
-    "version": "0.0.1",
+    "version": "0.2.0",
     "scheme": "ai-novel",
     "platforms": [
       "ios",
@@ -13,7 +13,8 @@
       "backgroundColor": "#0f172a"
     },
     "android": {
-      "usesCleartextTraffic": true
+      "usesCleartextTraffic": true,
+      "package": "com.anonymous.ainovel"
     },
     "ios": {
       "infoPlist": {

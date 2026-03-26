@@ -66,7 +66,8 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:deepwiki.com)",
       "WebFetch(domain:www.shadertoy.com)",
-      "WebFetch(domain:cdn.jsdelivr.net)"
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "Bash(./gradlew assembleRelease 2>&1 | tail -5)"
     ]
   }
 }
