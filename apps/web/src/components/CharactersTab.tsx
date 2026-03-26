@@ -17,11 +17,11 @@ function useAutoResizeTextarea(value: string) {
 }
 
 const roleBadgeColors: Record<string, string> = {
-  protagonist: "bg-amber-50 text-amber-700 border-amber-200",
-  antagonist: "bg-red-50 text-red-700 border-red-200",
-  supporting: "bg-blue-50 text-blue-700 border-blue-200",
-  minor: "bg-gray-50 text-gray-600 border-gray-200",
-  other: "bg-gray-50 text-gray-500 border-gray-200",
+  protagonist: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  antagonist: "bg-red-500/10 text-red-400 border-red-500/20",
+  supporting: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  minor: "bg-white/5 text-white/60 border-white/10",
+  other: "bg-white/5 text-white/50 border-white/10",
 };
 
 const profileFields = ["appearance", "personality", "background", "goals"] as const;
@@ -109,8 +109,8 @@ export default function CharactersTab({
   return (
     <div>
       {hasSearch && (
-        <div className="mb-4 flex items-center gap-2 text-xs text-gray-500">
-          <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-1 text-teal-700">
+        <div className="mb-4 flex items-center gap-2 text-xs text-white/50">
+          <span className="rounded-full border border-teal-500/20 bg-teal-500/10 px-2 py-1 text-teal-400">
             {searchMethod === "vector" ? t("search.semanticBadge") : t("search.keywordBadge")}
           </span>
           <span>
@@ -122,8 +122,8 @@ export default function CharactersTab({
       )}
 
       {showCharForm && (
-        <div className="mb-4 p-4 rounded-xl border border-gray-200 bg-white shadow-sm">
-          <h4 className="text-sm font-semibold text-gray-900 mb-3">{t("character.newCharacter")}</h4>
+        <div className="mb-4 p-4 rounded-xl glass-panel">
+          <h4 className="text-sm font-semibold text-white/90 mb-3">{t("character.newCharacter")}</h4>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -140,12 +140,12 @@ export default function CharactersTab({
               value={charName}
               onChange={(e) => setCharName(e.target.value)}
               placeholder={t("character.namePlaceholder")}
-              className="flex-1 min-w-[200px] rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="flex-1 min-w-[200px] rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
             <select
               value={charRole}
               onChange={(e) => setCharRole(e.target.value)}
-              className="rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
               <option value="protagonist">{t("character.protagonist")}</option>
               <option value="antagonist">{t("character.antagonist")}</option>
@@ -156,14 +156,14 @@ export default function CharactersTab({
             <button
               type="submit"
               disabled={createCharMut.isPending}
-              className="px-4 py-2 text-sm rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
+              className="px-4 py-2 text-sm rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 disabled:opacity-50 transition-colors"
             >
               {createCharMut.isPending ? t("character.adding") : t("character.add")}
             </button>
             <button
               type="button"
               onClick={() => { setShowCharForm(false); setCharName(""); setCharRole("other"); }}
-              className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+              className="px-3 py-2 text-sm rounded-lg border border-white/20 text-white/60 hover:bg-white/5 transition-colors"
             >
               {t("character.cancel")}
             </button>
@@ -172,15 +172,15 @@ export default function CharactersTab({
       )}
 
       {isSearching ? (
-        <div className="text-center py-8 text-gray-400 text-sm">
+        <div className="text-center py-8 text-white/40 text-sm">
           {t("search.searching")}
         </div>
       ) : hasSearch && visibleCharacters.length === 0 && !showCharForm ? (
-        <div className="text-center py-8 text-gray-400 text-sm">
+        <div className="text-center py-8 text-white/40 text-sm">
           {t("search.noResults", { query: searchQuery })}
         </div>
       ) : characters.length === 0 && !showCharForm ? (
-        <div className="text-center py-8 text-gray-400 text-sm">
+        <div className="text-center py-8 text-white/40 text-sm">
           {t("character.empty")}
         </div>
       ) : (
@@ -193,7 +193,7 @@ export default function CharactersTab({
             return (
               <div
                 key={char._id}
-                className={`rounded-lg border bg-white transition-all ${isExpanded ? "border-teal-300 shadow-md" : "border-gray-200 hover:border-gray-300 hover:shadow-sm"}`}
+                className={`rounded-lg border transition-all ${isExpanded ? "border-teal-400/30 bg-white/8" : "border-white/10 bg-white/5 hover:border-white/20"}`}
               >
                 <div
                   className="flex items-start justify-between gap-3 p-4 cursor-pointer group"
@@ -210,13 +210,13 @@ export default function CharactersTab({
                       <span className={`text-xs px-2 py-0.5 rounded-full border ${badgeClass}`}>
                         {t(`character.${char.role}`) || char.role}
                       </span>
-                      <h4 className="text-sm font-medium text-gray-800">{char.name}</h4>
+                      <h4 className="text-sm font-medium text-white/80">{char.name}</h4>
                       {char.aliases && char.aliases.length > 0 && (
-                        <span className="text-xs text-gray-400">({char.aliases.join(", ")})</span>
+                        <span className="text-xs text-white/40">({char.aliases.join(", ")})</span>
                       )}
                     </div>
                     {!isExpanded && summary && (
-                      <p className="text-xs text-gray-500 line-clamp-2 ml-5">{summary}</p>
+                      <p className="text-xs text-white/50 line-clamp-2 ml-5">{summary}</p>
                     )}
                   </div>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
@@ -227,7 +227,7 @@ export default function CharactersTab({
                           deleteCharMut.mutate({ id: char._id });
                         }
                       }}
-                      className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                      className="text-xs px-2 py-1 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
                     >
                       {t("character.delete")}
                     </button>
@@ -235,7 +235,7 @@ export default function CharactersTab({
                 </div>
 
                 {isExpanded && (
-                  <div className="px-4 pb-4 border-t border-gray-100">
+                  <div className="px-4 pb-4 border-t border-white/5">
                     {isEditing ? (
                       <form
                         onSubmit={(e) => {
@@ -261,22 +261,22 @@ export default function CharactersTab({
                       >
                         <div className="flex gap-3">
                           <div className="flex-1">
-                            <label className="block text-xs font-medium text-gray-500 mb-1.5">{t("character.name")}</label>
+                            <label className="block text-xs font-medium text-white/50 mb-1.5">{t("character.name")}</label>
                             <input
                               value={editName}
                               onChange={(e) => setEditName(e.target.value)}
                               placeholder={t("character.namePlaceholder")}
                               onClick={(e) => e.stopPropagation()}
-                              className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                              className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1.5">{t("character.role")}</label>
+                            <label className="block text-xs font-medium text-white/50 mb-1.5">{t("character.role")}</label>
                             <select
                               value={editRole}
                               onChange={(e) => setEditRole(e.target.value)}
                               onClick={(e) => e.stopPropagation()}
-                              className="rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                              className="rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                             >
                               <option value="protagonist">{t("character.protagonist")}</option>
                               <option value="antagonist">{t("character.antagonist")}</option>
@@ -289,8 +289,8 @@ export default function CharactersTab({
                         {profileFields.map((field) => (
                           <div key={field}>
                             <div className="flex items-center justify-between gap-3 mb-1.5">
-                              <label className="block text-xs font-medium text-gray-500">{t(`character.${field}`)}</label>
-                              <span className="text-[11px] text-gray-400">{t("character.supportsMarkdown")}</span>
+                              <label className="block text-xs font-medium text-white/50">{t(`character.${field}`)}</label>
+                              <span className="text-[11px] text-white/40">{t("character.supportsMarkdown")}</span>
                             </div>
                             <textarea
                               ref={activeField === field ? editTextarea.ref : undefined}
@@ -300,7 +300,7 @@ export default function CharactersTab({
                               onInput={activeField === field ? editTextarea.onInput : undefined}
                               onClick={(e) => e.stopPropagation()}
                               placeholder={t(`character.${field}Placeholder`)}
-                              className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y leading-relaxed"
+                              className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y leading-relaxed"
                               style={{ minHeight: "80px" }}
                             />
                           </div>
@@ -309,14 +309,14 @@ export default function CharactersTab({
                           <button
                             type="button"
                             onClick={() => setEditingId(null)}
-                            className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                            className="px-3 py-2 text-sm rounded-lg border border-white/20 text-white/60 hover:bg-white/5 transition-colors"
                           >
                             {t("character.cancel")}
                           </button>
                           <button
                             type="submit"
                             disabled={updateCharMut.isPending}
-                            className="px-4 py-2 text-sm rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
+                            className="px-4 py-2 text-sm rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 disabled:opacity-50 transition-colors"
                           >
                             {updateCharMut.isPending ? t("character.saving") : t("character.save")}
                           </button>
@@ -329,14 +329,14 @@ export default function CharactersTab({
                         title={t("character.doubleClickEdit")}
                       >
                         {hasProfileContent(char) ? (
-                          <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3 space-y-3">
+                          <div className="rounded-xl bg-white/5 border border-white/5 px-4 py-3 space-y-3">
                             {profileFields.map((field) => {
                               const val = char.profile?.[field];
                               if (!val) return null;
                               return (
                                 <div key={field}>
-                                  <h5 className="text-xs font-medium text-gray-500 mb-1">{t(`character.${field}`)}</h5>
-                                  <div className="world-setting-markdown text-sm text-gray-700 leading-relaxed break-words">
+                                  <h5 className="text-xs font-medium text-white/50 mb-1">{t(`character.${field}`)}</h5>
+                                  <div className="world-setting-markdown text-sm text-white/70 leading-relaxed break-words">
                                     <Markdown remarkPlugins={[remarkGfm]}>{val}</Markdown>
                                   </div>
                                 </div>
@@ -344,11 +344,11 @@ export default function CharactersTab({
                             })}
                           </div>
                         ) : (
-                          <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
-                            <p className="text-sm text-gray-400 italic">{t("character.noContent")}</p>
+                          <div className="rounded-xl bg-white/5 border border-white/5 px-4 py-3">
+                            <p className="text-sm text-white/40 italic">{t("character.noContent")}</p>
                           </div>
                         )}
-                        <div className="flex items-center justify-between gap-3 text-[11px] text-gray-400">
+                        <div className="flex items-center justify-between gap-3 text-[11px] text-white/40">
                           <span>{t("character.clickHint")}</span>
                           <button
                             type="button"
@@ -356,7 +356,7 @@ export default function CharactersTab({
                               e.stopPropagation();
                               openEditMode(char);
                             }}
-                            className="px-2.5 py-1 rounded-md border border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-600 transition-colors"
+                            className="px-2.5 py-1 rounded-md border border-white/10 text-white/50 hover:border-teal-400/30 hover:text-teal-400 transition-colors"
                           >
                             {t("character.edit")}
                           </button>

@@ -34,7 +34,7 @@ export default function ChapterList({ chapters, onAdd, onEdit, onDelete }: Chapt
         </h3>
         <button
           onClick={onAdd}
-          className="text-xs px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-500 transition-colors"
+          className="text-xs px-3 py-1.5 rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 transition-colors"
         >
           {t("chapter.addChapter")}
         </button>

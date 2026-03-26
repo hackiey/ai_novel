@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, Trash2, Upload, X, MessageSquare } from "lucide-react";
+import { Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import CharactersTab from "../components/CharactersTab.js";
 import WorldSettingsTab from "../components/WorldSettingsTab.js";
 import DraftsTab from "../components/DraftsTab.js";
 import AgentChatPanel from "../components/AgentChatPanel.js";
 import FileImportDialog from "../components/FileImportDialog.js";
+import { useBreadcrumb } from "../contexts/BreadcrumbContext.js";
 
 type Tab = "characters" | "worldSettings" | "drafts";
 
@@ -23,7 +24,6 @@ export default function WorldPage() {
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [showImportDialog, setShowImportDialog] = useState(false);
-  const [showMobileChat, setShowMobileChat] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -78,19 +78,32 @@ export default function WorldPage() {
   );
   const isSearchActive = searchQuery.length > 0;
 
+  // Hide global header — WorldPage has its own top bar
+  const { setBreadcrumb, setImmersive } = useBreadcrumb();
+  useEffect(() => {
+    setImmersive(true);
+    setBreadcrumb(null);
+    return () => {
+      setBreadcrumb(null);
+      setImmersive(false);
+    };
+  }, [setBreadcrumb, setImmersive]);
+
   if (worldQuery.isLoading) {
     return (
-      <div className="text-center py-20">
-        <div className="inline-block w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-gray-500 mt-3">{t("world.loading")}</p>
+      <div className="h-screen w-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-white/50 mt-3">{t("world.loading")}</p>
+        </div>
       </div>
     );
   }
 
   if (!world) {
     return (
-      <div className="text-center py-20">
-        <p className="text-gray-500">{t("world.notFound")}</p>
+      <div className="h-screen w-screen flex items-center justify-center">
+        <p className="text-white/50">{t("world.notFound")}</p>
       </div>
     );
   }
@@ -109,226 +122,224 @@ export default function WorldPage() {
         : t("world.createDraft");
 
   return (
-    <div className="flex h-[calc(100vh-53px)] relative">
-      <div className="flex-1 overflow-y-auto">
-          <div className="px-4 sm:px-6 py-6">
-            {/* Header */}
-            <div className="mb-6">
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-gray-900">{world.name}</h1>
+    <div className="h-screen w-screen overflow-hidden relative">
+      {/* Top bar */}
+      <div className="fixed top-0 left-0 right-0 z-20 px-4 py-2 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm min-w-0">
+          <Link
+            to="/"
+            className="text-white/60 hover:text-white transition-colors font-bold shrink-0"
+          >
+            AI Novel
+          </Link>
+          <span className="text-white/30 shrink-0">/</span>
+          <span className="font-medium text-white/80 truncate">
+            {world.name}
+          </span>
+        </div>
+      </div>
+
+      {/* Center: Content + Chat side by side */}
+      <div className="absolute inset-0 flex items-start justify-center z-10 pt-12 pb-4 px-4">
+        <div
+          className="h-full flex gap-3 transition-all duration-300 ease-in-out"
+          style={{ width: "100%", maxWidth: "90rem" }}
+        >
+          {/* World content panel */}
+          <div className="flex-1 min-w-0 flex flex-col glass-panel rounded-xl overflow-hidden">
+            {/* Fixed header area */}
+            <div className="shrink-0 px-4 sm:px-6 pt-5">
+              {/* Header */}
+              <div className="mb-5">
+                <h1 className="text-xl font-bold text-white/90">{world.name}</h1>
+                {world.description && (
+                  <p className="text-sm text-white/50 mt-1 max-w-2xl">{world.description}</p>
+                )}
               </div>
-              {world.description && (
-                <p className="text-sm text-gray-500 mt-1 max-w-2xl">{world.description}</p>
-              )}
-          </div>
 
-          {/* Projects Bar */}
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t("world.novels")}</h2>
-            </div>
-            <div className="flex items-center gap-3 overflow-x-auto pb-2">
-              {projects.map((project: any) => (
-                <Link
-                  key={project._id}
-                  to="/project/$projectId/write"
-                  params={{ projectId: project._id }}
-                  search={{ chapterId: undefined }}
-                  className="flex-shrink-0 group relative px-4 py-3 rounded-xl border border-gray-200 bg-white hover:border-teal-300 hover:shadow-md transition-all min-w-[160px] max-w-[220px]"
-                >
-                  <div className="text-sm font-medium text-gray-800 group-hover:text-teal-600 truncate pr-5">
-                    {project.name}
-                  </div>
-                  {project.settings?.genre && (
-                    <div className="text-[10px] text-gray-400 mt-1 truncate">{project.settings.genre}</div>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (confirm(t("world.deleteConfirm", { name: project.name }))) {
-                        deleteProjectMut.mutate({ id: project._id });
-                      }
-                    }}
-                    className="absolute top-2 right-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </Link>
-              ))}
-
-              {/* New Project button / form */}
-              {showProjectForm ? (
-                <form
-                  className="flex-shrink-0 flex items-center gap-2"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!projectName.trim()) return;
-                    createProjectMut.mutate({
-                      name: projectName.trim(),
-                      worldId,
-                    });
-                  }}
-                >
-                  <input
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                    placeholder={t("world.novelNamePlaceholder")}
-                    autoFocus
-                    className="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                  />
-                  <button
-                    type="submit"
-                    disabled={createProjectMut.isPending || !projectName.trim()}
-                    className="px-3 py-2 text-sm rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
-                  >
-                    {createProjectMut.isPending ? "..." : t("world.add")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowProjectForm(false); setProjectName(""); }}
-                    className="px-2 py-2 text-sm text-gray-400 hover:text-gray-600"
-                  >
-                    {t("world.cancel")}
-                  </button>
-                </form>
-              ) : (
-                <button
-                  onClick={() => setShowProjectForm(true)}
-                  className="flex-shrink-0 flex items-center gap-1.5 px-4 py-3 rounded-xl border border-dashed border-gray-300 text-sm text-gray-400 hover:text-teal-600 hover:border-teal-300 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  {t("world.newNovel")}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="mb-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-              <div className="flex gap-1 overflow-x-auto rounded-xl bg-gray-100 p-1">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
-                      activeTab === tab.key
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-gray-500 hover:text-gray-700 hover:bg-white/70"
-                    }`}
-                  >
-                    {tab.label}
-                    {tab.count !== undefined && <span className="ml-1.5 text-xs text-gray-400">{tab.count}</span>}
-                  </button>
-                ))}
-              </div>
-              <div className="shrink-0 flex items-center gap-2">
-                <div className="relative w-full sm:w-72">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-                  <input
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    placeholder={t("search.placeholder")}
-                    className="w-full rounded-lg border border-gray-300 bg-white py-1.5 pl-9 pr-9 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                  />
-                  {searchInput && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchInput("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                      aria-label={t("search.clear")}
+              {/* Projects Bar */}
+              <div className="mb-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <h2 className="text-xs font-semibold text-white/50 uppercase tracking-wide">{t("world.novels")}</h2>
+                </div>
+                <div className="flex items-center gap-3 overflow-x-auto pb-2">
+                  {projects.map((project: any) => (
+                    <Link
+                      key={project._id}
+                      to="/project/$projectId/write"
+                      params={{ projectId: project._id }}
+                      search={{ chapterId: undefined }}
+                      className="flex-shrink-0 group relative px-4 py-3 rounded-xl border border-white/10 bg-white/5 hover:border-teal-400/30 hover:bg-white/10 transition-all min-w-[160px] max-w-[220px]"
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <div className="text-sm font-medium text-white/80 group-hover:text-teal-400 truncate pr-5">
+                        {project.name}
+                      </div>
+                      {project.settings?.genre && (
+                        <div className="text-[10px] text-white/40 mt-1 truncate">{project.settings.genre}</div>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (confirm(t("world.deleteConfirm", { name: project.name }))) {
+                            deleteProjectMut.mutate({ id: project._id });
+                          }
+                        }}
+                        className="absolute top-2 right-2 text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </Link>
+                  ))}
+
+                  {/* New Project button / form */}
+                  {showProjectForm ? (
+                    <form
+                      className="flex-shrink-0 flex items-center gap-2"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!projectName.trim()) return;
+                        createProjectMut.mutate({
+                          name: projectName.trim(),
+                          worldId,
+                        });
+                      }}
+                    >
+                      <input
+                        value={projectName}
+                        onChange={(e) => setProjectName(e.target.value)}
+                        placeholder={t("world.novelNamePlaceholder")}
+                        autoFocus
+                        className="w-40 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      />
+                      <button
+                        type="submit"
+                        disabled={createProjectMut.isPending || !projectName.trim()}
+                        className="px-3 py-2 text-sm rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 disabled:opacity-50 transition-colors"
+                      >
+                        {createProjectMut.isPending ? "..." : t("world.add")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowProjectForm(false); setProjectName(""); }}
+                        className="px-2 py-2 text-sm text-white/40 hover:text-white/60"
+                      >
+                        {t("world.cancel")}
+                      </button>
+                    </form>
+                  ) : (
+                    <button
+                      onClick={() => setShowProjectForm(true)}
+                      className="flex-shrink-0 flex items-center gap-1.5 px-4 py-3 rounded-xl border border-dashed border-white/20 text-sm text-white/40 hover:text-teal-400 hover:border-teal-400/30 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      {t("world.newNovel")}
                     </button>
                   )}
                 </div>
-                <button
-                  onClick={() => setShowImportDialog(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-teal-600 border border-gray-300 hover:border-teal-300 rounded-lg transition-colors shrink-0"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{t("import.button")}</span>
-                </button>
-                <button
-                  onClick={() => setCreateRequestKey((value) => value + 1)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-xs text-white hover:bg-teal-500 transition-colors shrink-0"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{activeTabCreateLabel}</span>
-                </button>
               </div>
+
+              {/* Tabs */}
+              <div className="mb-5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                  <div className="flex gap-1 overflow-x-auto rounded-xl bg-white/5 p-1">
+                    {tabs.map((tab) => (
+                      <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+                          activeTab === tab.key
+                            ? "bg-white/10 text-white/90 shadow-sm"
+                            : "text-white/50 hover:text-white/70 hover:bg-white/5"
+                        }`}
+                      >
+                        {tab.label}
+                        {tab.count !== undefined && <span className="ml-1.5 text-xs text-white/40">{tab.count}</span>}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <div className="relative w-full sm:w-72">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
+                      <input
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
+                        placeholder={t("search.placeholder")}
+                        className="w-full rounded-lg border border-white/20 bg-white/5 py-1.5 pl-9 pr-9 text-xs text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      />
+                      {searchInput && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchInput("")}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-white/40 hover:bg-white/10 hover:text-white/60 transition-colors"
+                          aria-label={t("search.clear")}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setShowImportDialog(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/50 hover:text-teal-400 border border-white/20 hover:border-teal-400/30 rounded-lg transition-colors shrink-0"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">{t("import.button")}</span>
+                    </button>
+                    <button
+                      onClick={() => setCreateRequestKey((value) => value + 1)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 border border-white/15 text-xs text-white/80 hover:bg-white/20 transition-colors shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">{activeTabCreateLabel}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Scrollable tab content */}
+            <div className="flex-1 overflow-y-auto scrollbar-none px-4 sm:px-6 pb-5">
+              {activeTab === "characters" && (
+                <CharactersTab
+                  worldId={worldId}
+                  createRequestKey={createRequestKey}
+                  searchQuery={searchQuery}
+                  searchResultIds={searchResultIds}
+                  searchMethod={semanticSearchQuery.data?.method ?? null}
+                  isSearching={semanticSearchQuery.isFetching && isSearchActive}
+                />
+              )}
+
+              {activeTab === "worldSettings" && (
+                <WorldSettingsTab
+                  worldId={worldId}
+                  createRequestKey={createRequestKey}
+                  searchQuery={searchQuery}
+                  searchResultIds={searchResultIds}
+                  searchMethod={semanticSearchQuery.data?.method ?? null}
+                  isSearching={semanticSearchQuery.isFetching && isSearchActive}
+                />
+              )}
+
+              {activeTab === "drafts" && (
+                <DraftsTab
+                  worldId={worldId}
+                  createRequestKey={createRequestKey}
+                  searchQuery={searchQuery}
+                  searchResultIds={searchResultIds}
+                  searchMethod={semanticSearchQuery.data?.method ?? null}
+                  isSearching={semanticSearchQuery.isFetching && isSearchActive}
+                />
+              )}
             </div>
           </div>
 
-          {/* Tab Content */}
-          <div>
-            {activeTab === "characters" && (
-              <CharactersTab
-                worldId={worldId}
-                createRequestKey={createRequestKey}
-                searchQuery={searchQuery}
-                searchResultIds={searchResultIds}
-                searchMethod={semanticSearchQuery.data?.method ?? null}
-                isSearching={semanticSearchQuery.isFetching && isSearchActive}
-              />
-            )}
-
-            {activeTab === "worldSettings" && (
-              <WorldSettingsTab
-                worldId={worldId}
-                createRequestKey={createRequestKey}
-                searchQuery={searchQuery}
-                searchResultIds={searchResultIds}
-                searchMethod={semanticSearchQuery.data?.method ?? null}
-                isSearching={semanticSearchQuery.isFetching && isSearchActive}
-              />
-            )}
-
-            {activeTab === "drafts" && (
-              <DraftsTab
-                worldId={worldId}
-                createRequestKey={createRequestKey}
-                searchQuery={searchQuery}
-                searchResultIds={searchResultIds}
-                searchMethod={semanticSearchQuery.data?.method ?? null}
-                isSearching={semanticSearchQuery.isFetching && isSearchActive}
-              />
-            )}
+          {/* Chat panel */}
+          <div className="shrink-0 w-[420px] flex flex-col overflow-hidden glass-panel rounded-xl">
+            <AgentChatPanel worldId={worldId} variant="immersive" />
           </div>
         </div>
       </div>
-
-      {/* AI Chat Panel — desktop sidebar */}
-      <div className="hidden md:block w-1/3 min-w-[320px] border-l border-gray-200 bg-gray-50/50 shrink-0">
-        <AgentChatPanel worldId={worldId} />
-      </div>
-
-      {/* AI Chat — mobile floating button */}
-      <button
-        onClick={() => setShowMobileChat(true)}
-        className="md:hidden fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-teal-600 text-white shadow-lg flex items-center justify-center hover:bg-teal-500 transition-colors"
-      >
-        <MessageSquare className="w-6 h-6" />
-      </button>
-
-      {/* AI Chat — mobile full-screen overlay */}
-      {showMobileChat && (
-        <div className="md:hidden fixed inset-0 z-50 bg-gray-50 flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white shrink-0">
-            <span className="text-sm font-semibold text-gray-700">AI Chat</span>
-            <button
-              onClick={() => setShowMobileChat(false)}
-              className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <AgentChatPanel worldId={worldId} />
-          </div>
-        </div>
-      )}
 
       {/* File Import Dialog */}
       {showImportDialog && (

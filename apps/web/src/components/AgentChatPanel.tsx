@@ -40,9 +40,11 @@ interface Props {
   currentChapterId?: string;
   onAgentAppend?: (text: string) => void;
   onChapterEdit?: (chapterId: string) => void;
+  variant?: "default" | "immersive";
 }
 
-export default function AgentChatPanel({ projectId, worldId, currentChapterId, onAgentAppend, onChapterEdit }: Props) {
+export default function AgentChatPanel({ projectId, worldId, currentChapterId, onAgentAppend, onChapterEdit, variant = "default" }: Props) {
+  const imm = variant === "immersive";
   const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -71,11 +73,11 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
   const [projectMemoryDraft, setProjectMemoryDraft] = useState<string | null>(null);
   const [memorySaveStatus, setMemorySaveStatus] = useState<Record<string, string>>({});
 
-  // Auto-resize textarea
+  // Auto-resize textarea: grow with content, cap at 120px
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+      textareaRef.current.style.height = "38px";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
   }, [input]);
 
@@ -370,15 +372,15 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-1.5 border-b border-gray-200 shrink-0">
+      <div className={`flex items-center justify-between px-4 py-1.5 border-b shrink-0 ${imm ? "border-white/10" : "border-gray-200"}`}>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-gray-700">{t("chat.aiAssistant")}</span>
+          <span className={`text-sm font-semibold ${imm ? "text-white/80" : "text-gray-700"}`}>{t("chat.aiAssistant")}</span>
           <button
             onClick={() => { setShowHistory((v) => !v); setShowMemory(false); }}
             className={`p-1.5 rounded-md transition-colors ${
               showHistory
-                ? "text-gray-900 hover:bg-gray-200"
-                : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                ? imm ? "text-white hover:bg-white/15" : "text-gray-900 hover:bg-gray-200"
+                : imm ? "text-white/50 hover:text-white hover:bg-white/10" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
             }`}
             title={showHistory ? t("chat.close") : t("chat.history")}
           >
@@ -393,14 +395,13 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                 setWorldMemoryDraft(null);
                 setProjectMemoryDraft(null);
                 setMemorySaveStatus({});
-                // default sub-tab: project if available, else world
                 setMemorySubTab(projectId ? "project" : "world");
               }
             }}
             className={`p-1.5 rounded-md transition-colors ${
               showMemory
-                ? "text-gray-900 hover:bg-gray-200"
-                : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                ? imm ? "text-white hover:bg-white/15" : "text-gray-900 hover:bg-gray-200"
+                : imm ? "text-white/50 hover:text-white hover:bg-white/10" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
             }`}
             title={showMemory ? t("chat.close") : t("chat.memory")}
           >
@@ -413,11 +414,14 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
               <select
                 value={selectedModel || modelsQuery.data.default}
                 onChange={(e) => setSelectedModel(e.target.value)}
-                className="appearance-none text-xs bg-gray-100 border border-gray-200 rounded-md pl-2 pr-6 py-1.5 text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer"
+                className={`appearance-none text-xs rounded-md pl-2 pr-6 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer ${
+                  imm
+                    ? "bg-white/10 border border-white/15 text-white/80 hover:bg-white/15"
+                    : "bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200"
+                }`}
                 title={t("chat.selectModel")}
               >
                 {modelsQuery.data.available.map((m: string) => {
-                  // Format: "provider:modelId/reasoning" → display "modelId (reasoning)"
                   const afterColon = m.includes(":") ? m.split(":")[1] : m;
                   const slashIdx = afterColon.lastIndexOf("/");
                   const reasoningLevels = ["minimal", "low", "medium", "high", "xhigh"];
@@ -432,13 +436,13 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                   );
                 })}
               </select>
-              <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <ChevronDown className={`w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none ${imm ? "text-white/40" : "text-gray-400"}`} />
             </div>
           )}
           {!showMemory && (
             <button
               onClick={handleNewSession}
-              className="p-1.5 rounded-md bg-teal-600 text-white shadow-sm hover:bg-teal-500 transition-colors"
+              className="p-1.5 rounded-md bg-white/10 border border-white/15 text-white/80 shadow-sm hover:bg-white/20 transition-colors"
               title={t("chat.newChat")}
             >
               <Plus className="w-4 h-4" />
@@ -447,7 +451,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
           {showMemory && (
             <div className="flex items-center gap-2">
               {memorySaveStatus[memorySubTab] && (
-                <span className="text-[10px] text-teal-600">{memorySaveStatus[memorySubTab]}</span>
+                <span className="text-[10px] text-teal-400">{memorySaveStatus[memorySubTab]}</span>
               )}
               <button
                 onClick={async () => {
@@ -468,7 +472,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                   }
                 }}
                 disabled={updateMemoryMutation.isPending || (memorySubTab === "world" ? worldMemoryDraft === null : projectMemoryDraft === null)}
-                className="px-3 py-1 rounded-md text-xs bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
+                className="px-3 py-1 rounded-md text-xs bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 disabled:opacity-50 transition-colors"
               >
                 {t("chat.memorySave")}
               </button>
@@ -481,13 +485,13 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
         <>
           {/* Memory sub-tabs */}
           {worldId && projectId && (
-            <div className="flex border-b border-gray-200 shrink-0">
+            <div className={`flex border-b shrink-0 ${imm ? "border-white/10" : "border-gray-200"}`}>
               <button
                 onClick={() => setMemorySubTab("world")}
                 className={`flex-1 py-1.5 text-xs font-medium text-center transition-colors ${
                   memorySubTab === "world"
-                    ? "text-teal-700 border-b-2 border-teal-600"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? imm ? "text-teal-400 border-b-2 border-teal-400" : "text-teal-700 border-b-2 border-teal-600"
+                    : imm ? "text-white/50 hover:text-white/70" : "text-gray-500 hover:text-gray-700"
                 }`}
               >
                 {t("chat.memoryWorld")}
@@ -496,8 +500,8 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                 onClick={() => setMemorySubTab("project")}
                 className={`flex-1 py-1.5 text-xs font-medium text-center transition-colors ${
                   memorySubTab === "project"
-                    ? "text-teal-700 border-b-2 border-teal-600"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? imm ? "text-teal-400 border-b-2 border-teal-400" : "text-teal-700 border-b-2 border-teal-600"
+                    : imm ? "text-white/50 hover:text-white/70" : "text-gray-500 hover:text-gray-700"
                 }`}
               >
                 {t("chat.memoryProject")}
@@ -508,20 +512,24 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
           {/* Memory textarea — full remaining height */}
           <div className="flex-1 flex flex-col p-3 min-h-0">
             {memoryQuery.isLoading ? (
-              <div className="text-xs text-gray-400">{t("chat.loading")}</div>
+              <div className={`text-xs ${imm ? "text-white/40" : "text-gray-400"}`}>{t("chat.loading")}</div>
             ) : memorySubTab === "world" ? (
               <textarea
                 value={worldMemoryDraft ?? memoryQuery.data?.worldMemory ?? ""}
                 onChange={(e) => setWorldMemoryDraft(e.target.value)}
                 placeholder={t("chat.memoryEmpty")}
-                className="flex-1 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500 resize-none"
+                className={`flex-1 w-full rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-500 resize-none ${
+                  imm ? "bg-white/5 border border-white/10 text-white/90 placeholder-white/30" : "border border-gray-200 bg-white text-gray-800 placeholder-gray-400"
+                }`}
               />
             ) : (
               <textarea
                 value={projectMemoryDraft ?? memoryQuery.data?.projectMemory ?? ""}
                 onChange={(e) => setProjectMemoryDraft(e.target.value)}
                 placeholder={t("chat.memoryEmpty")}
-                className="flex-1 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-teal-500 resize-none"
+                className={`flex-1 w-full rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-500 resize-none ${
+                  imm ? "bg-white/5 border border-white/10 text-white/90 placeholder-white/30" : "border border-gray-200 bg-white text-gray-800 placeholder-gray-400"
+                }`}
               />
             )}
           </div>
@@ -530,23 +538,25 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
         <>
           {/* History sidebar overlay */}
           {showHistory && (
-            <div className="border-b border-gray-200 max-h-60 overflow-y-auto bg-gray-50">
+            <div className={`border-b max-h-60 overflow-y-auto scrollbar-none ${imm ? "border-white/10 bg-white/5" : "border-gray-200 bg-gray-50"}`}>
               {sessionsQuery.isLoading && (
-                <div className="p-3 text-xs text-gray-400">{t("chat.loading")}</div>
+                <div className={`p-3 text-xs ${imm ? "text-white/40" : "text-gray-400"}`}>{t("chat.loading")}</div>
               )}
               {sessionsQuery.data?.length === 0 && (
-                <div className="p-3 text-xs text-gray-400">{t("chat.noHistory")}</div>
+                <div className={`p-3 text-xs ${imm ? "text-white/40" : "text-gray-400"}`}>{t("chat.noHistory")}</div>
               )}
               {sessionsQuery.data?.map((s: any) => (
                 <button
                   key={s.sessionId}
                   onClick={() => loadSession(s.sessionId)}
-                  className={`w-full text-left px-4 py-2 text-xs hover:bg-gray-100 transition-colors border-b border-gray-100 last:border-b-0 ${
-                    sessionId === s.sessionId ? "bg-gray-100 text-gray-900 font-semibold" : "text-gray-600"
+                  className={`w-full text-left px-4 py-2 text-xs transition-colors border-b last:border-b-0 ${
+                    imm
+                      ? `border-white/5 hover:bg-white/10 ${sessionId === s.sessionId ? "bg-white/10 text-white font-semibold" : "text-white/70"}`
+                      : `border-gray-100 hover:bg-gray-100 ${sessionId === s.sessionId ? "bg-gray-100 text-gray-900 font-semibold" : "text-gray-600"}`
                   }`}
                 >
                   <div className="font-medium truncate">{s.title || t("chat.untitled")}</div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">
+                  <div className={`text-[10px] mt-0.5 ${imm ? "text-white/30" : "text-gray-400"}`}>
                     {s.updatedAt ? new Date(s.updatedAt).toLocaleString() : ""}
                   </div>
                 </button>
@@ -555,28 +565,29 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
           )}
 
           {/* Messages */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-none p-4 space-y-4">
             {messages.length === 0 && (
-              <div className="text-center py-12">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gray-100 flex items-center justify-center shadow-sm border border-gray-200">
-                  <BotMessageSquare className="w-6 h-6 text-gray-700" strokeWidth={1.5} />
-                </div>
-                <p className="text-sm text-gray-600 mb-1">{t("chat.emptyTitle")}</p>
-                <p className="text-xs text-gray-400 max-w-xs mx-auto">
+              <div className="text-center py-8">
+                <p className={`text-sm mb-1 ${imm ? "text-white/70" : "text-gray-600"}`}>{t("chat.emptyTitle")}</p>
+                <p className={`text-xs max-w-xs mx-auto ${imm ? "text-white/40" : "text-gray-400"}`}>
                   {t("chat.emptySubtitle")}
                 </p>
-                <div className="mt-4 flex flex-wrap justify-center gap-1.5">
+                <div className="mt-3 flex flex-wrap justify-center gap-1.5">
                   {suggestions.map((s) => (
                     <button
                       key={s}
                       onClick={() => { setInput(s); }}
-                      className="text-[10px] px-2 py-1 rounded-full border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-colors"
+                      className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
+                        imm
+                          ? "border-white/15 text-white/50 hover:text-white/80 hover:border-white/30"
+                          : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
+                      }`}
                     >
                       {s}
                     </button>
                   ))}
                 </div>
-                <p className="mt-3 text-xs text-gray-400 max-w-xs mx-auto">
+                <p className={`mt-3 text-xs max-w-xs mx-auto ${imm ? "text-white/30" : "text-gray-400"}`}>
                   {t("chat.memoryHint")}
                 </p>
               </div>
@@ -592,7 +603,9 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                           ref={editTextareaRef}
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
-                          className="w-full rounded-xl bg-white border border-teal-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none overflow-y-auto"
+                          className={`w-full rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none overflow-y-auto ${
+                            imm ? "bg-white/10 border border-white/20 text-white" : "bg-white border border-teal-300 text-gray-900"
+                          }`}
                           style={{ minHeight: "38px", maxHeight: "200px" }}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
@@ -606,7 +619,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                         <div className="flex justify-end gap-2">
                           <button
                             onClick={() => setEditingIndex(null)}
-                            className="px-3 py-1 rounded-lg text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                            className={`px-3 py-1 rounded-lg text-xs transition-colors ${imm ? "text-white/50 hover:text-white hover:bg-white/10" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"}`}
                           >
                             {t("chat.cancel")}
                           </button>
@@ -616,7 +629,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                               if (trimmed) handleEditRetry(i, trimmed);
                             }}
                             disabled={!editText.trim()}
-                            className="px-3 py-1 rounded-lg text-xs bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
+                            className="px-3 py-1 rounded-lg text-xs bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 disabled:opacity-50 transition-colors"
                           >
                             {t("chat.saveAndSend")}
                           </button>
@@ -630,7 +643,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                           <button
                             onClick={() => { setEditingIndex(i); setEditText(msg.content); }}
                             disabled={isLoading}
-                            className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                            className={`p-1 rounded-md disabled:opacity-30 transition-colors ${imm ? "text-white/40 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"}`}
                             title={t("chat.editTooltip")}
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -638,13 +651,13 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                           <button
                             onClick={() => handleEditRetry(i, msg.content)}
                             disabled={isLoading}
-                            className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                            className={`p-1 rounded-md disabled:opacity-30 transition-colors ${imm ? "text-white/40 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"}`}
                             title={t("chat.retryTooltip")}
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <div className="max-w-[80%] px-3 py-2 rounded-xl bg-teal-600 text-white text-sm shadow-sm">
+                        <div className="max-w-[80%] px-3 py-2 rounded-xl bg-white/15 text-white text-sm shadow-sm">
                           {msg.content}
                         </div>
                       </div>
@@ -659,7 +672,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
             ))}
 
             {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
-              <div className="flex items-center gap-2 text-xs text-teal-600">
+              <div className={`flex items-center gap-2 text-xs ${imm ? "text-teal-400" : "text-teal-600"}`}>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>{t("chat.thinking")}</span>
               </div>
@@ -667,8 +680,8 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
           </div>
 
           {/* Input */}
-          <div className="border-t border-gray-200 p-3 shrink-0">
-            <div className="flex gap-2">
+          <div className={`border-t p-2 shrink-0 ${imm ? "border-white/10" : "border-gray-200"}`}>
+            <div className="flex gap-2 items-end">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -676,13 +689,17 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                 onKeyDown={handleKeyDown}
                 placeholder={t("chat.inputPlaceholder")}
                 rows={1}
-                className="flex-1 rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none overflow-y-auto"
-                style={{ minHeight: "38px", maxHeight: "200px" }}
+                className={`w-0 flex-1 rounded-lg px-3 py-2 text-sm leading-normal focus:outline-none focus:ring-1 focus:ring-teal-500 resize-none overflow-y-auto scrollbar-none ${
+                  imm
+                    ? "bg-white/5 border border-white/10 text-white/90 placeholder-white/30"
+                    : "bg-white border border-gray-300 text-gray-900 placeholder-gray-400"
+                }`}
+                style={{ height: "38px", maxHeight: "120px" }}
               />
               <button
                 onClick={handleSend}
                 disabled={isLoading || !input.trim()}
-                className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm shadow-sm hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-white/80 text-sm hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
               >
                 {t("chat.send")}
               </button>

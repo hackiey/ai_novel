@@ -82,8 +82,8 @@ export default function DraftsTab({
   return (
     <div>
       {hasSearch && (
-        <div className="mb-4 flex items-center gap-2 text-xs text-gray-500">
-          <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-1 text-teal-700">
+        <div className="mb-4 flex items-center gap-2 text-xs text-white/50">
+          <span className="rounded-full border border-teal-500/20 bg-teal-500/10 px-2 py-1 text-teal-400">
             {searchMethod === "vector" ? t("search.semanticBadge") : t("search.keywordBadge")}
           </span>
           <span>
@@ -95,8 +95,8 @@ export default function DraftsTab({
       )}
 
       {showForm && (
-        <div className="mb-4 p-4 rounded-xl border border-gray-200 bg-white shadow-sm">
-          <h4 className="text-sm font-semibold text-gray-900 mb-3">{t("draft.newDraft")}</h4>
+        <div className="mb-4 p-4 rounded-xl glass-panel">
+          <h4 className="text-sm font-semibold text-white/90 mb-3">{t("draft.newDraft")}</h4>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -114,27 +114,27 @@ export default function DraftsTab({
               onChange={(e) => setTitle(e.target.value)}
               placeholder={t("draft.titlePlaceholder")}
               autoFocus
-              className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder={t("draft.contentPlaceholder")}
               rows={4}
-              className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
+              className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
             />
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setTitle(""); setContent(""); }}
-                className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                className="px-3 py-2 text-sm rounded-lg border border-white/20 text-white/60 hover:bg-white/5 transition-colors"
               >
                 {t("draft.cancel")}
               </button>
               <button
                 type="submit"
                 disabled={createMut.isPending}
-                className="px-4 py-2 text-sm rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 disabled:opacity-50 transition-colors"
               >
                 {createMut.isPending ? t("draft.adding") : t("draft.add")}
               </button>
@@ -144,15 +144,15 @@ export default function DraftsTab({
       )}
 
       {isSearching ? (
-        <div className="text-center py-8 text-gray-400 text-sm">
+        <div className="text-center py-8 text-white/40 text-sm">
           {t("search.searching")}
         </div>
       ) : hasSearch && visibleDrafts.length === 0 && !showForm ? (
-        <div className="text-center py-8 text-gray-400 text-sm">
+        <div className="text-center py-8 text-white/40 text-sm">
           {t("search.noResults", { query: searchQuery })}
         </div>
       ) : drafts.length === 0 && !showForm ? (
-        <div className="text-center py-8 text-gray-400 text-sm">
+        <div className="text-center py-8 text-white/40 text-sm">
           {t("draft.empty")}
         </div>
       ) : (
@@ -163,7 +163,7 @@ export default function DraftsTab({
             return (
               <div
                 key={draft._id}
-                className={`rounded-lg border bg-white transition-all ${isExpanded ? "border-teal-300 shadow-md" : "border-gray-200 hover:border-gray-300 hover:shadow-sm"}`}
+                className={`rounded-lg border transition-all ${isExpanded ? "border-teal-400/30 bg-white/8" : "border-white/10 bg-white/5 hover:border-white/20"}`}
               >
                 <div
                   className="flex items-start justify-between gap-3 p-4 cursor-pointer group"
@@ -177,15 +177,15 @@ export default function DraftsTab({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-xs transition-transform inline-block ${isExpanded ? "rotate-90" : ""}`}>▶</span>
-                      <h4 className="text-sm font-medium text-gray-800">{draft.title}</h4>
+                      <h4 className="text-sm font-medium text-white/80">{draft.title}</h4>
                     </div>
                     {!isExpanded && draft.content && (
-                      <p className="text-xs text-gray-500 line-clamp-2 ml-5">{draft.content}</p>
+                      <p className="text-xs text-white/50 line-clamp-2 ml-5">{draft.content}</p>
                     )}
                     {!isExpanded && draft.tags && draft.tags.length > 0 && (
                       <div className="flex gap-1 mt-2 ml-5">
                         {draft.tags.map((tag: string) => (
-                          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50">
                             {tag}
                           </span>
                         ))}
@@ -200,7 +200,7 @@ export default function DraftsTab({
                           deleteMut.mutate({ id: draft._id });
                         }
                       }}
-                      className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                      className="text-xs px-2 py-1 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
                     >
                       {t("draft.delete")}
                     </button>
@@ -208,7 +208,7 @@ export default function DraftsTab({
                 </div>
 
                 {isExpanded && (
-                  <div className="px-4 pb-4 border-t border-gray-100">
+                  <div className="px-4 pb-4 border-t border-white/5">
                     {isEditing ? (
                       <form
                         onSubmit={(e) => {
@@ -225,19 +225,19 @@ export default function DraftsTab({
                         className="space-y-4 pt-4"
                       >
                         <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1.5">{t("draft.title")}</label>
+                          <label className="block text-xs font-medium text-white/50 mb-1.5">{t("draft.title")}</label>
                           <input
                             value={editTitle}
                             onChange={(e) => setEditTitle(e.target.value)}
                             placeholder={t("draft.titlePlaceholder")}
                             onClick={(e) => e.stopPropagation()}
-                            className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                           />
                         </div>
                         <div>
                           <div className="flex items-center justify-between gap-3 mb-1.5">
-                            <label className="block text-xs font-medium text-gray-500">{t("draft.content")}</label>
-                            <span className="text-[11px] text-gray-400">{t("draft.supportsMarkdown")}</span>
+                            <label className="block text-xs font-medium text-white/50">{t("draft.content")}</label>
+                            <span className="text-[11px] text-white/40">{t("draft.supportsMarkdown")}</span>
                           </div>
                           <textarea
                             ref={editContentTextarea.ref}
@@ -246,14 +246,14 @@ export default function DraftsTab({
                             onInput={editContentTextarea.onInput}
                             onClick={(e) => e.stopPropagation()}
                             placeholder={t("draft.contentPlaceholder")}
-                            className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y leading-relaxed"
+                            className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y leading-relaxed"
                             style={{ minHeight: "160px" }}
                           />
                         </div>
                         {draft.tags && draft.tags.length > 0 && (
                           <div className="flex gap-1">
                             {draft.tags.map((tag: string) => (
-                              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50">
                                 {tag}
                               </span>
                             ))}
@@ -263,14 +263,14 @@ export default function DraftsTab({
                           <button
                             type="button"
                             onClick={() => setEditingId(null)}
-                            className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                            className="px-3 py-2 text-sm rounded-lg border border-white/20 text-white/60 hover:bg-white/5 transition-colors"
                           >
                             {t("draft.cancel")}
                           </button>
                           <button
                             type="submit"
                             disabled={updateMut.isPending}
-                            className="px-4 py-2 text-sm rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
+                            className="px-4 py-2 text-sm rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 disabled:opacity-50 transition-colors"
                           >
                             {updateMut.isPending ? t("draft.saving") : t("draft.save")}
                           </button>
@@ -282,25 +282,25 @@ export default function DraftsTab({
                         onDoubleClick={() => openEditMode(draft)}
                         title={t("draft.doubleClickEdit")}
                       >
-                        <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
+                        <div className="rounded-xl bg-white/5 border border-white/5 px-4 py-3">
                           {draft.content ? (
-                            <div className="world-setting-markdown text-sm text-gray-700 leading-relaxed break-words">
+                            <div className="world-setting-markdown text-sm text-white/70 leading-relaxed break-words">
                               <Markdown remarkPlugins={[remarkGfm]}>{draft.content}</Markdown>
                             </div>
                           ) : (
-                            <p className="text-sm text-gray-400 italic">{t("draft.noContent")}</p>
+                            <p className="text-sm text-white/40 italic">{t("draft.noContent")}</p>
                           )}
                         </div>
                         {draft.tags && draft.tags.length > 0 && (
                           <div className="flex gap-1">
                             {draft.tags.map((tag: string) => (
-                              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50">
                                 {tag}
                               </span>
                             ))}
                           </div>
                         )}
-                        <div className="flex items-center justify-between gap-3 text-[11px] text-gray-400">
+                        <div className="flex items-center justify-between gap-3 text-[11px] text-white/40">
                           <span>{t("draft.clickHint")}</span>
                           <button
                             type="button"
@@ -308,7 +308,7 @@ export default function DraftsTab({
                               e.stopPropagation();
                               openEditMode(draft);
                             }}
-                            className="px-2.5 py-1 rounded-md border border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-600 transition-colors"
+                            className="px-2.5 py-1 rounded-md border border-white/10 text-white/50 hover:border-teal-400/30 hover:text-teal-400 transition-colors"
                           >
                             {t("draft.edit")}
                           </button>

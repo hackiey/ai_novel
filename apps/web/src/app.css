@@ -1,8 +1,75 @@
 @import "tailwindcss";
 
+/* ─── Hide scrollbar but keep scrollable ─── */
+.scrollbar-none {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* ─── Glassmorphism Panel ─── */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-panel-solid {
+  background: rgba(20, 20, 35, 0.85);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* ─── Immersive TipTap Styles ─── */
+.tiptap-immersive {
+  color: rgba(255, 255, 255, 0.9);
+  font-family: "LXGW WenKai", serif;
+}
+
+.tiptap-immersive h1,
+.tiptap-immersive h2,
+.tiptap-immersive h3 {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.tiptap-immersive blockquote {
+  border-left-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.tiptap-immersive hr {
+  border-top-color: rgba(255, 255, 255, 0.15);
+}
+
+.tiptap-immersive code {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.tiptap-immersive pre {
+  background-color: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.tiptap-immersive p.is-editor-empty:first-child::before {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.tiptap-immersive strong {
+  color: rgba(255, 255, 255, 1);
+}
+
+.tiptap-immersive a {
+  color: #67e8f9;
+}
+
 body {
-  background-color: #f8fafc;
-  color: #1e293b;
+  background-color: #0a0a14;
+  color: #e2e8f0;
   font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   min-height: 100vh;
 }
@@ -72,30 +139,30 @@ a {
 }
 
 .tiptap blockquote {
-  border-left: 3px solid #d1d5db;
+  border-left: 3px solid rgba(255, 255, 255, 0.2);
   padding-left: 1em;
   margin-top: 0.5em;
   margin-bottom: 0.5em;
-  color: #6b7280;
+  color: rgba(255, 255, 255, 0.5);
   font-style: italic;
 }
 
 .tiptap hr {
   border: none;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
   margin-top: 1.5em;
   margin-bottom: 1.5em;
 }
 
 .tiptap code {
-  background-color: #f3f4f6;
+  background-color: rgba(255, 255, 255, 0.1);
   padding: 0.15em 0.3em;
   border-radius: 0.25em;
   font-size: 0.875em;
 }
 
 .tiptap pre {
-  background-color: #f3f4f6;
+  background-color: rgba(0, 0, 0, 0.3);
   padding: 0.75em 1em;
   border-radius: 0.375em;
   overflow-x: auto;
@@ -114,7 +181,7 @@ a {
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: #9ca3af;
+  color: rgba(255, 255, 255, 0.3);
   pointer-events: none;
   height: 0;
 }
@@ -187,25 +254,25 @@ a {
 
 .agent-markdown blockquote,
 .world-setting-markdown blockquote {
-  border-left: 2px solid #d1d5db;
+  border-left: 2px solid rgba(255, 255, 255, 0.2);
   padding-left: 0.75em;
   margin-top: 0.3em;
   margin-bottom: 0.3em;
-  color: #6b7280;
+  color: rgba(255, 255, 255, 0.5);
   font-style: italic;
 }
 
 .agent-markdown hr,
 .world-setting-markdown hr {
   border: none;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   margin-top: 0.75em;
   margin-bottom: 0.75em;
 }
 
 .agent-markdown code,
 .world-setting-markdown code {
-  background-color: #f3f4f6;
+  background-color: rgba(255, 255, 255, 0.1);
   padding: 0.1em 0.25em;
   border-radius: 0.2em;
   font-size: 0.85em;
@@ -213,7 +280,7 @@ a {
 
 .agent-markdown pre,
 .world-setting-markdown pre {
-  background-color: #f3f4f6;
+  background-color: rgba(0, 0, 0, 0.3);
   padding: 0.5em 0.75em;
   border-radius: 0.3em;
   overflow-x: auto;
@@ -239,7 +306,7 @@ a {
 
 .agent-markdown a,
 .world-setting-markdown a {
-  color: #4f46e5;
+  color: #67e8f9;
   text-decoration: underline;
 }
 
@@ -256,13 +323,13 @@ a {
 .agent-markdown td,
 .world-setting-markdown th,
 .world-setting-markdown td {
-  border: 1px solid #e5e7eb;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 0.25em 0.5em;
   text-align: left;
 }
 
 .agent-markdown th,
 .world-setting-markdown th {
-  background-color: #f9fafb;
+  background-color: rgba(255, 255, 255, 0.05);
   font-weight: 600;
 }

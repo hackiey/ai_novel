@@ -56,6 +56,8 @@
   "home.noWorldsTitle": "No worlds yet",
   "home.noWorldsText": "Create a world to start building characters, settings, and writing novels.",
   "home.updated": "Updated",
+  "home.novels": "Novels",
+  "home.noNovels": "No novels yet",
   "home.deleteConfirm": "Delete \"{{name}}\" and all its data?",
 
   "write.back": "Back",
@@ -71,6 +73,9 @@
   "write.editorPlaceholder": "Start writing your story...",
   "write.deleteChapter": "Delete this chapter",
   "write.deleteChapterConfirm": "Delete chapter \"{{name}}\"?",
+  "write.theme": "Theme",
+  "write.theme_rain": "Rain",
+  "write.theme_starfield": "Starfield",
 
   "world.backToHome": "Back to home",
   "world.novels": "Novels",

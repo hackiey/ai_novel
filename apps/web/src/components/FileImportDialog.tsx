@@ -199,12 +199,12 @@ export default function FileImportDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col mx-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="glass-panel-solid rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col mx-4">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">{t("import.title")}</h2>
-          <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <h2 className="text-lg font-semibold text-white/90">{t("import.title")}</h2>
+          <button onClick={handleClose} className="text-white/40 hover:text-white/60 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -220,32 +220,32 @@ export default function FileImportDialog({
                 onDrop={handleDrop}
                 className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
                   dragOver
-                    ? "border-teal-400 bg-teal-50"
+                    ? "border-teal-400 bg-teal-500/10"
                     : file
-                    ? "border-teal-300 bg-teal-50/50"
-                    : "border-gray-300 hover:border-gray-400"
+                    ? "border-teal-400/30 bg-teal-500/5"
+                    : "border-white/20 hover:border-white/30"
                 }`}
               >
                 {file ? (
                   <div className="flex items-center justify-center gap-3">
-                    <FileText className="w-8 h-8 text-teal-500" />
+                    <FileText className="w-8 h-8 text-teal-400" />
                     <div className="text-left">
-                      <p className="text-sm font-medium text-gray-900">{file.name}</p>
-                      <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                      <p className="text-sm font-medium text-white/90">{file.name}</p>
+                      <p className="text-xs text-white/50">{formatFileSize(file.size)}</p>
                     </div>
                     <button
                       onClick={() => setFile(null)}
-                      className="ml-2 text-gray-400 hover:text-red-500"
+                      className="ml-2 text-white/40 hover:text-red-400"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
                 ) : (
                   <>
-                    <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                    <p className="text-sm text-gray-600 mb-1">{t("import.dropHint")}</p>
-                    <p className="text-xs text-gray-400">{t("import.supportedFormats")}</p>
-                    <label className="mt-3 inline-block px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-500 cursor-pointer transition-colors">
+                    <Upload className="w-10 h-10 text-white/40 mx-auto mb-3" />
+                    <p className="text-sm text-white/60 mb-1">{t("import.dropHint")}</p>
+                    <p className="text-xs text-white/40">{t("import.supportedFormats")}</p>
+                    <label className="mt-3 inline-block px-4 py-2 text-sm bg-white/10 border border-white/15 text-white/80 rounded-lg hover:bg-white/20 cursor-pointer transition-colors">
                       {t("import.selectFile")}
                       <input
                         type="file"
@@ -265,14 +265,14 @@ export default function FileImportDialog({
               {/* Progress */}
               <div>
                 <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-gray-600">
+                  <span className="text-white/60">
                     {t("import.processing", { current: currentChunk + 1, total: totalChunks })}
                   </span>
-                  <span className="text-gray-400">
+                  <span className="text-white/40">
                     {totalChunks > 0 ? `${Math.round(((currentChunk + 1) / totalChunks) * 100)}%` : ""}
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-white/10 rounded-full h-2">
                   <div
                     className="bg-teal-500 h-2 rounded-full transition-all duration-300"
                     style={{ width: totalChunks > 0 ? `${((currentChunk + 1) / totalChunks) * 100}%` : "0%" }}
@@ -288,7 +288,7 @@ export default function FileImportDialog({
               )}
 
               {errorMsg && (
-                <div className="text-sm text-red-600 bg-red-50 rounded-lg p-3">
+                <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
                   {errorMsg}
                 </div>
               )}
@@ -299,16 +299,16 @@ export default function FileImportDialog({
             <div className="text-center py-8">
               {errorMsg ? (
                 <>
-                  <div className="text-red-500 text-sm mb-4 bg-red-50 rounded-lg p-3 text-left whitespace-pre-wrap">
+                  <div className="text-red-400 text-sm mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-left whitespace-pre-wrap">
                     {errorMsg}
                   </div>
-                  <p className="text-sm text-gray-500">{t("import.doneWithErrors")}</p>
+                  <p className="text-sm text-white/50">{t("import.doneWithErrors")}</p>
                 </>
               ) : (
                 <>
-                  <Check className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-                  <p className="text-gray-900 font-medium">{t("import.done")}</p>
-                  <p className="text-sm text-gray-500 mt-1">{t("import.doneHint")}</p>
+                  <Check className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
+                  <p className="text-white/90 font-medium">{t("import.done")}</p>
+                  <p className="text-sm text-white/50 mt-1">{t("import.doneHint")}</p>
                 </>
               )}
             </div>
@@ -316,19 +316,19 @@ export default function FileImportDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-white/10">
           {stage === "select" && (
             <>
               <button
                 onClick={handleClose}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                className="px-4 py-2 text-sm text-white/60 hover:text-white/80 transition-colors"
               >
                 {t("common.cancel")}
               </button>
               <button
                 onClick={startImport}
                 disabled={!file}
-                className="px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm bg-white/10 border border-white/15 text-white/80 rounded-lg hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {t("import.start")}
               </button>
@@ -337,7 +337,7 @@ export default function FileImportDialog({
           {stage === "importing" && (
             <button
               onClick={handleCancel}
-              className="px-4 py-2 text-sm text-red-600 hover:text-red-700 transition-colors"
+              className="px-4 py-2 text-sm text-red-400 hover:text-red-300 transition-colors"
             >
               {t("import.cancel")}
             </button>
@@ -345,7 +345,7 @@ export default function FileImportDialog({
           {stage === "done" && (
             <button
               onClick={handleClose}
-              className="px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-500 transition-colors"
+              className="px-4 py-2 text-sm bg-white/10 border border-white/15 text-white/80 rounded-lg hover:bg-white/20 transition-colors"
             >
               {t("import.close")}
             </button>

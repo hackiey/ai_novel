@@ -13,7 +13,7 @@ export default function LanguageSwitcher() {
   return (
     <button
       onClick={toggle}
-      className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-gray-500 hover:text-teal-600 hover:bg-gray-100 transition-colors cursor-pointer"
+      className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-white/50 hover:text-teal-400 hover:bg-white/10 transition-colors cursor-pointer"
       title={isZh ? "Switch to English" : "切换到中文"}
     >
       <Languages className="w-3.5 h-3.5" />

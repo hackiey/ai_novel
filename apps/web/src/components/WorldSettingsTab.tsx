@@ -85,8 +85,8 @@ export default function WorldSettingsTab({
   return (
     <div>
       {hasSearch && (
-        <div className="mb-4 flex items-center gap-2 text-xs text-gray-500">
-          <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-1 text-teal-700">
+        <div className="mb-4 flex items-center gap-2 text-xs text-white/50">
+          <span className="rounded-full border border-teal-500/20 bg-teal-500/10 px-2 py-1 text-teal-400">
             {searchMethod === "vector" ? t("search.semanticBadge") : t("search.keywordBadge")}
           </span>
           <span>
@@ -98,8 +98,8 @@ export default function WorldSettingsTab({
       )}
 
       {showWorldForm && (
-        <div className="mb-4 p-4 rounded-xl border border-gray-200 bg-white shadow-sm">
-          <h4 className="text-sm font-semibold text-gray-900 mb-3">{t("worldSetting.newSetting")}</h4>
+        <div className="mb-4 p-4 rounded-xl glass-panel">
+          <h4 className="text-sm font-semibold text-white/90 mb-3">{t("worldSetting.newSetting")}</h4>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -118,13 +118,13 @@ export default function WorldSettingsTab({
                 value={worldCategory}
                 onChange={(e) => setWorldCategory(e.target.value)}
                 placeholder={t("worldSetting.categoryPlaceholder")}
-                className="flex-1 rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="flex-1 rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
               <input
                 value={worldTitle}
                 onChange={(e) => setWorldTitle(e.target.value)}
                 placeholder={t("worldSetting.titlePlaceholder")}
-                className="flex-1 rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="flex-1 rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
             <textarea
@@ -132,20 +132,20 @@ export default function WorldSettingsTab({
               onChange={(e) => setWorldContent(e.target.value)}
               placeholder={t("worldSetting.descriptionPlaceholder")}
               rows={3}
-              className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
+              className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
             />
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
                 onClick={() => { setShowWorldForm(false); setWorldCategory(""); setWorldTitle(""); setWorldContent(""); }}
-                className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                className="px-3 py-2 text-sm rounded-lg border border-white/20 text-white/60 hover:bg-white/5 transition-colors"
               >
                 {t("worldSetting.cancel")}
               </button>
               <button
                 type="submit"
                 disabled={createWorldSettingMut.isPending}
-                className="px-4 py-2 text-sm rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 disabled:opacity-50 transition-colors"
               >
                 {createWorldSettingMut.isPending ? t("worldSetting.adding") : t("worldSetting.add")}
               </button>
@@ -155,15 +155,15 @@ export default function WorldSettingsTab({
       )}
 
       {isSearching ? (
-        <div className="text-center py-8 text-gray-400 text-sm">
+        <div className="text-center py-8 text-white/40 text-sm">
           {t("search.searching")}
         </div>
       ) : hasSearch && visibleWorldSettings.length === 0 && !showWorldForm ? (
-        <div className="text-center py-8 text-gray-400 text-sm">
+        <div className="text-center py-8 text-white/40 text-sm">
           {t("search.noResults", { query: searchQuery })}
         </div>
       ) : worldSettings.length === 0 && !showWorldForm ? (
-        <div className="text-center py-8 text-gray-400 text-sm">
+        <div className="text-center py-8 text-white/40 text-sm">
           {t("worldSetting.empty")}
         </div>
       ) : (
@@ -174,7 +174,7 @@ export default function WorldSettingsTab({
             return (
               <div
                 key={ws._id}
-                className={`rounded-lg border bg-white transition-all ${isExpanded ? "border-teal-300 shadow-md" : "border-gray-200 hover:border-gray-300 hover:shadow-sm"}`}
+                className={`rounded-lg border transition-all ${isExpanded ? "border-teal-400/30 bg-white/8" : "border-white/10 bg-white/5 hover:border-white/20"}`}
               >
                 <div
                   className="flex items-start justify-between gap-3 p-4 cursor-pointer group"
@@ -192,18 +192,18 @@ export default function WorldSettingsTab({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-xs transition-transform inline-block ${isExpanded ? "rotate-90" : ""}`}>▶</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                         {ws.category}
                       </span>
-                      <h4 className="text-sm font-medium text-gray-800">{ws.title}</h4>
+                      <h4 className="text-sm font-medium text-white/80">{ws.title}</h4>
                     </div>
                     {!isExpanded && ws.content && (
-                      <p className="text-xs text-gray-500 line-clamp-2 ml-5">{ws.content}</p>
+                      <p className="text-xs text-white/50 line-clamp-2 ml-5">{ws.content}</p>
                     )}
                     {!isExpanded && ws.tags && ws.tags.length > 0 && (
                       <div className="flex gap-1 mt-2 ml-5">
                         {ws.tags.map((tag: string) => (
-                          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50">
                             {tag}
                           </span>
                         ))}
@@ -218,7 +218,7 @@ export default function WorldSettingsTab({
                           deleteWorldSettingMut.mutate({ id: ws._id });
                         }
                       }}
-                      className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                      className="text-xs px-2 py-1 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
                     >
                       {t("worldSetting.delete")}
                     </button>
@@ -226,7 +226,7 @@ export default function WorldSettingsTab({
                 </div>
 
                 {isExpanded && (
-                  <div className="px-4 pb-4 border-t border-gray-100">
+                  <div className="px-4 pb-4 border-t border-white/5">
                     {isEditing ? (
                       <form
                         onSubmit={(e) => {
@@ -245,30 +245,30 @@ export default function WorldSettingsTab({
                       >
                         <div className="flex gap-3">
                           <div className="flex-1">
-                            <label className="block text-xs font-medium text-gray-500 mb-1.5">{t("worldSetting.category")}</label>
+                            <label className="block text-xs font-medium text-white/50 mb-1.5">{t("worldSetting.category")}</label>
                             <input
                               value={editWorldCategory}
                               onChange={(e) => setEditWorldCategory(e.target.value)}
                               placeholder={t("worldSetting.editCategoryPlaceholder")}
                               onClick={(e) => e.stopPropagation()}
-                              className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                              className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                             />
                           </div>
                           <div className="flex-1">
-                            <label className="block text-xs font-medium text-gray-500 mb-1.5">{t("worldSetting.title")}</label>
+                            <label className="block text-xs font-medium text-white/50 mb-1.5">{t("worldSetting.title")}</label>
                             <input
                               value={editWorldTitle}
                               onChange={(e) => setEditWorldTitle(e.target.value)}
                               placeholder={t("worldSetting.titlePlaceholder")}
                               onClick={(e) => e.stopPropagation()}
-                              className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                              className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                             />
                           </div>
                         </div>
                         <div>
                           <div className="flex items-center justify-between gap-3 mb-1.5">
-                            <label className="block text-xs font-medium text-gray-500">{t("worldSetting.content")}</label>
-                            <span className="text-[11px] text-gray-400">{t("worldSetting.supportsMarkdown")}</span>
+                            <label className="block text-xs font-medium text-white/50">{t("worldSetting.content")}</label>
+                            <span className="text-[11px] text-white/40">{t("worldSetting.supportsMarkdown")}</span>
                           </div>
                           <textarea
                             ref={editContentTextarea.ref}
@@ -277,14 +277,14 @@ export default function WorldSettingsTab({
                             onInput={editContentTextarea.onInput}
                             onClick={(e) => e.stopPropagation()}
                             placeholder={t("worldSetting.contentPlaceholder")}
-                            className="w-full rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y leading-relaxed"
+                            className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y leading-relaxed"
                             style={{ minHeight: "160px" }}
                           />
                         </div>
                         {ws.tags && ws.tags.length > 0 && (
                           <div className="flex gap-1">
                             {ws.tags.map((tag: string) => (
-                              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50">
                                 {tag}
                               </span>
                             ))}
@@ -294,14 +294,14 @@ export default function WorldSettingsTab({
                           <button
                             type="button"
                             onClick={() => setEditingWorldSettingId(null)}
-                            className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                            className="px-3 py-2 text-sm rounded-lg border border-white/20 text-white/60 hover:bg-white/5 transition-colors"
                           >
                             {t("worldSetting.cancel")}
                           </button>
                           <button
                             type="submit"
                             disabled={updateWorldSettingMut.isPending}
-                            className="px-4 py-2 text-sm rounded-lg bg-teal-600 text-white hover:bg-teal-500 disabled:opacity-50 transition-colors"
+                            className="px-4 py-2 text-sm rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 disabled:opacity-50 transition-colors"
                           >
                             {updateWorldSettingMut.isPending ? t("worldSetting.saving") : t("worldSetting.save")}
                           </button>
@@ -313,25 +313,25 @@ export default function WorldSettingsTab({
                         onDoubleClick={() => openEditMode(ws)}
                         title={t("worldSetting.doubleClickEdit")}
                       >
-                        <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
+                        <div className="rounded-xl bg-white/5 border border-white/5 px-4 py-3">
                           {ws.content ? (
-                            <div className="world-setting-markdown text-sm text-gray-700 leading-relaxed break-words">
+                            <div className="world-setting-markdown text-sm text-white/70 leading-relaxed break-words">
                               <Markdown remarkPlugins={[remarkGfm]}>{ws.content}</Markdown>
                             </div>
                           ) : (
-                            <p className="text-sm text-gray-400 italic">{t("worldSetting.noContent")}</p>
+                            <p className="text-sm text-white/40 italic">{t("worldSetting.noContent")}</p>
                           )}
                         </div>
                         {ws.tags && ws.tags.length > 0 && (
                           <div className="flex gap-1">
                             {ws.tags.map((tag: string) => (
-                              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50">
                                 {tag}
                               </span>
                             ))}
                           </div>
                         )}
-                        <div className="flex items-center justify-between gap-3 text-[11px] text-gray-400">
+                        <div className="flex items-center justify-between gap-3 text-[11px] text-white/40">
                           <span>{t("worldSetting.clickHint")}</span>
                           <button
                             type="button"
@@ -339,7 +339,7 @@ export default function WorldSettingsTab({
                               e.stopPropagation();
                               openEditMode(ws);
                             }}
-                            className="px-2.5 py-1 rounded-md border border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-600 transition-colors"
+                            className="px-2.5 py-1 rounded-md border border-white/10 text-white/50 hover:border-teal-400/30 hover:text-teal-400 transition-colors"
                           >
                             {t("worldSetting.edit")}
                           </button>

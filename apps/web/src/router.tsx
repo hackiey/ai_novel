@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import {
   createRootRoute,
   createRoute,
@@ -7,6 +8,7 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { ChevronDown, Shield, Palette, Languages, LogOut } from "lucide-react";
 import HomePage from "./pages/HomePage.js";
 import WritePage from "./pages/WritePage.js";
 import WorldPage from "./pages/WorldPage.js";
@@ -16,7 +18,76 @@ import AdminPage from "./pages/AdminPage.js";
 import { getToken } from "./lib/auth.js";
 import { useAuth } from "./contexts/AuthContext.js";
 import { BreadcrumbProvider, useBreadcrumb } from "./contexts/BreadcrumbContext.js";
-import LanguageSwitcher from "./components/LanguageSwitcher.js";
+import { WriteThemeProvider, useWriteTheme } from "./contexts/WriteThemeContext.js";
+
+import ShaderCanvas from "./components/shader/ShaderCanvas.js";
+
+function UserMenu({ user, logout }: { user: { displayName: string; role: string }; logout: () => void }) {
+  const { t, i18n } = useTranslation();
+  const { theme, setTheme } = useWriteTheme();
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isZh = i18n.language?.startsWith("zh");
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    const id = setTimeout(() => document.addEventListener("mousedown", handleClick), 0);
+    return () => { clearTimeout(id); document.removeEventListener("mousedown", handleClick); };
+  }, [open]);
+
+  return (
+    <div ref={menuRef} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1 text-white/60 hover:text-white transition-colors"
+      >
+        <span>{user.displayName}</span>
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-40 glass-panel-solid rounded-lg py-1 shadow-xl z-50">
+          {user.role === "admin" && (
+            <Link
+              to="/admin"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-4 py-2 text-sm text-white/70 hover:text-teal-400 hover:bg-white/5 transition-colors"
+            >
+              <Shield className="w-3.5 h-3.5" />
+              {t("header.admin")}
+            </Link>
+          )}
+          <button
+            onClick={() => setTheme(theme === "rain" ? "starfield" : "rain")}
+            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-white/70 hover:text-teal-400 hover:bg-white/5 transition-colors"
+          >
+            <Palette className="w-3.5 h-3.5" />
+            {t(`write.theme_${theme === "rain" ? "starfield" : "rain"}`)}
+          </button>
+          <button
+            onClick={() => i18n.changeLanguage(isZh ? "en" : "zh-CN")}
+            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-white/70 hover:text-teal-400 hover:bg-white/5 transition-colors"
+          >
+            <Languages className="w-3.5 h-3.5" />
+            {isZh ? "English" : "中文"}
+          </button>
+          <div className="border-t border-white/10 my-1" />
+          <button
+            onClick={() => { setOpen(false); logout(); }}
+            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-white/70 hover:text-red-400 hover:bg-white/5 transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            {t("header.logout")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function requireAuth() {
   if (!getToken()) {
@@ -26,57 +97,47 @@ function requireAuth() {
 
 function RootComponent() {
   return (
-    <BreadcrumbProvider>
-      <RootInner />
-    </BreadcrumbProvider>
+    <WriteThemeProvider>
+      <BreadcrumbProvider>
+        <RootInner />
+      </BreadcrumbProvider>
+    </WriteThemeProvider>
   );
 }
 
 function RootInner() {
   const { user, logout } = useAuth();
   const { t } = useTranslation();
-  const { breadcrumb } = useBreadcrumb();
+  const { breadcrumb, immersive } = useBreadcrumb();
+  const { theme } = useWriteTheme();
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+    <div className="min-h-screen relative">
+      {/* Global shader background */}
+      <ShaderCanvas theme={theme} />
+
+      <header className={`border-b border-white/10 bg-white/5 backdrop-blur-sm sticky top-0 z-50 ${immersive ? "hidden" : ""}`}>
         <div className="px-3 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <Link
               to="/"
-              className="text-lg font-bold text-teal-600 shrink-0"
+              className="text-lg font-bold text-teal-400 shrink-0"
             >
               {t("header.brand")}
             </Link>
             {breadcrumb && (
               <div className="hidden sm:flex items-center gap-3 min-w-0">
-                <span className="text-gray-300 shrink-0">/</span>
+                <span className="text-white/20 shrink-0">/</span>
                 {breadcrumb}
               </div>
             )}
           </div>
           <div className="flex items-center gap-2 sm:gap-4 text-sm">
-            <LanguageSwitcher />
-            {user && (
-              <>
-                {user.role === "admin" && (
-                  <Link to="/admin" className="text-gray-600 hover:text-teal-600 transition-colors">
-                    {t("header.admin")}
-                  </Link>
-                )}
-                <span className="text-gray-500 hidden sm:inline">{user.displayName}</span>
-                <button
-                  onClick={logout}
-                  className="text-gray-400 hover:text-red-500 transition-colors"
-                >
-                  {t("header.logout")}
-                </button>
-              </>
-            )}
+            {user && <UserMenu user={user} logout={logout} />}
           </div>
         </div>
       </header>
-      <main>
+      <main className="relative z-10">
         <Outlet />
       </main>
     </div>

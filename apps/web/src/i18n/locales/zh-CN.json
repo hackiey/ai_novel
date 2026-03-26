@@ -56,6 +56,8 @@
   "home.noWorldsTitle": "还没有世界",
   "home.noWorldsText": "创建一个世界，开始构建角色、设定和小说。",
   "home.updated": "更新于",
+  "home.novels": "小说",
+  "home.noNovels": "还没有小说",
   "home.deleteConfirm": "删除 \"{{name}}\" 及其所有数据？",
 
   "write.back": "返回",
@@ -71,6 +73,9 @@
   "write.editorPlaceholder": "开始创作你的故事...",
   "write.deleteChapter": "删除本章节",
   "write.deleteChapterConfirm": "确定要删除章节 \"{{name}}\" 吗？",
+  "write.theme": "主题",
+  "write.theme_rain": "雨夜",
+  "write.theme_starfield": "星空",
   "write.reviewTitle": "AI 修改审阅",
   "write.accept": "接受",
   "write.cancel": "取消",

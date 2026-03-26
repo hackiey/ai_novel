@@ -5,7 +5,7 @@ import Typography from "@tiptap/extension-typography";
 import Underline from "@tiptap/extension-underline";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { marked } from "marked";
-import { EditorToolbar } from "./EditorToolbar";
+import { EditorToolbar, type EditorVariant } from "./EditorToolbar";
 
 // Configure marked for synchronous rendering, no extra wrappers
 marked.use({
@@ -138,6 +138,8 @@ export interface NovelEditorProps {
   appendText?: string;
   onDelete?: () => void;
   deleteTitle?: string;
+  variant?: EditorVariant;
+  onStatsChange?: (count: number, isCjk: boolean) => void;
 }
 
 export function NovelEditor({
@@ -150,14 +152,18 @@ export function NovelEditor({
   appendText,
   onDelete,
   deleteTitle,
+  variant = "default",
+  onStatsChange,
 }: NovelEditorProps) {
-  const [words, setWords] = useState(0);
-  const [chars, setChars] = useState(0);
+  const [statCount, setStatCount] = useState(0);
+  const [statIsCjk, setStatIsCjk] = useState(false);
 
   const isInternalUpdate = useRef(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
+  const onStatsChangeRef = useRef(onStatsChange);
+  onStatsChangeRef.current = onStatsChange;
   const contentRef = useRef(content);
   contentRef.current = content;
   const dirtyHtmlRef = useRef<string | null>(null);
@@ -193,8 +199,9 @@ export function NovelEditor({
     },
     editorProps: {
       attributes: {
-        class:
-          "tiptap h-full overflow-y-auto box-border focus:outline-none px-6 py-4 leading-relaxed text-gray-800 text-lg",
+        class: variant === "immersive"
+          ? "tiptap tiptap-immersive h-full overflow-y-auto scrollbar-none box-border focus:outline-none px-6 py-4 leading-relaxed text-lg"
+          : "tiptap h-full overflow-y-auto scrollbar-none box-border focus:outline-none px-6 py-4 leading-relaxed text-gray-800 text-lg",
       },
       handlePaste,
     },
@@ -207,9 +214,12 @@ export function NovelEditor({
     }
   }, [editor]);
 
-  // Word/char count
+  // Word/char count — CJK-aware
+  // CJK-dominant text → show character count; otherwise → show word count
   useEffect(() => {
     if (!editor) return;
+
+    const CJK_RE = /[\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\uff00-\uffef\u2e80-\u2eff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/g;
 
     const updateStats = () => {
       const text = editor.state.doc.textBetween(
@@ -218,10 +228,23 @@ export function NovelEditor({
         " ",
         " ",
       );
-      const c = text.length;
-      const w = text.split(/\s+/).filter((s) => s.length > 0).length;
-      setWords(w);
-      setChars(c);
+      const stripped = text.replace(/\s/g, "");
+      const cjkMatches = stripped.match(CJK_RE);
+      const cjkCount = cjkMatches ? cjkMatches.length : 0;
+      const isCjk = stripped.length > 0 && cjkCount / stripped.length > 0.3;
+
+      let count: number;
+      if (isCjk) {
+        // Character count (excluding whitespace)
+        count = stripped.length;
+      } else {
+        // Word count (whitespace split)
+        count = text.split(/\s+/).filter((s) => s.length > 0).length;
+      }
+
+      setStatCount(count);
+      setStatIsCjk(isCjk);
+      onStatsChangeRef.current?.(count, isCjk);
     };
 
     updateStats();
@@ -280,14 +303,21 @@ export function NovelEditor({
     };
   }, []);
 
+  const immersive = variant === "immersive";
+
   return (
     <div
-      className={`flex min-h-0 flex-col border border-gray-200 rounded-lg bg-white ${className ?? ""}`}
+      className={`flex min-h-0 flex-col rounded-lg ${
+        immersive
+          ? "glass-panel border-0 bg-transparent"
+          : "border border-gray-200 bg-white"
+      } ${className ?? ""}`}
     >
       <EditorToolbar
         editor={editor}
         onDelete={onDelete}
         deleteTitle={deleteTitle}
+        variant={variant}
       />
 
       <div
@@ -302,14 +332,11 @@ export function NovelEditor({
         <EditorContent editor={editor} className="h-full" />
       </div>
 
-      <div className="flex items-center justify-end gap-4 border-t border-gray-200 px-4 py-1.5 text-xs text-gray-400 shrink-0">
-        <span>
-          {words} {words === 1 ? "word" : "words"}
-        </span>
-        <span>
-          {chars} {chars === 1 ? "character" : "characters"}
-        </span>
-      </div>
+      {!immersive && (
+        <div className="flex items-center justify-end gap-4 border-t border-gray-200 px-4 py-1.5 text-xs text-gray-400 shrink-0">
+          <span>{statCount} {statIsCjk ? "字" : "words"}</span>
+        </div>
+      )}
     </div>
   );
 }
