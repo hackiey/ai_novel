@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -13,15 +13,18 @@ import {
   Alert,
   StyleSheet,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, Stack } from "expo-router";
+import { BookOpen, History, Plus } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import Markdown from "react-native-markdown-display";
 import { useAgentChat } from "../../lib/useAgentChat";
 import { buildSegments, type ChatMessage } from "../../lib/segments";
 import ToolCallBlock from "../../components/ToolCallBlock";
-import { markdownStyles } from "../../lib/markdownStyles";
+import { getMarkdownStyles } from "../../lib/markdownStyles";
 import { trpc } from "../../lib/trpc";
-import { colors, base } from "../../lib/theme";
+import { useTheme } from "../../contexts/ThemeContext";
+import ThemeBackground from "../../components/backgrounds/ThemeBackground";
 
 function formatModelName(model: string) {
   const parts = model.split(":");
@@ -35,19 +38,25 @@ function AssistantMessageContent({
   events,
   content,
   isStreaming,
+  chatStyles,
+  mdStyles,
+  tealColor,
 }: {
   events?: any[];
   content: string;
   isStreaming: boolean;
+  chatStyles: ReturnType<typeof createStyles>;
+  mdStyles: ReturnType<typeof getMarkdownStyles>;
+  tealColor: string;
 }) {
   const { t } = useTranslation();
   const segments = buildSegments(events, content, isStreaming);
 
   if (segments.length === 0 && isStreaming) {
     return (
-      <View style={styles.thinkingRow}>
-        <ActivityIndicator size="small" color={colors.teal} />
-        <Text style={styles.thinkingText}>{t("chat.thinking")}</Text>
+      <View style={chatStyles.thinkingRow}>
+        <ActivityIndicator size="small" color={tealColor} />
+        <Text style={chatStyles.thinkingText}>{t("chat.thinking")}</Text>
       </View>
     );
   }
@@ -57,13 +66,13 @@ function AssistantMessageContent({
       {segments.map((seg, i) => {
         if (seg.type === "text") {
           return (
-            <View key={i} style={styles.textBubble}>
-              <Markdown style={markdownStyles}>{seg.content}</Markdown>
+            <View key={i} style={chatStyles.textBubble}>
+              <Markdown style={mdStyles}>{seg.content}</Markdown>
             </View>
           );
         }
         return (
-          <View key={i} style={styles.toolBlockWrap}>
+          <View key={i} style={chatStyles.toolBlockWrap}>
             {seg.calls.map((call, j) => (
               <ToolCallBlock key={j} {...call} />
             ))}
@@ -77,6 +86,8 @@ function AssistantMessageContent({
 export default function ChatScreen() {
   const { worldId } = useLocalSearchParams<{ worldId: string }>();
   const { t } = useTranslation();
+  const { colors, baseStyles: base, fontFamily, themeVariant } = useTheme();
+  const insets = useSafeAreaInsets();
   const [input, setInput] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
@@ -190,6 +201,9 @@ export default function ChatScreen() {
   const defaultModel = modelsQuery.data?.default;
   const currentModel = selectedModel || defaultModel || "";
 
+  const s = useMemo(() => createStyles(colors), [colors]);
+  const mdStyles = useMemo(() => getMarkdownStyles(colors, fontFamily), [colors, fontFamily]);
+
   function renderMessage({
     item,
     index,
@@ -200,34 +214,34 @@ export default function ChatScreen() {
     if (item.role === "user") {
       if (editingIndex === index) {
         return (
-          <View style={styles.userRow}>
-            <View style={styles.editBubble}>
+          <View style={s.userRow}>
+            <View style={s.editBubble}>
               <TextInput
                 value={editText}
                 onChangeText={setEditText}
                 multiline
                 autoFocus
-                style={styles.editInput}
+                style={s.editInput}
               />
-              <View style={styles.editActions}>
+              <View style={s.editActions}>
                 <TouchableOpacity
                   onPress={() => {
                     setEditingIndex(null);
                     setEditText("");
                   }}
-                  style={styles.editCancelBtn}
+                  style={s.editCancelBtn}
                 >
-                  <Text style={styles.editCancelText}>{t("chat.cancel")}</Text>
+                  <Text style={s.editCancelText}>{t("chat.cancel")}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleEditSend}
                   disabled={!editText.trim()}
                   style={[
-                    styles.editSendBtn,
-                    !editText.trim() && styles.sendBtnDisabled,
+                    s.editSendBtn,
+                    !editText.trim() && s.sendBtnDisabled,
                   ]}
                 >
-                  <Text style={styles.sendBtnText}>{t("chat.saveAndSend")}</Text>
+                  <Text style={s.sendBtnText}>{t("chat.saveAndSend")}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -235,23 +249,28 @@ export default function ChatScreen() {
         );
       }
       return (
-        <View style={styles.userRow}>
+        <View style={s.userRow}>
           <TouchableOpacity
             onLongPress={() => handleLongPressUser(index)}
-            style={styles.userBubble}
+            style={s.userBubble}
           >
-            <Text style={styles.userText}>{item.content}</Text>
+            <Text style={[s.userText, fontFamily ? { fontFamily } : undefined]}>
+              {item.content}
+            </Text>
           </TouchableOpacity>
         </View>
       );
     }
 
     return (
-      <View style={styles.assistantRow}>
+      <View style={s.assistantRow}>
         <AssistantMessageContent
           events={item.events}
           content={item.content}
           isStreaming={isLoading && index === messages.length - 1}
+          chatStyles={s}
+          mdStyles={mdStyles}
+          tealColor={colors.teal}
         />
       </View>
     );
@@ -265,37 +284,29 @@ export default function ChatScreen() {
 
   return (
     <View style={[base.flex1, base.bgDark]}>
+      <ThemeBackground theme={themeVariant} bgColor={colors.bg} />
       <Stack.Screen
         options={{
-          headerShown: true,
           title: t("chat.aiAssistant"),
-          headerStyle: { backgroundColor: colors.bg },
-          headerTintColor: colors.text,
           headerRight: () => (
-            <View style={styles.headerRight}>
+            <View style={s.headerRight}>
               <TouchableOpacity
                 onPress={() => setShowMemory(true)}
-                style={styles.headerBtnOutline}
+                style={s.headerIconBtn}
               >
-                <Text style={styles.headerBtnOutlineText}>
-                  {t("chat.memory")}
-                </Text>
+                <BookOpen size={18} color={colors.muted} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setShowHistory(true)}
-                style={styles.headerBtnOutline}
+                style={s.headerIconBtn}
               >
-                <Text style={styles.headerBtnOutlineText}>
-                  {t("chat.history")}
-                </Text>
+                <History size={18} color={colors.muted} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={newSession}
-                style={styles.headerBtnPrimary}
+                style={s.headerIconBtn}
               >
-                <Text style={styles.headerBtnPrimaryText}>
-                  + {t("chat.newChat")}
-                </Text>
+                <Plus size={18} color={colors.teal} />
               </TouchableOpacity>
             </View>
           ),
@@ -310,10 +321,10 @@ export default function ChatScreen() {
         {/* Model selector bar */}
         <TouchableOpacity
           onPress={() => setShowModelPicker(true)}
-          style={styles.modelBar}
+          style={s.modelBar}
         >
-          <Text style={styles.modelBarLabel}>{t("chat.model")}: </Text>
-          <Text style={styles.modelBarValue}>
+          <Text style={s.modelBarLabel}>{t("chat.model")}: </Text>
+          <Text style={s.modelBarValue}>
             {currentModel ? formatModelName(currentModel) : "..."}
           </Text>
         </TouchableOpacity>
@@ -323,25 +334,25 @@ export default function ChatScreen() {
           data={messages}
           renderItem={renderMessage}
           keyExtractor={(_, i) => String(i)}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={s.listContent}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyTitle}>{t("chat.emptyTitle")}</Text>
-              <Text style={styles.emptySubtitle}>
+            <View style={s.emptyContainer}>
+              <Text style={s.emptyTitle}>{t("chat.emptyTitle")}</Text>
+              <Text style={s.emptySubtitle}>
                 {t("chat.emptySubtitle")}
               </Text>
-              <View style={styles.suggestionsWrap}>
-                {suggestions.map((s) => (
+              <View style={s.suggestionsWrap}>
+                {suggestions.map((sug) => (
                   <TouchableOpacity
-                    key={s}
-                    onPress={() => setInput(s)}
-                    style={styles.suggestionChip}
+                    key={sug}
+                    onPress={() => setInput(sug)}
+                    style={s.suggestionChip}
                   >
-                    <Text style={styles.suggestionText}>{s}</Text>
+                    <Text style={s.suggestionText}>{sug}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-              <Text style={[styles.emptySubtitle, { marginTop: 8 }]}>
+              <Text style={[s.emptySubtitle, { marginTop: 8 }]}>
                 {t("chat.memoryHint")}
               </Text>
             </View>
@@ -349,25 +360,25 @@ export default function ChatScreen() {
         />
 
         {/* Input */}
-        <View style={styles.inputBar}>
-          <View style={styles.inputRow}>
+        <View style={[s.inputBar, { paddingBottom: 12 + insets.bottom }]}>
+          <View style={s.inputRow}>
             <TextInput
               value={input}
               onChangeText={setInput}
               placeholder={t("chat.inputPlaceholder")}
               placeholderTextColor={colors.slate500}
               multiline
-              style={styles.textInput}
+              style={s.textInput}
             />
             <TouchableOpacity
               onPress={handleSend}
               disabled={isLoading || !input.trim()}
               style={[
-                styles.sendBtn,
-                (isLoading || !input.trim()) && styles.sendBtnDisabled,
+                s.sendBtn,
+                (isLoading || !input.trim()) && s.sendBtnDisabled,
               ]}
             >
-              <Text style={styles.sendBtnText}>{t("chat.send")}</Text>
+              <Text style={s.sendBtnText}>{t("chat.send")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -375,17 +386,17 @@ export default function ChatScreen() {
 
       {/* Model Picker Modal */}
       <Modal visible={showModelPicker} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t("chat.selectModel")}</Text>
+        <View style={s.modalOverlay}>
+          <View style={s.modalContent}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>{t("chat.selectModel")}</Text>
               <TouchableOpacity onPress={() => setShowModelPicker(false)}>
-                <Text style={styles.modalCloseText}>{t("chat.close")}</Text>
+                <Text style={s.modalCloseText}>{t("chat.close")}</Text>
               </TouchableOpacity>
             </View>
             <ScrollView style={base.px4}>
               {modelsQuery.isLoading && (
-                <View style={styles.modalLoading}>
+                <View style={s.modalLoading}>
                   <ActivityIndicator color={colors.teal} />
                 </View>
               )}
@@ -397,19 +408,19 @@ export default function ChatScreen() {
                     setShowModelPicker(false);
                   }}
                   style={[
-                    styles.sessionItem,
-                    currentModel === m && styles.sessionItemActive,
+                    s.sessionItem,
+                    currentModel === m && s.sessionItemActive,
                   ]}
                 >
                   <Text
                     style={[
-                      styles.sessionTitle,
-                      currentModel === m && styles.sessionTitleActive,
+                      s.sessionTitle,
+                      currentModel === m && s.sessionTitleActive,
                     ]}
                   >
                     {formatModelName(m)}
                   </Text>
-                  <Text style={styles.sessionDate}>{m}</Text>
+                  <Text style={s.sessionDate}>{m}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -419,27 +430,27 @@ export default function ChatScreen() {
 
       {/* Memory Editor Modal */}
       <Modal visible={showMemory} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t("chat.memory")}</Text>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalContent, { maxHeight: "80%" }]}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>{t("chat.memory")}</Text>
               <TouchableOpacity onPress={() => setShowMemory(false)}>
-                <Text style={styles.modalCloseText}>{t("chat.close")}</Text>
+                <Text style={s.modalCloseText}>{t("chat.close")}</Text>
               </TouchableOpacity>
             </View>
             {/* Sub-tabs */}
-            <View style={styles.memoryTabBar}>
+            <View style={s.memoryTabBar}>
               <TouchableOpacity
                 onPress={() => setMemorySubTab("world")}
                 style={[
-                  styles.memoryTab,
-                  memorySubTab === "world" && styles.memoryTabActive,
+                  s.memoryTab,
+                  memorySubTab === "world" && s.memoryTabActive,
                 ]}
               >
                 <Text
                   style={[
-                    styles.memoryTabText,
-                    memorySubTab === "world" && styles.memoryTabTextActive,
+                    s.memoryTabText,
+                    memorySubTab === "world" && s.memoryTabTextActive,
                   ]}
                 >
                   {t("chat.memoryWorld")}
@@ -448,23 +459,23 @@ export default function ChatScreen() {
               <TouchableOpacity
                 onPress={() => setMemorySubTab("project")}
                 style={[
-                  styles.memoryTab,
-                  memorySubTab === "project" && styles.memoryTabActive,
+                  s.memoryTab,
+                  memorySubTab === "project" && s.memoryTabActive,
                 ]}
               >
                 <Text
                   style={[
-                    styles.memoryTabText,
-                    memorySubTab === "project" && styles.memoryTabTextActive,
+                    s.memoryTabText,
+                    memorySubTab === "project" && s.memoryTabTextActive,
                   ]}
                 >
                   {t("chat.memoryProject")}
                 </Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.memoryBody}>
+            <View style={s.memoryBody}>
               {memoryQuery.isLoading ? (
-                <View style={styles.modalLoading}>
+                <View style={s.modalLoading}>
                   <ActivityIndicator color={colors.teal} />
                 </View>
               ) : (
@@ -475,17 +486,17 @@ export default function ChatScreen() {
                     placeholder={t("chat.memoryEmpty")}
                     placeholderTextColor={colors.slate500}
                     multiline
-                    style={styles.memoryInput}
+                    style={s.memoryInput}
                   />
                   <TouchableOpacity
                     onPress={handleSaveMemory}
                     disabled={memorySaveStatus === "saving"}
                     style={[
-                      styles.memorySaveBtn,
+                      s.memorySaveBtn,
                       memorySaveStatus === "saving" && base.btnDisabled,
                     ]}
                   >
-                    <Text style={styles.memorySaveBtnText}>
+                    <Text style={s.memorySaveBtnText}>
                       {memorySaveStatus === "saving"
                         ? t("chat.memorySaving")
                         : memorySaveStatus === "saved"
@@ -502,51 +513,51 @@ export default function ChatScreen() {
 
       {/* History Modal */}
       <Modal visible={showHistory} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t("chat.history")}</Text>
+        <View style={s.modalOverlay}>
+          <View style={s.modalContent}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>{t("chat.history")}</Text>
               <TouchableOpacity onPress={() => setShowHistory(false)}>
-                <Text style={styles.modalCloseText}>{t("chat.close")}</Text>
+                <Text style={s.modalCloseText}>{t("chat.close")}</Text>
               </TouchableOpacity>
             </View>
             <ScrollView style={base.px4}>
               {sessionsQuery.isLoading && (
-                <View style={styles.modalLoading}>
+                <View style={s.modalLoading}>
                   <ActivityIndicator color={colors.teal} />
                 </View>
               )}
               {sessionsQuery.data?.length === 0 && (
-                <View style={styles.modalLoading}>
-                  <Text style={styles.noHistoryText}>
+                <View style={s.modalLoading}>
+                  <Text style={s.noHistoryText}>
                     {t("chat.noHistory")}
                   </Text>
                 </View>
               )}
-              {sessionsQuery.data?.map((s: any) => (
+              {sessionsQuery.data?.map((sess: any) => (
                 <TouchableOpacity
-                  key={s.sessionId}
+                  key={sess.sessionId}
                   onPress={() => {
                     setShowHistory(false);
-                    loadSession(s.sessionId);
+                    loadSession(sess.sessionId);
                   }}
                   style={[
-                    styles.sessionItem,
-                    sessionId === s.sessionId && styles.sessionItemActive,
+                    s.sessionItem,
+                    sessionId === sess.sessionId && s.sessionItemActive,
                   ]}
                 >
                   <Text
                     style={[
-                      styles.sessionTitle,
-                      sessionId === s.sessionId && styles.sessionTitleActive,
+                      s.sessionTitle,
+                      sessionId === sess.sessionId && s.sessionTitleActive,
                     ]}
                     numberOfLines={1}
                   >
-                    {s.title || t("chat.untitled")}
+                    {sess.title || t("chat.untitled")}
                   </Text>
-                  <Text style={styles.sessionDate}>
-                    {s.updatedAt
-                      ? new Date(s.updatedAt).toLocaleString("zh-CN")
+                  <Text style={s.sessionDate}>
+                    {sess.updatedAt
+                      ? new Date(sess.updatedAt).toLocaleString("zh-CN")
                       : ""}
                   </Text>
                 </TouchableOpacity>
@@ -559,340 +570,332 @@ export default function ChatScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  // AssistantMessageContent
-  thinkingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 8,
-  },
-  thinkingText: {
-    color: colors.teal,
-    fontSize: 11,
-  },
-  textBubble: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 8,
-    maxWidth: "90%",
-  },
-  toolBlockWrap: {
-    maxWidth: "90%",
-    marginBottom: 8,
-  },
+function createStyles(colors: any) {
+  return StyleSheet.create({
+    // AssistantMessageContent
+    thinkingRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 8,
+    },
+    thinkingText: {
+      color: colors.teal,
+      fontSize: 11,
+    },
+    textBubble: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      marginBottom: 8,
+      maxWidth: "90%",
+    },
+    toolBlockWrap: {
+      maxWidth: "90%",
+      marginBottom: 8,
+    },
 
-  // Message rows
-  userRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginBottom: 12,
-    paddingHorizontal: 16,
-  },
-  userBubble: {
-    backgroundColor: colors.tealDark,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    maxWidth: "80%",
-  },
-  userText: {
-    color: colors.white,
-    fontSize: 13,
-  },
-  assistantRow: {
-    marginBottom: 12,
-    paddingHorizontal: 16,
-  },
+    // Message rows
+    userRow: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      marginBottom: 12,
+      paddingHorizontal: 16,
+    },
+    userBubble: {
+      backgroundColor: "rgba(20,184,166,0.15)",
+      borderWidth: 1,
+      borderColor: "rgba(20,184,166,0.3)",
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      maxWidth: "80%",
+    },
+    userText: {
+      color: colors.white,
+      fontSize: 13,
+    },
+    assistantRow: {
+      marginBottom: 12,
+      paddingHorizontal: 16,
+    },
 
-  // Edit mode
-  editBubble: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.teal,
-    borderRadius: 16,
-    padding: 12,
-    maxWidth: "85%",
-    width: "85%",
-  },
-  editInput: {
-    color: colors.text,
-    fontSize: 13,
-    minHeight: 60,
-    textAlignVertical: "top",
-  },
-  editActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 8,
-    marginTop: 8,
-  },
-  editCancelBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  editCancelText: {
-    color: colors.muted,
-    fontSize: 11,
-  },
-  editSendBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: colors.tealDark,
-  },
+    // Edit mode
+    editBubble: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.teal,
+      borderRadius: 16,
+      padding: 12,
+      maxWidth: "85%",
+      width: "85%",
+    },
+    editInput: {
+      color: colors.text,
+      fontSize: 13,
+      minHeight: 60,
+      textAlignVertical: "top",
+    },
+    editActions: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      gap: 8,
+      marginTop: 8,
+    },
+    editCancelBtn: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    editCancelText: {
+      color: colors.muted,
+      fontSize: 11,
+    },
+    editSendBtn: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      backgroundColor: "rgba(20,184,166,0.25)",
+      borderWidth: 1,
+      borderColor: "rgba(20,184,166,0.4)",
+    },
 
-  // Header
-  headerRight: {
-    flexDirection: "row",
-    gap: 8,
-    marginRight: 8,
-  },
-  headerBtnOutline: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  headerBtnOutlineText: {
-    color: colors.muted,
-    fontSize: 11,
-  },
-  headerBtnPrimary: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: colors.tealDark,
-  },
-  headerBtnPrimaryText: {
-    color: colors.white,
-    fontSize: 11,
-  },
+    // Header
+    headerRight: {
+      flexDirection: "row",
+      gap: 12,
+      marginRight: 8,
+    },
+    headerIconBtn: {
+      padding: 6,
+    },
 
-  // Model bar
-  modelBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modelBarLabel: {
-    color: colors.muted,
-    fontSize: 11,
-  },
-  modelBarValue: {
-    color: colors.teal,
-    fontSize: 11,
-    fontWeight: "600",
-  },
+    // Model bar
+    modelBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    modelBarLabel: {
+      color: colors.muted,
+      fontSize: 11,
+    },
+    modelBarValue: {
+      color: colors.teal,
+      fontSize: 11,
+      fontWeight: "600",
+    },
 
-  // List
-  listContent: {
-    paddingVertical: 16,
-    flexGrow: 1,
-  },
+    // List
+    listContent: {
+      paddingVertical: 16,
+      flexGrow: 1,
+    },
 
-  // Empty state
-  emptyContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 80,
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: colors.text,
-    marginBottom: 4,
-  },
-  emptySubtitle: {
-    fontSize: 13,
-    color: colors.muted,
-    textAlign: "center",
-    paddingHorizontal: 32,
-    marginBottom: 16,
-  },
-  suggestionsWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 8,
-    paddingHorizontal: 24,
-  },
-  suggestionChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  suggestionText: {
-    color: colors.muted,
-    fontSize: 11,
-  },
+    // Empty state
+    emptyContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 80,
+    },
+    emptyTitle: {
+      fontSize: 17,
+      fontWeight: "600",
+      color: colors.text,
+      marginBottom: 4,
+    },
+    emptySubtitle: {
+      fontSize: 13,
+      color: colors.muted,
+      textAlign: "center",
+      paddingHorizontal: 32,
+      marginBottom: 16,
+    },
+    suggestionsWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "center",
+      gap: 8,
+      paddingHorizontal: 24,
+    },
+    suggestionChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 9999,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    suggestionText: {
+      color: colors.muted,
+      fontSize: 11,
+    },
 
-  // Input bar
-  inputBar: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  inputRow: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "flex-end",
-  },
-  textInput: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    color: colors.text,
-    fontSize: 13,
-    maxHeight: 120,
-    minHeight: 40,
-  },
-  sendBtn: {
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: colors.tealDark,
-  },
-  sendBtnDisabled: {
-    backgroundColor: colors.tealDark,
-    opacity: 0.5,
-  },
-  sendBtnText: {
-    color: colors.white,
-    fontWeight: "600",
-    fontSize: 13,
-  },
+    // Input bar
+    inputBar: {
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    inputRow: {
+      flexDirection: "row",
+      gap: 8,
+      alignItems: "flex-end",
+    },
+    textInput: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      color: colors.text,
+      fontSize: 13,
+      maxHeight: 120,
+      minHeight: 40,
+    },
+    sendBtn: {
+      borderRadius: 16,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      backgroundColor: "rgba(20,184,166,0.25)",
+      borderWidth: 1,
+      borderColor: "rgba(20,184,166,0.4)",
+    },
+    sendBtnDisabled: {
+      opacity: 0.4,
+    },
+    sendBtnText: {
+      color: colors.teal,
+      fontWeight: "600",
+      fontSize: 13,
+    },
 
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: colors.black50,
-  },
-  modalContent: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    maxHeight: "60%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modalTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  modalCloseText: {
-    color: colors.muted,
-    fontSize: 13,
-  },
-  modalLoading: {
-    paddingVertical: 32,
-    alignItems: "center",
-  },
-  noHistoryText: {
-    fontSize: 13,
-    color: colors.muted,
-  },
-  sessionItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  sessionItemActive: {
-    backgroundColor: colors.bg,
-  },
-  sessionTitle: {
-    fontSize: 13,
-    color: colors.muted,
-  },
-  sessionTitleActive: {
-    color: colors.text,
-    fontWeight: "600",
-  },
-  sessionDate: {
-    fontSize: 11,
-    color: colors.slate600,
-    marginTop: 2,
-  },
+    // Modal
+    modalOverlay: {
+      flex: 1,
+      justifyContent: "flex-end",
+      backgroundColor: colors.black50,
+    },
+    modalContent: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      maxHeight: "60%",
+    },
+    modalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 24,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    modalTitle: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    modalCloseText: {
+      color: colors.muted,
+      fontSize: 13,
+    },
+    modalLoading: {
+      paddingVertical: 32,
+      alignItems: "center",
+    },
+    noHistoryText: {
+      fontSize: 13,
+      color: colors.muted,
+    },
+    sessionItem: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    sessionItemActive: {
+      backgroundColor: colors.bg,
+    },
+    sessionTitle: {
+      fontSize: 13,
+      color: colors.muted,
+    },
+    sessionTitleActive: {
+      color: colors.text,
+      fontWeight: "600",
+    },
+    sessionDate: {
+      fontSize: 11,
+      color: colors.slate600,
+      marginTop: 2,
+    },
 
-  // Memory editor
-  memoryTabBar: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  memoryTab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
-  memoryTabActive: {
-    borderBottomColor: colors.teal,
-  },
-  memoryTabText: {
-    fontSize: 13,
-    color: colors.muted,
-  },
-  memoryTabTextActive: {
-    color: colors.teal,
-    fontWeight: "600",
-  },
-  memoryBody: {
-    padding: 16,
-  },
-  memoryInput: {
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 12,
-    color: colors.text,
-    fontSize: 13,
-    minHeight: 200,
-    textAlignVertical: "top",
-    marginBottom: 12,
-  },
-  memorySaveBtn: {
-    backgroundColor: colors.teal,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  memorySaveBtnText: {
-    color: colors.white,
-    fontWeight: "600",
-    fontSize: 13,
-  },
-});
+    // Memory editor
+    memoryTabBar: {
+      flexDirection: "row",
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    memoryTab: {
+      flex: 1,
+      paddingVertical: 10,
+      alignItems: "center",
+      borderBottomWidth: 2,
+      borderBottomColor: "transparent",
+    },
+    memoryTabActive: {
+      borderBottomColor: colors.teal,
+    },
+    memoryTabText: {
+      fontSize: 13,
+      color: colors.muted,
+    },
+    memoryTabTextActive: {
+      color: colors.teal,
+      fontWeight: "600",
+    },
+    memoryBody: {
+      padding: 16,
+    },
+    memoryInput: {
+      backgroundColor: colors.bg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      padding: 12,
+      color: colors.text,
+      fontSize: 13,
+      minHeight: 200,
+      textAlignVertical: "top",
+      marginBottom: 12,
+    },
+    memorySaveBtn: {
+      backgroundColor: "rgba(20,184,166,0.25)",
+      borderWidth: 1,
+      borderColor: "rgba(20,184,166,0.4)",
+      borderRadius: 12,
+      paddingVertical: 12,
+      alignItems: "center",
+    },
+    memorySaveBtnText: {
+      color: colors.teal,
+      fontWeight: "600",
+      fontSize: 13,
+    },
+
+  });
+}

@@ -1,29 +1,34 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   FlatList,
+  ScrollView,
   RefreshControl,
   ActivityIndicator,
   Alert,
   Modal,
   StyleSheet,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Stack } from "expo-router";
+import { Settings, FileEdit } from "lucide-react-native";
 import { trpc } from "../../lib/trpc";
 import { useTranslation } from "react-i18next";
-import { colors, base } from "../../lib/theme";
+import { useTheme } from "../../contexts/ThemeContext";
+import ThemeBackground from "../../components/backgrounds/ThemeBackground";
 
 export default function HomeScreen() {
   const { t } = useTranslation();
+  const { colors, baseStyles: base, themeVariant } = useTheme();
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
   const worldsQuery = trpc.world.list.useQuery();
+  const projectsQuery = trpc.project.list.useQuery();
   const createMutation = trpc.world.create.useMutation({
     onSuccess: () => {
       worldsQuery.refetch();
@@ -37,6 +42,15 @@ export default function HomeScreen() {
   });
 
   const worlds = (worldsQuery.data ?? []) as any[];
+  const projects = (projectsQuery.data ?? []) as any[];
+
+  const worldMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const w of worlds) map.set(w._id, w.name);
+    return map;
+  }, [worlds]);
+
+  const s = useMemo(() => createStyles(colors), [colors]);
 
   function handleDelete(world: any) {
     Alert.alert(
@@ -81,6 +95,22 @@ export default function HomeScreen() {
 
   return (
     <View style={[base.flex1, base.bgDark]}>
+      <ThemeBackground theme={themeVariant} bgColor={colors.bg} />
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: t("header.brand"),
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => router.push("/(tabs)/settings")}
+              style={s.settingsBtn}
+            >
+              <Settings size={20} color={colors.muted} />
+            </TouchableOpacity>
+          ),
+        }}
+      />
+
       <FlatList
         data={worlds}
         renderItem={renderWorld}
@@ -94,8 +124,45 @@ export default function HomeScreen() {
           />
         }
         ListHeaderComponent={
-          <View style={base.mb4}>
-            <Text style={base.textSm}>{t("home.subtitle")}</Text>
+          <View>
+            {/* Novels section */}
+            {projects.length > 0 && (
+              <View style={base.mb6}>
+                <Text style={[s.sectionLabel, base.mb3]}>
+                  {t("home.novels")}
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                >
+                  {projects.map((project: any) => (
+                    <TouchableOpacity
+                      key={project._id}
+                      onPress={() => router.push(`/project/${project._id}`)}
+                      style={[base.card, s.novelCard]}
+                      activeOpacity={0.7}
+                    >
+                      <View style={s.novelCardRow}>
+                        <FileEdit size={14} color={colors.teal} />
+                        <Text style={s.novelName} numberOfLines={1}>
+                          {project.name}
+                        </Text>
+                      </View>
+                      {project.worldId && worldMap.has(project.worldId) && (
+                        <Text style={s.novelWorld} numberOfLines={1}>
+                          {worldMap.get(project.worldId)}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Worlds section header */}
+            <Text style={[s.sectionLabel, base.mb3]}>
+              {t("home.title")}
+            </Text>
           </View>
         }
         ListEmptyComponent={
@@ -109,7 +176,10 @@ export default function HomeScreen() {
               <Text style={[base.textSm, base.mb3, { color: colors.red }]}>
                 {t("home.loadFailed")}
               </Text>
-              <TouchableOpacity onPress={() => worldsQuery.refetch()}>
+              <TouchableOpacity
+                onPress={() => worldsQuery.refetch()}
+                style={s.glassBtn}
+              >
                 <Text style={base.textTeal}>{t("home.retry")}</Text>
               </TouchableOpacity>
             </View>
@@ -123,7 +193,7 @@ export default function HomeScreen() {
               </Text>
               <TouchableOpacity
                 onPress={() => setShowForm(true)}
-                style={s.emptyNewWorldBtn}
+                style={[base.btnPrimary, { paddingHorizontal: 24 }]}
               >
                 <Text style={base.textWhite}>{t("home.newWorld")}</Text>
               </TouchableOpacity>
@@ -185,7 +255,7 @@ export default function HomeScreen() {
                 }}
                 style={[base.btnOutline, base.flex1]}
               >
-                <Text style={[base.textMuted, base.textWhite, { fontWeight: "600", color: colors.muted }]}>
+                <Text style={[base.textMuted, { fontWeight: "600" }]}>
                   {t("home.cancel")}
                 </Text>
               </TouchableOpacity>
@@ -218,59 +288,99 @@ export default function HomeScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  worldCard: {
-    padding: 20,
-    marginBottom: 12,
-  },
-  emptyContainer: {
-    alignItems: "center",
-    paddingVertical: 80,
-  },
-  emptyNewWorldBtn: {
-    backgroundColor: colors.teal,
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  fab: {
-    position: "absolute",
-    bottom: 24,
-    right: 24,
-    backgroundColor: colors.teal,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  fabText: {
-    color: colors.white,
-    fontSize: 24,
-    fontWeight: "300",
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: colors.black50,
-  },
-  modalContent: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  labelSpacing: {
-    marginBottom: 6,
-  },
-  mb5: {
-    marginBottom: 20,
-  },
-});
+function createStyles(colors: any) {
+  return StyleSheet.create({
+    settingsBtn: {
+      marginRight: 8,
+      padding: 4,
+    },
+    sectionLabel: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: colors.muted,
+      textTransform: "uppercase",
+      letterSpacing: 1,
+    },
+    novelCard: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      marginRight: 10,
+      minWidth: 160,
+      maxWidth: 220,
+    },
+    novelCardRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    novelName: {
+      fontSize: 13,
+      fontWeight: "500",
+      color: colors.text,
+      flexShrink: 1,
+    },
+    novelWorld: {
+      fontSize: 11,
+      color: colors.muted,
+      marginTop: 4,
+    },
+    worldCard: {
+      padding: 20,
+      marginBottom: 12,
+    },
+    emptyContainer: {
+      alignItems: "center",
+      paddingVertical: 80,
+    },
+    glassBtn: {
+      backgroundColor: "rgba(255,255,255,0.08)",
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,0.15)",
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    fab: {
+      position: "absolute",
+      bottom: 24,
+      right: 24,
+      backgroundColor: "rgba(20,184,166,0.25)",
+      borderWidth: 1,
+      borderColor: "rgba(20,184,166,0.4)",
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      alignItems: "center",
+      justifyContent: "center",
+      elevation: 6,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+    },
+    fabText: {
+      color: colors.teal,
+      fontSize: 24,
+      fontWeight: "300",
+    },
+    modalOverlay: {
+      flex: 1,
+      justifyContent: "flex-end",
+      backgroundColor: colors.black50,
+    },
+    modalContent: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: 24,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    labelSpacing: {
+      marginBottom: 6,
+    },
+    mb5: {
+      marginBottom: 20,
+    },
+  });
+}

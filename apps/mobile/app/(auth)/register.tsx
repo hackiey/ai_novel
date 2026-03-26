@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,11 +12,12 @@ import {
 } from "react-native";
 import { Link } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
 import { useTranslation } from "react-i18next";
-import { colors, base } from "../../lib/theme";
 
 export default function RegisterScreen() {
   const { register } = useAuth();
+  const { colors, baseStyles: base } = useTheme();
   const { t } = useTranslation();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -37,6 +38,8 @@ export default function RegisterScreen() {
       setLoading(false);
     }
   }
+
+  const s = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <KeyboardAvoidingView
@@ -131,49 +134,53 @@ export default function RegisterScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 32,
-  },
-  subtitle: {
-    fontSize: 17,
-    color: colors.muted,
-  },
-  fieldGroup: {
-    gap: 0,
-  },
-  label: {
-    fontSize: 13,
-    color: colors.muted,
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: colors.text,
-    fontSize: 15,
-  },
-  submitBtn: {
-    backgroundColor: colors.teal,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 24,
-  },
-  linkText: {
-    color: colors.teal,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-});
+function createStyles(colors: any) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      justifyContent: "center",
+      paddingHorizontal: 32,
+    },
+    subtitle: {
+      fontSize: 17,
+      color: colors.muted,
+    },
+    fieldGroup: {
+      gap: 0,
+    },
+    label: {
+      fontSize: 13,
+      color: colors.muted,
+      marginBottom: 6,
+    },
+    input: {
+      backgroundColor: "rgba(0,0,0,0.3)",
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      color: colors.text,
+      fontSize: 15,
+    },
+    submitBtn: {
+      backgroundColor: "rgba(20,184,166,0.25)",
+      borderWidth: 1,
+      borderColor: "rgba(20,184,166,0.4)",
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: "center",
+      marginTop: 8,
+    },
+    footer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      marginTop: 24,
+    },
+    linkText: {
+      color: colors.teal,
+      fontSize: 13,
+      fontWeight: "600",
+    },
+  });
+}

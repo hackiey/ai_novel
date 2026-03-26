@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,12 +10,14 @@ import {
   StyleSheet,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+import { MessageCircle } from "lucide-react-native";
 import { trpc } from "../../lib/trpc";
 import { useTranslation } from "react-i18next";
+import { useTheme } from "../../contexts/ThemeContext";
+import ThemeBackground from "../../components/backgrounds/ThemeBackground";
 import CharactersTab from "../../components/CharactersTab";
 import WorldSettingsTab from "../../components/WorldSettingsTab";
 import DraftsTab from "../../components/DraftsTab";
-import { colors, base } from "../../lib/theme";
 
 type Tab = "characters" | "worldSettings" | "drafts";
 
@@ -29,6 +31,7 @@ export default function WorldDetailScreen() {
   const { worldId } = useLocalSearchParams<{ worldId: string }>();
   const router = useRouter();
   const { t } = useTranslation();
+  const { colors, baseStyles: base, themeVariant } = useTheme();
   const [activeTab, setActiveTab] = useState<Tab>("characters");
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -85,6 +88,8 @@ export default function WorldDetailScreen() {
   const worldSettings = (worldSettingsQuery.data ?? []) as any[];
   const drafts = (draftsQuery.data ?? []) as any[];
 
+  const s = useMemo(() => createStyles(colors), [colors]);
+
   if (worldQuery.isLoading) {
     return (
       <View style={[base.flex1, base.bgDark, base.center]}>
@@ -133,12 +138,18 @@ export default function WorldDetailScreen() {
 
   return (
     <View style={[base.flex1, base.bgDark]}>
+      <ThemeBackground theme={themeVariant} bgColor={colors.bg} />
       <Stack.Screen
         options={{
-          headerShown: true,
           title: world.name,
-          headerStyle: { backgroundColor: colors.bg },
-          headerTintColor: colors.text,
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => router.push(`/chat/${worldId}`)}
+              style={{ padding: 6, marginRight: 8 }}
+            >
+              <MessageCircle size={20} color={colors.teal} />
+            </TouchableOpacity>
+          ),
         }}
       />
 
@@ -155,6 +166,7 @@ export default function WorldDetailScreen() {
             {projects.map((project: any) => (
               <TouchableOpacity
                 key={project._id}
+                onPress={() => router.push(`/project/${project._id}`)}
                 onLongPress={() => handleDeleteProject(project)}
                 style={[base.card, s.projectCard]}
               >
@@ -213,16 +225,6 @@ export default function WorldDetailScreen() {
             )}
           </ScrollView>
         </View>
-
-        {/* AI Chat button */}
-        <TouchableOpacity
-          onPress={() => router.push(`/chat/${worldId}`)}
-          style={[base.btnPrimary, base.mb6, { paddingVertical: 14 }]}
-        >
-          <Text style={[base.textWhite, { fontSize: 15 }]}>
-            {t("chat.aiAssistant")}
-          </Text>
-        </TouchableOpacity>
 
         {/* Search Bar */}
         <View style={s.searchBar}>
@@ -286,110 +288,112 @@ export default function WorldDetailScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: colors.muted,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-  projectCard: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginRight: 12,
-    minWidth: 140,
-  },
-  projectName: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: colors.text,
-  },
-  addProjectBtn: {
-    backgroundColor: colors.teal,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  addProjectText: {
-    color: colors.white,
-    fontSize: 13,
-  },
-  addProjectDashed: {
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 120,
-  },
-  // Search
-  searchBar: {
-    marginBottom: 16,
-  },
-  searchInput: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    color: colors.text,
-    fontSize: 13,
-  },
-  searchMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 8,
-  },
-  searchBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-  },
-  searchBadgeVector: {
-    backgroundColor: colors.tealBg,
-  },
-  searchBadgeRegex: {
-    backgroundColor: colors.emeraldBg,
-  },
-  searchBadgeText: {
-    fontSize: 11,
-    color: colors.teal,
-  },
-  searchCount: {
-    fontSize: 11,
-    color: colors.muted,
-  },
-  // Tabs
-  tabBar: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  tabItem: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-    borderBottomWidth: 2,
-  },
-  tabActive: {
-    borderBottomColor: colors.teal,
-  },
-  tabInactive: {
-    borderBottomColor: "transparent",
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  tabTextActive: {
-    color: colors.teal,
-  },
-  tabTextInactive: {
-    color: colors.muted,
-  },
-});
+function createStyles(colors: any) {
+  return StyleSheet.create({
+    sectionLabel: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: colors.muted,
+      textTransform: "uppercase",
+      letterSpacing: 1,
+    },
+    projectCard: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      marginRight: 12,
+      minWidth: 140,
+    },
+    projectName: {
+      fontSize: 13,
+      fontWeight: "500",
+      color: colors.text,
+    },
+    addProjectBtn: {
+      backgroundColor: "rgba(20,184,166,0.25)",
+      borderWidth: 1,
+      borderColor: "rgba(20,184,166,0.4)",
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    addProjectText: {
+      color: colors.teal,
+      fontSize: 13,
+    },
+    addProjectDashed: {
+      borderWidth: 1,
+      borderStyle: "dashed",
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      minWidth: 120,
+    },
+    searchBar: {
+      marginBottom: 16,
+    },
+    searchInput: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      color: colors.text,
+      fontSize: 13,
+    },
+    searchMeta: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 8,
+    },
+    searchBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 999,
+    },
+    searchBadgeVector: {
+      backgroundColor: colors.tealBg,
+    },
+    searchBadgeRegex: {
+      backgroundColor: colors.emeraldBg,
+    },
+    searchBadgeText: {
+      fontSize: 11,
+      color: colors.teal,
+    },
+    searchCount: {
+      fontSize: 11,
+      color: colors.muted,
+    },
+    tabBar: {
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    tabItem: {
+      flex: 1,
+      paddingVertical: 12,
+      alignItems: "center",
+      borderBottomWidth: 2,
+    },
+    tabActive: {
+      borderBottomColor: colors.teal,
+    },
+    tabInactive: {
+      borderBottomColor: "transparent",
+    },
+    tabText: {
+      fontSize: 13,
+      fontWeight: "500",
+    },
+    tabTextActive: {
+      color: colors.teal,
+    },
+    tabTextInactive: {
+      color: colors.muted,
+    },
+  });
+}

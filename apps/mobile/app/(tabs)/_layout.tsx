@@ -1,42 +1,19 @@
-import { Tabs } from "expo-router";
-import { Text } from "react-native";
-import { useTranslation } from "react-i18next";
-import { colors } from "../../lib/theme";
+import { Stack } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function TabsLayout() {
-  const { t } = useTranslation();
-
+  const { colors } = useTheme();
   return (
-    <Tabs
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.bg },
-        headerTintColor: colors.text,
-        tabBarStyle: {
-          backgroundColor: colors.bg,
-          borderTopColor: colors.border,
-        },
-        tabBarActiveTintColor: colors.teal,
-        tabBarInactiveTintColor: colors.slate500,
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: t("home.title"),
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20 }}>🌍</Text>
-          ),
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={["bottom"]}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          headerStyle: { backgroundColor: "transparent" },
+          headerTintColor: colors.text,
+          contentStyle: { backgroundColor: colors.bg },
         }}
       />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: t("settings.title", "设置"),
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20 }}>⚙️</Text>
-          ),
-        }}
-      />
-    </Tabs>
+    </SafeAreaView>
   );
 }

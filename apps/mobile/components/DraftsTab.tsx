@@ -10,8 +10,8 @@ import {
 import { trpc } from "../lib/trpc";
 import { useTranslation } from "react-i18next";
 import Markdown from "react-native-markdown-display";
-import { markdownStyles } from "../lib/markdownStyles";
-import { colors, base } from "../lib/theme";
+import { getMarkdownStyles } from "../lib/markdownStyles";
+import { useTheme } from "../contexts/ThemeContext";
 
 interface Props {
   worldId: string;
@@ -20,6 +20,7 @@ interface Props {
 
 export default function DraftsTab({ worldId, searchResultIds }: Props) {
   const { t } = useTranslation();
+  const { colors, baseStyles: base } = useTheme();
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -76,21 +77,17 @@ export default function DraftsTab({ worldId, searchResultIds }: Props) {
     );
   }
 
+  const s = useMemo(() => createStyles(colors), [colors]);
+  const mdStyles = useMemo(() => getMarkdownStyles(colors), [colors]);
+
   return (
     <View>
-      <View style={[base.rowCenter, s.headerRow]}>
-        <Text style={s.sectionLabel}>
-          {t("draft.count", { count: drafts.length })}
-        </Text>
-        <TouchableOpacity
-          onPress={() => setShowForm(true)}
-          style={s.addBtn}
-        >
-          <Text style={s.addBtnText}>
-            {t("draft.addDraft")}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        onPress={() => setShowForm(true)}
+        style={s.addBtn}
+      >
+        <Text style={s.addBtnText}>+ {t("draft.add")}</Text>
+      </TouchableOpacity>
 
       {showForm && (
         <View style={[base.card, base.p4, base.mb4]}>
@@ -245,7 +242,7 @@ export default function DraftsTab({ worldId, searchResultIds }: Props) {
                     <View style={s.editContainer}>
                       <View style={s.contentBox}>
                         {draft.content ? (
-                          <Markdown style={markdownStyles}>
+                          <Markdown style={mdStyles}>
                             {draft.content}
                           </Markdown>
                         ) : (
@@ -274,90 +271,84 @@ export default function DraftsTab({ worldId, searchResultIds }: Props) {
   );
 }
 
-const s = StyleSheet.create({
-  headerRow: {
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: colors.muted,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-  addBtn: {
-    backgroundColor: colors.teal,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  addBtnText: {
-    color: colors.white,
-    fontSize: 11,
-    fontWeight: "500",
-  },
-  formTitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  submitText: {
-    color: colors.white,
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  emptyContainer: {
-    alignItems: "center",
-    paddingVertical: 32,
-  },
-  draftCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 8,
-    backgroundColor: colors.card,
-  },
-  draftCardExpanded: {
-    borderColor: "rgba(20,184,166,0.5)",
-  },
-  draftCardDefault: {
-    borderColor: colors.border,
-  },
-  draftTitle: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: colors.text,
-  },
-  expandedSection: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  editContainer: {
-    paddingTop: 16,
-  },
-  contentBox: {
-    backgroundColor: colors.bg,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  noContentText: {
-    fontSize: 13,
-    color: colors.muted,
-    fontStyle: "italic",
-  },
-  editBtn: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingVertical: 8,
-    alignItems: "center",
-  },
-  editBtnText: {
-    color: colors.teal,
-    fontSize: 11,
-    fontWeight: "500",
-  },
-});
+function createStyles(colors: any) {
+  return StyleSheet.create({
+    addBtn: {
+      borderWidth: 1,
+      borderStyle: "dashed",
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingVertical: 10,
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    addBtnText: {
+      color: colors.muted,
+      fontSize: 13,
+    },
+    formTitle: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    submitText: {
+      color: colors.white,
+      fontSize: 13,
+      fontWeight: "500",
+    },
+    emptyContainer: {
+      alignItems: "center",
+      paddingVertical: 32,
+    },
+    draftCard: {
+      borderRadius: 12,
+      borderWidth: 1,
+      marginBottom: 8,
+      backgroundColor: colors.card,
+    },
+    draftCardExpanded: {
+      borderColor: "rgba(20,184,166,0.5)",
+    },
+    draftCardDefault: {
+      borderColor: colors.border,
+    },
+    draftTitle: {
+      fontSize: 13,
+      fontWeight: "500",
+      color: colors.text,
+    },
+    expandedSection: {
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    editContainer: {
+      paddingTop: 16,
+    },
+    contentBox: {
+      backgroundColor: colors.bg,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+    },
+    noContentText: {
+      fontSize: 13,
+      color: colors.muted,
+      fontStyle: "italic",
+    },
+    editBtn: {
+      backgroundColor: "rgba(255,255,255,0.1)",
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,0.15)",
+      borderRadius: 8,
+      paddingVertical: 8,
+      alignItems: "center",
+    },
+    editBtnText: {
+      color: colors.teal,
+      fontSize: 11,
+      fontWeight: "500",
+    },
+  });
+}

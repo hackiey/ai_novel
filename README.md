@@ -11,6 +11,7 @@ AI Novel is a cross-platform writing studio for long-form fiction. It organizes 
 - Immersive writing workspace: full-screen WebGL shader backgrounds (rain / starfield), glassmorphism panels, floating controls, and 11 Chinese font choices.
 - Agent automation: 18 built-in tools for CRUD, semantic search, memory, synopsis generation, and continuation.
 - Import pipeline: upload `.txt`, `.md`, `.docx`, or `.pdf` files and let the agent extract structured knowledge into a world.
+- Mobile chapter editor: Notion-style block editing with inline markdown, auto-save, and per-editor font selection.
 - Multi-platform access: web, Electron desktop, and Expo mobile clients share the same backend and types.
 
 ## Tech Stack
@@ -19,7 +20,7 @@ AI Novel is a cross-platform writing studio for long-form fiction. It organizes 
 |-------|------------|
 | Monorepo | Turborepo + pnpm workspaces |
 | Web | React 19 + Vite + Tailwind CSS v4 + TanStack Router / Query |
-| Mobile | Expo Router + React Native + TanStack Query |
+| Mobile | Expo Router + React Native + NativeWind + TanStack Query + Lucide icons |
 | Desktop | Electron |
 | Editor | TipTap rich text editor with auto-save, CJK-aware word/char counting |
 | Shader | WebGL2 full-screen fragment shaders (rain on glass, starfield) |
@@ -38,7 +39,7 @@ ai_novel/
 │   ├── server/     # Fastify + tRPC backend, SSE routes, auth, embeddings
 │   ├── web/        # React web app, main writing workspace
 │   ├── desktop/    # Electron shell for the web app
-│   └── mobile/     # Expo mobile app
+│   └── mobile/     # Expo mobile app with chapter editor and AI chat
 └── packages/
     ├── agent/      # NovelAgentSession, i18n prompts, MCP tools
     ├── core/       # Embedding service and chunking utilities
@@ -143,7 +144,7 @@ pnpm --filter @ai-novel/mobile dev
 
 - Web supports Chinese and English via `i18next`.
 - Agent prompts, tool descriptions, and world summaries are locale-aware.
-- Mobile ships with Simplified Chinese strings.
+- Mobile ships with Simplified Chinese strings and Lucide icon-based navigation.
 
 ## Development
 
