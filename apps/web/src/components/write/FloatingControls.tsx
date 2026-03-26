@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { List, MessageSquare, Palette } from "lucide-react";
+import { List, MessageSquare, Palette, Type } from "lucide-react";
 import ThemePicker from "./ThemePicker.js";
 import ChapterDrawer from "./ChapterDrawer.js";
-import { type WriteTheme } from "../../contexts/WriteThemeContext.js";
+import { type WriteTheme, type WriteFont } from "../../contexts/WriteThemeContext.js";
 
 interface FloatingControlsProps {
   onOpenChat: () => void;
   theme: WriteTheme;
   onThemeChange: (theme: WriteTheme) => void;
+  font: WriteFont;
+  onFontChange: (font: WriteFont) => void;
   statCount: number;
   statIsCjk: boolean;
   chapters: any[];
@@ -20,10 +22,17 @@ interface FloatingControlsProps {
   chatOpen?: boolean;
 }
 
+const FONTS: { key: WriteFont; label: string }[] = [
+  { key: "default", label: "楷体" },
+  { key: "handwriting", label: "手写" },
+];
+
 export default function FloatingControls({
   onOpenChat,
   theme,
   onThemeChange,
+  font,
+  onFontChange,
   statCount,
   statIsCjk,
   chapters,
@@ -37,6 +46,9 @@ export default function FloatingControls({
   const { t } = useTranslation();
   const [themeOpen, setThemeOpen] = useState(false);
   const [chaptersOpen, setChaptersOpen] = useState(false);
+  const [fontOpen, setFontOpen] = useState(false);
+
+  const closeAll = () => { setThemeOpen(false); setChaptersOpen(false); setFontOpen(false); };
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30">
@@ -55,7 +67,7 @@ export default function FloatingControls({
             creating={chapterCreating}
           />
           <button
-            onClick={() => { setChaptersOpen(!chaptersOpen); setThemeOpen(false); }}
+            onClick={() => { const next = !chaptersOpen; closeAll(); setChaptersOpen(next); }}
             className={`p-2 rounded-full transition-colors ${chaptersOpen ? "text-white bg-white/15" : "text-white/70 hover:text-white hover:bg-white/10"}`}
             title={t("write.chapters")}
           >
@@ -64,12 +76,37 @@ export default function FloatingControls({
         </div>
 
         <button
-          onClick={() => { onOpenChat(); setChaptersOpen(false); setThemeOpen(false); }}
+          onClick={() => { onOpenChat(); closeAll(); }}
           className={`p-2 rounded-full transition-colors ${chatOpen ? "text-white bg-white/15" : "text-white/70 hover:text-white hover:bg-white/10"}`}
           title={t("chat.aiAssistant")}
         >
           <MessageSquare className="w-4 h-4" />
         </button>
+
+        {/* Font button + picker */}
+        <div className="relative">
+          {fontOpen && (
+            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 glass-panel-solid rounded-lg py-1 shadow-xl min-w-[100px]">
+              {FONTS.map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => { onFontChange(f.key); setFontOpen(false); }}
+                  className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${font === f.key ? "text-white bg-white/15" : "text-white/70 hover:text-white hover:bg-white/10"}`}
+                  style={{ fontFamily: f.key === "handwriting" ? '"Ma Shan Zheng", cursive' : '"LXGW WenKai", serif' }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => { const next = !fontOpen; closeAll(); setFontOpen(next); }}
+            className={`p-2 rounded-full transition-colors ${fontOpen ? "text-white bg-white/15" : "text-white/70 hover:text-white hover:bg-white/10"}`}
+            title={t("write.font")}
+          >
+            <Type className="w-4 h-4" />
+          </button>
+        </div>
 
         {/* Theme button + picker anchor */}
         <div className="relative">
@@ -80,7 +117,7 @@ export default function FloatingControls({
             onSelect={onThemeChange}
           />
           <button
-            onClick={() => { setThemeOpen(!themeOpen); setChaptersOpen(false); }}
+            onClick={() => { const next = !themeOpen; closeAll(); setThemeOpen(next); }}
             className={`p-2 rounded-full transition-colors ${themeOpen ? "text-white bg-white/15" : "text-white/70 hover:text-white hover:bg-white/10"}`}
             title={t("write.theme")}
           >

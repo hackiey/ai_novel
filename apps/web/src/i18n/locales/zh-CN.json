@@ -74,6 +74,7 @@
   "write.deleteChapter": "删除本章节",
   "write.deleteChapterConfirm": "确定要删除章节 \"{{name}}\" 吗？",
   "write.theme": "主题",
+  "write.font": "字体",
   "write.theme_rain": "雨夜",
   "write.theme_starfield": "星空",
   "write.reviewTitle": "AI 修改审阅",

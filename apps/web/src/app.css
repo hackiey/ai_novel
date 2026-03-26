@@ -30,6 +30,10 @@
   font-family: "LXGW WenKai", serif;
 }
 
+.tiptap-font-handwriting .tiptap-immersive {
+  font-family: "Ma Shan Zheng", cursive;
+}
+
 .tiptap-immersive h1,
 .tiptap-immersive h2,
 .tiptap-immersive h3 {

@@ -74,6 +74,7 @@
   "write.deleteChapter": "Delete this chapter",
   "write.deleteChapterConfirm": "Delete chapter \"{{name}}\"?",
   "write.theme": "Theme",
+  "write.font": "Font",
   "write.theme_rain": "Rain",
   "write.theme_starfield": "Starfield",
 

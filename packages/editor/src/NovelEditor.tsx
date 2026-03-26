@@ -139,6 +139,7 @@ export interface NovelEditorProps {
   onDelete?: () => void;
   deleteTitle?: string;
   variant?: EditorVariant;
+  fontClass?: string;
   onStatsChange?: (count: number, isCjk: boolean) => void;
 }
 
@@ -153,6 +154,7 @@ export function NovelEditor({
   onDelete,
   deleteTitle,
   variant = "default",
+  fontClass,
   onStatsChange,
 }: NovelEditorProps) {
   const [statCount, setStatCount] = useState(0);
@@ -311,7 +313,7 @@ export function NovelEditor({
         immersive
           ? "glass-panel border-0 bg-transparent"
           : "border border-gray-200 bg-white"
-      } ${className ?? ""}`}
+      } ${fontClass ?? ""} ${className ?? ""}`}
     >
       <EditorToolbar
         editor={editor}
