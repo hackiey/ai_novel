@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,13 +9,16 @@ import {
 } from "react-native";
 import { trpc } from "../lib/trpc";
 import { useTranslation } from "react-i18next";
+import Markdown from "react-native-markdown-display";
+import { markdownStyles } from "../lib/markdownStyles";
 import { colors, base } from "../lib/theme";
 
 interface Props {
   worldId: string;
+  searchResultIds?: Set<string>;
 }
 
-export default function DraftsTab({ worldId }: Props) {
+export default function DraftsTab({ worldId, searchResultIds }: Props) {
   const { t } = useTranslation();
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
@@ -45,7 +48,11 @@ export default function DraftsTab({ worldId }: Props) {
     onSuccess: () => query.refetch(),
   });
 
-  const drafts = (query.data ?? []) as any[];
+  const allDrafts = (query.data ?? []) as any[];
+  const drafts = useMemo(() => {
+    if (!searchResultIds) return allDrafts;
+    return allDrafts.filter((d: any) => searchResultIds.has(d._id));
+  }, [allDrafts, searchResultIds]);
 
   const openEditMode = useCallback((draft: any) => {
     setExpandedId(draft._id);
@@ -238,9 +245,9 @@ export default function DraftsTab({ worldId }: Props) {
                     <View style={s.editContainer}>
                       <View style={s.contentBox}>
                         {draft.content ? (
-                          <Text style={s.contentText}>
+                          <Markdown style={markdownStyles}>
                             {draft.content}
-                          </Text>
+                          </Markdown>
                         ) : (
                           <Text style={s.noContentText}>
                             {t("draft.noContent")}
@@ -335,11 +342,6 @@ const s = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-  },
-  contentText: {
-    fontSize: 13,
-    color: colors.text,
-    lineHeight: 20,
   },
   noContentText: {
     fontSize: 13,

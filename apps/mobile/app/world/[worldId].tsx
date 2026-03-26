@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,12 @@ import { colors, base } from "../../lib/theme";
 
 type Tab = "characters" | "worldSettings" | "drafts";
 
+const TAB_SCOPE_MAP: Record<Tab, string[]> = {
+  characters: ["characters"],
+  worldSettings: ["world_settings"],
+  drafts: ["drafts"],
+};
+
 export default function WorldDetailScreen() {
   const { worldId } = useLocalSearchParams<{ worldId: string }>();
   const router = useRouter();
@@ -26,6 +32,9 @@ export default function WorldDetailScreen() {
   const [activeTab, setActiveTab] = useState<Tab>("characters");
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [projectName, setProjectName] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const worldQuery = trpc.world.getById.useQuery({ id: worldId! });
   const projectsQuery = trpc.project.listByWorld.useQuery({
@@ -36,6 +45,28 @@ export default function WorldDetailScreen() {
     worldId: worldId!,
   });
   const draftsQuery = trpc.draft.list.useQuery({ worldId: worldId! });
+
+  const searchResult = trpc.search.search.useQuery(
+    {
+      worldId: worldId!,
+      query: searchQuery,
+      scope: TAB_SCOPE_MAP[activeTab],
+    },
+    { enabled: !!searchQuery && searchQuery.length > 0 }
+  );
+
+  const handleSearchChange = useCallback((text: string) => {
+    setSearchInput(text);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearchQuery(text.trim());
+    }, 300);
+  }, []);
+
+  const searchResultIds = searchQuery && searchResult.data
+    ? new Set(searchResult.data.results.map((r: any) => r.id || r._id))
+    : undefined;
+  const searchMethod = searchResult.data?.method as "vector" | "regex" | undefined;
 
   const createProjectMut = trpc.project.create.useMutation({
     onSuccess: () => {
@@ -193,6 +224,29 @@ export default function WorldDetailScreen() {
           </Text>
         </TouchableOpacity>
 
+        {/* Search Bar */}
+        <View style={s.searchBar}>
+          <TextInput
+            value={searchInput}
+            onChangeText={handleSearchChange}
+            placeholder={t("search.placeholder")}
+            placeholderTextColor={colors.slate500}
+            style={s.searchInput}
+          />
+          {searchQuery && searchResult.data && (
+            <View style={s.searchMeta}>
+              <View style={[s.searchBadge, searchMethod === "vector" ? s.searchBadgeVector : s.searchBadgeRegex]}>
+                <Text style={s.searchBadgeText}>
+                  {searchMethod === "vector" ? t("search.semantic") : t("search.keyword")}
+                </Text>
+              </View>
+              <Text style={s.searchCount}>
+                {t("search.resultCount", { count: searchResult.data.results.length })}
+              </Text>
+            </View>
+          )}
+        </View>
+
         {/* Tabs */}
         <View style={[base.row, base.mb4, s.tabBar]}>
           {tabs.map((tab) => (
@@ -219,12 +273,14 @@ export default function WorldDetailScreen() {
 
         {/* Tab Content */}
         {activeTab === "characters" && (
-          <CharactersTab worldId={worldId!} />
+          <CharactersTab worldId={worldId!} searchResultIds={searchResultIds} />
         )}
         {activeTab === "worldSettings" && (
-          <WorldSettingsTab worldId={worldId!} />
+          <WorldSettingsTab worldId={worldId!} searchResultIds={searchResultIds} />
         )}
-        {activeTab === "drafts" && <DraftsTab worldId={worldId!} />}
+        {activeTab === "drafts" && (
+          <DraftsTab worldId={worldId!} searchResultIds={searchResultIds} />
+        )}
       </ScrollView>
     </View>
   );
@@ -270,6 +326,46 @@ const s = StyleSheet.create({
     justifyContent: "center",
     minWidth: 120,
   },
+  // Search
+  searchBar: {
+    marginBottom: 16,
+  },
+  searchInput: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    color: colors.text,
+    fontSize: 13,
+  },
+  searchMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+  },
+  searchBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  searchBadgeVector: {
+    backgroundColor: colors.tealBg,
+  },
+  searchBadgeRegex: {
+    backgroundColor: colors.emeraldBg,
+  },
+  searchBadgeText: {
+    fontSize: 11,
+    color: colors.teal,
+  },
+  searchCount: {
+    fontSize: 11,
+    color: colors.muted,
+  },
+  // Tabs
   tabBar: {
     borderBottomWidth: 1,
     borderBottomColor: colors.border,

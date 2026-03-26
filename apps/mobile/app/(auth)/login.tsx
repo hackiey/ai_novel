@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 import { Link } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTranslation } from "react-i18next";
+import { getApiBaseUrl, setApiBaseUrl } from "../../lib/config";
 import { colors, base } from "../../lib/theme";
 
 export default function LoginScreen() {
@@ -21,6 +22,13 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showServerConfig, setShowServerConfig] = useState(false);
+  const [serverUrl, setServerUrl] = useState("");
+  const [serverSaved, setServerSaved] = useState(false);
+
+  useEffect(() => {
+    getApiBaseUrl().then(setServerUrl);
+  }, []);
 
   const isDisabled = loading || !email.trim() || !password;
 
@@ -28,6 +36,7 @@ export default function LoginScreen() {
     if (!email.trim() || !password) return;
     setLoading(true);
     try {
+      await getApiBaseUrl();
       await login(email.trim(), password);
     } catch (err: any) {
       Alert.alert(t("login.failed"), err.message || "Unknown error");
@@ -110,6 +119,47 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </Link>
         </View>
+
+        {/* Server URL config */}
+        <TouchableOpacity
+          onPress={() => setShowServerConfig(!showServerConfig)}
+          style={s.serverToggle}
+        >
+          <Text style={s.serverToggleText}>
+            {t("settings.serverUrl")}
+          </Text>
+        </TouchableOpacity>
+
+        {showServerConfig && (
+          <View style={s.serverConfig}>
+            <TextInput
+              value={serverUrl}
+              onChangeText={(text) => {
+                setServerUrl(text);
+                setServerSaved(false);
+              }}
+              placeholder="https://your-server.com"
+              placeholderTextColor={colors.slate500}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={s.input}
+            />
+            <TouchableOpacity
+              onPress={async () => {
+                await setApiBaseUrl(serverUrl.trim());
+                setServerSaved(true);
+              }}
+              style={s.serverSaveBtn}
+            >
+              <Text style={s.serverSaveBtnText}>
+                {serverSaved ? t("settings.saved") : t("common.save")}
+              </Text>
+            </TouchableOpacity>
+            {serverSaved && (
+              <Text style={s.serverHint}>{t("settings.saved")}</Text>
+            )}
+          </View>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -159,5 +209,34 @@ const s = StyleSheet.create({
     color: colors.teal,
     fontSize: 13,
     fontWeight: "600",
+  },
+  serverToggle: {
+    alignItems: "center",
+    marginTop: 32,
+  },
+  serverToggleText: {
+    color: colors.slate500,
+    fontSize: 11,
+    textDecorationLine: "underline",
+  },
+  serverConfig: {
+    marginTop: 12,
+    gap: 8,
+  },
+  serverSaveBtn: {
+    backgroundColor: colors.tealDark,
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  serverSaveBtnText: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  serverHint: {
+    color: colors.muted,
+    fontSize: 11,
+    textAlign: "center",
   },
 });

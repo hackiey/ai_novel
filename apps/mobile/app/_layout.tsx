@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "react-native";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { trpc, trpcClient, queryClient } from "../lib/trpc";
+import { trpc, createTrpcClient, queryClient } from "../lib/trpc";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { getApiBaseUrl } from "../lib/config";
 import { I18nextProvider } from "react-i18next";
@@ -35,7 +35,12 @@ export default function RootLayout() {
     getApiBaseUrl().then(() => setReady(true));
   }, []);
 
-  if (!ready) return null;
+  const trpcClient = useMemo(() => {
+    if (!ready) return null;
+    return createTrpcClient();
+  }, [ready]);
+
+  if (!ready || !trpcClient) return null;
 
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>

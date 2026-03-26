@@ -12,6 +12,16 @@
     "splash": {
       "backgroundColor": "#0f172a"
     },
+    "android": {
+      "usesCleartextTraffic": true
+    },
+    "ios": {
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
+    },
     "plugins": [
       "expo-router"
     ]

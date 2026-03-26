@@ -6,8 +6,9 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { trpc, queryClient } from "../lib/trpc";
-import { getToken, setToken, removeToken } from "../lib/auth";
+import { queryClient } from "../lib/trpc";
+import { getToken, setToken, removeToken, getTokenSync } from "../lib/auth";
+import { getApiBaseUrlSync } from "../lib/config";
 
 interface AuthUser {
   _id: string;
@@ -31,66 +32,81 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+async function fetchTrpc(procedure: string, input: any) {
+  const baseUrl = getApiBaseUrlSync();
+  const token = getTokenSync();
+  const res = await fetch(`${baseUrl}/trpc/${procedure}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(input),
+  });
+  const json = await res.json();
+  if (json.error) {
+    const msg = json.error.message || JSON.stringify(json.error.json?.data || json.error);
+    throw new Error(msg);
+  }
+  return json.result?.data;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasToken, setHasToken] = useState(false);
 
-  const loginMutation = trpc.auth.login.useMutation();
-  const registerMutation = trpc.auth.register.useMutation();
-
-  // Check for existing token on mount
+  // Check for existing token on mount and restore user
   useEffect(() => {
-    getToken().then((token) => {
-      setHasToken(!!token);
-      if (!token) setIsLoading(false);
+    getToken().then(async (token) => {
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+      setHasToken(true);
+      try {
+        const baseUrl = getApiBaseUrlSync();
+        const res = await fetch(`${baseUrl}/trpc/auth.me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        if (json.result?.data) {
+          setUser(json.result.data as AuthUser);
+        } else {
+          await removeToken();
+          setHasToken(false);
+        }
+      } catch {
+        await removeToken();
+        setHasToken(false);
+      } finally {
+        setIsLoading(false);
+      }
     });
   }, []);
 
-  // Restore user from token
-  const meQuery = trpc.auth.me.useQuery(undefined, {
-    enabled: hasToken,
-    retry: false,
-  });
-
-  useEffect(() => {
-    if (!hasToken) return;
-    if (meQuery.data) {
-      setUser(meQuery.data as unknown as AuthUser);
-      setIsLoading(false);
-    } else if (meQuery.error) {
-      removeToken().then(() => {
-        setHasToken(false);
-        setUser(null);
-        setIsLoading(false);
-      });
-    }
-  }, [meQuery.data, meQuery.error, hasToken]);
-
   const login = useCallback(
     async (email: string, password: string) => {
-      const result = await loginMutation.mutateAsync({ email, password });
+      const result = await fetchTrpc("auth.login", { email, password });
       await setToken(result.token);
       setHasToken(true);
-      setUser(result.user as unknown as AuthUser);
+      setUser(result.user as AuthUser);
       queryClient.clear();
     },
-    [loginMutation]
+    []
   );
 
   const register = useCallback(
     async (email: string, password: string, displayName: string) => {
-      const result = await registerMutation.mutateAsync({
-        email,
-        password,
-        displayName,
+      const result = await fetchTrpc("auth.register", {
+        email, password, displayName,
       });
       await setToken(result.token);
       setHasToken(true);
-      setUser(result.user as unknown as AuthUser);
+      setUser(result.user as AuthUser);
       queryClient.clear();
     },
-    [registerMutation]
+    []
   );
 
   const logout = useCallback(async () => {

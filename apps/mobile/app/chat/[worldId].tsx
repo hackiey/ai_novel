@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
+  Alert,
   StyleSheet,
 } from "react-native";
 import { useLocalSearchParams, Stack } from "expo-router";
@@ -18,43 +19,17 @@ import Markdown from "react-native-markdown-display";
 import { useAgentChat } from "../../lib/useAgentChat";
 import { buildSegments, type ChatMessage } from "../../lib/segments";
 import ToolCallBlock from "../../components/ToolCallBlock";
+import { markdownStyles } from "../../lib/markdownStyles";
+import { trpc } from "../../lib/trpc";
 import { colors, base } from "../../lib/theme";
 
-const markdownStyles = {
-  body: { color: colors.text, fontSize: 14, lineHeight: 20 },
-  paragraph: { marginTop: 0, marginBottom: 8 },
-  code_inline: {
-    backgroundColor: colors.border,
-    color: colors.text,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 4,
-    fontSize: 13,
-  },
-  fence: {
-    backgroundColor: colors.card,
-    color: colors.text,
-    padding: 12,
-    borderRadius: 8,
-    fontSize: 13,
-  },
-  heading1: { color: colors.text, fontSize: 20, fontWeight: "700" as const },
-  heading2: { color: colors.text, fontSize: 18, fontWeight: "700" as const },
-  heading3: { color: colors.text, fontSize: 16, fontWeight: "600" as const },
-  list_item: { color: colors.text },
-  bullet_list: { color: colors.text },
-  ordered_list: { color: colors.text },
-  blockquote: {
-    borderLeftColor: colors.slate600,
-    borderLeftWidth: 3,
-    paddingLeft: 12,
-    backgroundColor: colors.card,
-    borderRadius: 4,
-  },
-  strong: { color: colors.text, fontWeight: "700" as const },
-  em: { color: "#cbd5e1", fontStyle: "italic" as const },
-  link: { color: colors.teal },
-};
+function formatModelName(model: string) {
+  const parts = model.split(":");
+  const id = parts.length > 1 ? parts[1] : parts[0];
+  return id
+    .replace(/^(claude-|gpt-|gemini-)/, "")
+    .replace(/-\d{8}$/, "");
+}
 
 function AssistantMessageContent({
   events,
@@ -104,6 +79,14 @@ export default function ChatScreen() {
   const { t } = useTranslation();
   const [input, setInput] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  const [showModelPicker, setShowModelPicker] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
+  const [memorySubTab, setMemorySubTab] = useState<"world" | "project">("world");
+  const [worldMemoryDraft, setWorldMemoryDraft] = useState("");
+  const [projectMemoryDraft, setProjectMemoryDraft] = useState("");
+  const [memorySaveStatus, setMemorySaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
   const flatListRef = useRef<FlatList>(null);
 
   const {
@@ -114,7 +97,25 @@ export default function ChatScreen() {
     sessionsQuery,
     loadSession,
     newSession,
+    modelsQuery,
+    selectedModel,
+    setSelectedModel,
+    truncateAndResend,
   } = useAgentChat(worldId!);
+
+  // Memory queries
+  const memoryQuery = trpc.agent.getMemory.useQuery(
+    { worldId: worldId! },
+    { enabled: !!worldId && showMemory }
+  );
+  const updateMemoryMut = trpc.agent.updateMemory.useMutation();
+
+  useEffect(() => {
+    if (memoryQuery.data) {
+      setWorldMemoryDraft(memoryQuery.data.worldMemory || "");
+      setProjectMemoryDraft(memoryQuery.data.projectMemory || "");
+    }
+  }, [memoryQuery.data]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -131,6 +132,64 @@ export default function ChatScreen() {
     sendMessage(text);
   }
 
+  async function handleSaveMemory() {
+    setMemorySaveStatus("saving");
+    try {
+      if (memorySubTab === "world") {
+        await updateMemoryMut.mutateAsync({
+          scope: "world",
+          worldId: worldId!,
+          content: worldMemoryDraft,
+        });
+      } else {
+        await updateMemoryMut.mutateAsync({
+          scope: "project",
+          projectId: worldId!,
+          content: projectMemoryDraft,
+        });
+      }
+      setMemorySaveStatus("saved");
+      setTimeout(() => setMemorySaveStatus("idle"), 2000);
+    } catch {
+      setMemorySaveStatus("idle");
+    }
+  }
+
+  function handleLongPressUser(index: number) {
+    Alert.alert(
+      t("chat.editTooltip"),
+      undefined,
+      [
+        {
+          text: t("chat.edit"),
+          onPress: () => {
+            setEditingIndex(index);
+            setEditText(messages[index].content);
+          },
+        },
+        {
+          text: t("chat.retry"),
+          onPress: () => {
+            truncateAndResend(index, messages[index].content);
+          },
+        },
+        { text: t("chat.cancel"), style: "cancel" },
+      ]
+    );
+  }
+
+  function handleEditSend() {
+    if (editingIndex === null || !editText.trim()) return;
+    const idx = editingIndex;
+    setEditingIndex(null);
+    truncateAndResend(idx, editText.trim());
+    setEditText("");
+  }
+
+  const models = modelsQuery.data?.available ?? [];
+  const defaultModel = modelsQuery.data?.default;
+  const currentModel = selectedModel || defaultModel || "";
+
   function renderMessage({
     item,
     index,
@@ -139,11 +198,50 @@ export default function ChatScreen() {
     index: number;
   }) {
     if (item.role === "user") {
+      if (editingIndex === index) {
+        return (
+          <View style={styles.userRow}>
+            <View style={styles.editBubble}>
+              <TextInput
+                value={editText}
+                onChangeText={setEditText}
+                multiline
+                autoFocus
+                style={styles.editInput}
+              />
+              <View style={styles.editActions}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setEditingIndex(null);
+                    setEditText("");
+                  }}
+                  style={styles.editCancelBtn}
+                >
+                  <Text style={styles.editCancelText}>{t("chat.cancel")}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleEditSend}
+                  disabled={!editText.trim()}
+                  style={[
+                    styles.editSendBtn,
+                    !editText.trim() && styles.sendBtnDisabled,
+                  ]}
+                >
+                  <Text style={styles.sendBtnText}>{t("chat.saveAndSend")}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        );
+      }
       return (
         <View style={styles.userRow}>
-          <View style={styles.userBubble}>
+          <TouchableOpacity
+            onLongPress={() => handleLongPressUser(index)}
+            style={styles.userBubble}
+          >
             <Text style={styles.userText}>{item.content}</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -165,7 +263,6 @@ export default function ChatScreen() {
     t("chat.suggestion.plotTwist"),
   ];
 
-
   return (
     <View style={[base.flex1, base.bgDark]}>
       <Stack.Screen
@@ -176,6 +273,14 @@ export default function ChatScreen() {
           headerTintColor: colors.text,
           headerRight: () => (
             <View style={styles.headerRight}>
+              <TouchableOpacity
+                onPress={() => setShowMemory(true)}
+                style={styles.headerBtnOutline}
+              >
+                <Text style={styles.headerBtnOutlineText}>
+                  {t("chat.memory")}
+                </Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setShowHistory(true)}
                 style={styles.headerBtnOutline}
@@ -202,6 +307,17 @@ export default function ChatScreen() {
         style={base.flex1}
         keyboardVerticalOffset={90}
       >
+        {/* Model selector bar */}
+        <TouchableOpacity
+          onPress={() => setShowModelPicker(true)}
+          style={styles.modelBar}
+        >
+          <Text style={styles.modelBarLabel}>{t("chat.model")}: </Text>
+          <Text style={styles.modelBarValue}>
+            {currentModel ? formatModelName(currentModel) : "..."}
+          </Text>
+        </TouchableOpacity>
+
         <FlatList
           ref={flatListRef}
           data={messages}
@@ -256,6 +372,133 @@ export default function ChatScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Model Picker Modal */}
+      <Modal visible={showModelPicker} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t("chat.selectModel")}</Text>
+              <TouchableOpacity onPress={() => setShowModelPicker(false)}>
+                <Text style={styles.modalCloseText}>{t("chat.close")}</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={base.px4}>
+              {modelsQuery.isLoading && (
+                <View style={styles.modalLoading}>
+                  <ActivityIndicator color={colors.teal} />
+                </View>
+              )}
+              {models.map((m: string) => (
+                <TouchableOpacity
+                  key={m}
+                  onPress={() => {
+                    setSelectedModel(m);
+                    setShowModelPicker(false);
+                  }}
+                  style={[
+                    styles.sessionItem,
+                    currentModel === m && styles.sessionItemActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.sessionTitle,
+                      currentModel === m && styles.sessionTitleActive,
+                    ]}
+                  >
+                    {formatModelName(m)}
+                  </Text>
+                  <Text style={styles.sessionDate}>{m}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Memory Editor Modal */}
+      <Modal visible={showMemory} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t("chat.memory")}</Text>
+              <TouchableOpacity onPress={() => setShowMemory(false)}>
+                <Text style={styles.modalCloseText}>{t("chat.close")}</Text>
+              </TouchableOpacity>
+            </View>
+            {/* Sub-tabs */}
+            <View style={styles.memoryTabBar}>
+              <TouchableOpacity
+                onPress={() => setMemorySubTab("world")}
+                style={[
+                  styles.memoryTab,
+                  memorySubTab === "world" && styles.memoryTabActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.memoryTabText,
+                    memorySubTab === "world" && styles.memoryTabTextActive,
+                  ]}
+                >
+                  {t("chat.memoryWorld")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setMemorySubTab("project")}
+                style={[
+                  styles.memoryTab,
+                  memorySubTab === "project" && styles.memoryTabActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.memoryTabText,
+                    memorySubTab === "project" && styles.memoryTabTextActive,
+                  ]}
+                >
+                  {t("chat.memoryProject")}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.memoryBody}>
+              {memoryQuery.isLoading ? (
+                <View style={styles.modalLoading}>
+                  <ActivityIndicator color={colors.teal} />
+                </View>
+              ) : (
+                <>
+                  <TextInput
+                    value={memorySubTab === "world" ? worldMemoryDraft : projectMemoryDraft}
+                    onChangeText={memorySubTab === "world" ? setWorldMemoryDraft : setProjectMemoryDraft}
+                    placeholder={t("chat.memoryEmpty")}
+                    placeholderTextColor={colors.slate500}
+                    multiline
+                    style={styles.memoryInput}
+                  />
+                  <TouchableOpacity
+                    onPress={handleSaveMemory}
+                    disabled={memorySaveStatus === "saving"}
+                    style={[
+                      styles.memorySaveBtn,
+                      memorySaveStatus === "saving" && base.btnDisabled,
+                    ]}
+                  >
+                    <Text style={styles.memorySaveBtnText}>
+                      {memorySaveStatus === "saving"
+                        ? t("chat.memorySaving")
+                        : memorySaveStatus === "saved"
+                          ? t("chat.memorySaved")
+                          : t("chat.memorySave")}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* History Modal */}
       <Modal visible={showHistory} transparent animationType="slide">
@@ -366,6 +609,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 
+  // Edit mode
+  editBubble: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.teal,
+    borderRadius: 16,
+    padding: 12,
+    maxWidth: "85%",
+    width: "85%",
+  },
+  editInput: {
+    color: colors.text,
+    fontSize: 13,
+    minHeight: 60,
+    textAlignVertical: "top",
+  },
+  editActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+    marginTop: 8,
+  },
+  editCancelBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  editCancelText: {
+    color: colors.muted,
+    fontSize: 11,
+  },
+  editSendBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: colors.tealDark,
+  },
+
   // Header
   headerRight: {
     flexDirection: "row",
@@ -392,6 +675,25 @@ const styles = StyleSheet.create({
   headerBtnPrimaryText: {
     color: colors.white,
     fontSize: 11,
+  },
+
+  // Model bar
+  modelBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modelBarLabel: {
+    color: colors.muted,
+    fontSize: 11,
+  },
+  modelBarValue: {
+    color: colors.teal,
+    fontSize: 11,
+    fontWeight: "600",
   },
 
   // List
@@ -541,5 +843,56 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.slate600,
     marginTop: 2,
+  },
+
+  // Memory editor
+  memoryTabBar: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  memoryTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  memoryTabActive: {
+    borderBottomColor: colors.teal,
+  },
+  memoryTabText: {
+    fontSize: 13,
+    color: colors.muted,
+  },
+  memoryTabTextActive: {
+    color: colors.teal,
+    fontWeight: "600",
+  },
+  memoryBody: {
+    padding: 16,
+  },
+  memoryInput: {
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 12,
+    color: colors.text,
+    fontSize: 13,
+    minHeight: 200,
+    textAlignVertical: "top",
+    marginBottom: 12,
+  },
+  memorySaveBtn: {
+    backgroundColor: colors.teal,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  memorySaveBtnText: {
+    color: colors.white,
+    fontWeight: "600",
+    fontSize: 13,
   },
 });

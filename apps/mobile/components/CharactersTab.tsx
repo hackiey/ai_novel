@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
 } from "react-native";
 import { trpc } from "../lib/trpc";
 import { useTranslation } from "react-i18next";
+import Markdown from "react-native-markdown-display";
+import { markdownStyles } from "../lib/markdownStyles";
 import { colors, base } from "../lib/theme";
 
 const roleBadgeColors: Record<string, { bg: string; text: string }> = {
@@ -25,9 +27,10 @@ const roles = ["protagonist", "antagonist", "supporting", "minor", "other"] as c
 
 interface Props {
   worldId: string;
+  searchResultIds?: Set<string>;
 }
 
-export default function CharactersTab({ worldId }: Props) {
+export default function CharactersTab({ worldId, searchResultIds }: Props) {
   const { t } = useTranslation();
   const [showForm, setShowForm] = useState(false);
   const [charName, setCharName] = useState("");
@@ -59,7 +62,11 @@ export default function CharactersTab({ worldId }: Props) {
     onSuccess: () => charactersQuery.refetch(),
   });
 
-  const characters = (charactersQuery.data ?? []) as any[];
+  const allCharacters = (charactersQuery.data ?? []) as any[];
+  const characters = useMemo(() => {
+    if (!searchResultIds) return allCharacters;
+    return allCharacters.filter((c: any) => searchResultIds.has(c._id));
+  }, [allCharacters, searchResultIds]);
 
   const openEditMode = useCallback((char: any) => {
     setExpandedId(char._id);
@@ -348,9 +355,9 @@ export default function CharactersTab({ worldId }: Props) {
                                 <Text style={s.profileFieldLabel}>
                                   {t(`character.${field}`)}
                                 </Text>
-                                <Text style={s.profileFieldValue}>
+                                <Markdown style={markdownStyles}>
                                   {val}
-                                </Text>
+                                </Markdown>
                               </View>
                             );
                           })}
@@ -495,11 +502,6 @@ const s = StyleSheet.create({
     fontWeight: "500",
     color: colors.muted,
     marginBottom: 4,
-  },
-  profileFieldValue: {
-    fontSize: 13,
-    color: colors.text,
-    lineHeight: 20,
   },
   noContentText: {
     fontSize: 13,

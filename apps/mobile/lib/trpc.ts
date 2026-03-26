@@ -1,5 +1,5 @@
 import { createTRPCReact } from "@trpc/react-query";
-import { httpBatchLink } from "@trpc/client";
+import { httpLink } from "@trpc/client";
 import { QueryClient } from "@tanstack/react-query";
 import type { AppRouter } from "../../server/src/routers/index.js";
 import { getTokenSync } from "./auth";
@@ -18,23 +18,12 @@ export const queryClient = new QueryClient({
   },
 });
 
-export const trpcClient = trpc.createClient({
-  links: [
-    httpBatchLink({
-      url: `${getApiBaseUrlSync()}/trpc`,
-      headers() {
-        const token = getTokenSync();
-        return token ? { Authorization: `Bearer ${token}` } : {};
-      },
-    }),
-  ],
-});
-
 export function createTrpcClient() {
+  const baseUrl = getApiBaseUrlSync();
   return trpc.createClient({
     links: [
-      httpBatchLink({
-        url: `${getApiBaseUrlSync()}/trpc`,
+      httpLink({
+        url: `${baseUrl}/trpc`,
         headers() {
           const token = getTokenSync();
           return token ? { Authorization: `Bearer ${token}` } : {};

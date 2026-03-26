@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,13 +9,16 @@ import {
 } from "react-native";
 import { trpc } from "../lib/trpc";
 import { useTranslation } from "react-i18next";
+import Markdown from "react-native-markdown-display";
+import { markdownStyles } from "../lib/markdownStyles";
 import { colors, base } from "../lib/theme";
 
 interface Props {
   worldId: string;
+  searchResultIds?: Set<string>;
 }
 
-export default function WorldSettingsTab({ worldId }: Props) {
+export default function WorldSettingsTab({ worldId, searchResultIds }: Props) {
   const { t } = useTranslation();
   const [showForm, setShowForm] = useState(false);
   const [category, setCategory] = useState("");
@@ -48,7 +51,11 @@ export default function WorldSettingsTab({ worldId }: Props) {
     onSuccess: () => query.refetch(),
   });
 
-  const items = (query.data ?? []) as any[];
+  const allItems = (query.data ?? []) as any[];
+  const items = useMemo(() => {
+    if (!searchResultIds) return allItems;
+    return allItems.filter((ws: any) => searchResultIds.has(ws._id));
+  }, [allItems, searchResultIds]);
 
   const openEditMode = useCallback((ws: any) => {
     setExpandedId(ws._id);
@@ -282,9 +289,9 @@ export default function WorldSettingsTab({ worldId }: Props) {
                     <View style={s.editContainer}>
                       <View style={s.contentBox}>
                         {ws.content ? (
-                          <Text style={s.contentText}>
+                          <Markdown style={markdownStyles}>
                             {ws.content}
-                          </Text>
+                          </Markdown>
                         ) : (
                           <Text style={s.noContentText}>
                             {t("worldSetting.noContent")}
@@ -389,11 +396,6 @@ const s = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-  },
-  contentText: {
-    fontSize: 13,
-    color: colors.text,
-    lineHeight: 20,
   },
   noContentText: {
     fontSize: 13,
