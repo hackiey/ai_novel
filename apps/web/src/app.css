@@ -285,25 +285,25 @@ a {
 
 .agent-markdown blockquote,
 .world-setting-markdown blockquote {
-  border-left: 2px solid rgba(255, 255, 255, 0.2);
+  border-left: 2px solid rgba(107, 114, 128, 0.3);
   padding-left: 0.75em;
   margin-top: 0.3em;
   margin-bottom: 0.3em;
-  color: rgba(255, 255, 255, 0.5);
+  opacity: 0.7;
   font-style: italic;
 }
 
 .agent-markdown hr,
 .world-setting-markdown hr {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(107, 114, 128, 0.2);
   margin-top: 0.75em;
   margin-bottom: 0.75em;
 }
 
 .agent-markdown code,
 .world-setting-markdown code {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(107, 114, 128, 0.1);
   padding: 0.1em 0.25em;
   border-radius: 0.2em;
   font-size: 0.85em;
@@ -311,7 +311,7 @@ a {
 
 .agent-markdown pre,
 .world-setting-markdown pre {
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(0, 0, 0, 0.06);
   padding: 0.5em 0.75em;
   border-radius: 0.3em;
   overflow-x: auto;
@@ -337,7 +337,7 @@ a {
 
 .agent-markdown a,
 .world-setting-markdown a {
-  color: #67e8f9;
+  color: #0d9488;
   text-decoration: underline;
 }
 
@@ -354,13 +354,43 @@ a {
 .agent-markdown td,
 .world-setting-markdown th,
 .world-setting-markdown td {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(107, 114, 128, 0.2);
   padding: 0.25em 0.5em;
   text-align: left;
 }
 
 .agent-markdown th,
 .world-setting-markdown th {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: rgba(107, 114, 128, 0.06);
   font-weight: 600;
+}
+
+/* Immersive dark mode overrides */
+.agent-markdown-dark blockquote {
+  border-left-color: rgba(255, 255, 255, 0.2);
+}
+
+.agent-markdown-dark hr {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.agent-markdown-dark code {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.agent-markdown-dark pre {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.agent-markdown-dark a {
+  color: #5eead4;
+}
+
+.agent-markdown-dark th,
+.agent-markdown-dark td {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.agent-markdown-dark th {
+  background-color: rgba(255, 255, 255, 0.05);
 }

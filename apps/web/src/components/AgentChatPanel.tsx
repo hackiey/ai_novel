@@ -665,7 +665,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                   )
                 ) : (
                   <div className="space-y-2">
-                    <AssistantMessageContent events={msg.events} content={msg.content} isStreaming={isLoading && i === messages.length - 1} />
+                    <AssistantMessageContent events={msg.events} content={msg.content} isStreaming={isLoading && i === messages.length - 1} immersive={imm} />
                   </div>
                 )}
               </div>

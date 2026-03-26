@@ -140,11 +140,12 @@ function CollapsibleSection({ label, children, defaultOpen = false }: {
   );
 }
 
-export function ToolCallBlock({ toolName, toolInput, result, pending }: {
+export function ToolCallBlock({ toolName, toolInput, result, pending, immersive }: {
   toolName: string;
   toolInput?: any;
   result?: string;
   pending?: boolean;
+  immersive?: boolean;
 }) {
   const { t } = useTranslation();
   const label = t(`tool.${toolName}`, toolName);
@@ -159,15 +160,19 @@ export function ToolCallBlock({ toolName, toolInput, result, pending }: {
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 text-xs overflow-hidden px-3 py-1.5 space-y-1">
+    <div className={`rounded-lg border text-xs overflow-hidden px-3 py-1.5 space-y-1 ${
+      immersive
+        ? "border-white/10 bg-white/5 backdrop-blur-sm"
+        : "border-gray-200 bg-gray-50"
+    }`}>
       <div className="flex items-center gap-2">
         {pending ? (
           <Loader2 className="w-3.5 h-3.5 text-teal-500 shrink-0 animate-spin" strokeWidth={2} />
         ) : (
           <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" strokeWidth={2} />
         )}
-        <span className="text-gray-600 font-medium">{label}</span>
-        <span className="text-gray-400 font-mono text-[10px]">{toolName}</span>
+        <span className={`font-medium ${immersive ? "text-white/70" : "text-gray-600"}`}>{label}</span>
+        <span className={`font-mono text-[10px] ${immersive ? "text-white/30" : "text-gray-400"}`}>{toolName}</span>
       </div>
       {toolInput && (
         <CollapsibleSection label={t("chat.parameters")}>
@@ -183,17 +188,18 @@ export function ToolCallBlock({ toolName, toolInput, result, pending }: {
   );
 }
 
-export function AssistantMessageContent({ events, content, isStreaming }: {
+export function AssistantMessageContent({ events, content, isStreaming, immersive }: {
   events?: AgentEvent[];
   content: string;
   isStreaming: boolean;
+  immersive?: boolean;
 }) {
   const { t } = useTranslation();
   const segments = buildSegments(events, content, isStreaming);
 
   if (segments.length === 0 && isStreaming) {
     return (
-      <div className="flex items-center gap-2 text-xs text-teal-600">
+      <div className={`flex items-center gap-2 text-xs ${immersive ? "text-teal-400" : "text-teal-600"}`}>
         <Loader2 className="w-4 h-4 animate-spin" />
         <span>{t("chat.thinking")}</span>
       </div>
@@ -205,7 +211,11 @@ export function AssistantMessageContent({ events, content, isStreaming }: {
       {segments.map((seg, i) => {
         if (seg.type === "text") {
           return (
-            <div key={i} className="max-w-[90%] px-3 py-2 rounded-xl bg-white border border-gray-200 text-gray-800 text-sm shadow-sm agent-markdown">
+            <div key={i} className={`max-w-[90%] text-sm agent-markdown ${
+              immersive
+                ? "agent-markdown-dark text-white/90"
+                : "text-gray-800"
+            }`}>
               <Markdown remarkPlugins={[remarkGfm, remarkBreaks]}>{seg.content}</Markdown>
             </div>
           );
@@ -213,7 +223,7 @@ export function AssistantMessageContent({ events, content, isStreaming }: {
         return (
           <div key={i} className="space-y-1 max-w-[90%]">
             {seg.calls.map((call, j) => (
-              <ToolCallBlock key={j} {...call} />
+              <ToolCallBlock key={j} {...call} immersive={immersive} />
             ))}
           </div>
         );
