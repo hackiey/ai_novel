@@ -42,7 +42,7 @@ function ThemedStack() {
       <AuthGuard>
         <Stack
           screenOptions={{
-            headerStyle: { backgroundColor: "transparent" },
+            headerStyle: { backgroundColor: colors.bg + "e6" },
             headerTintColor: colors.text,
             contentStyle: { backgroundColor: colors.bg },
             headerShown: false,

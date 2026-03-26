@@ -9,7 +9,7 @@ export default function TabsLayout() {
       <Stack
         screenOptions={{
           headerShown: false,
-          headerStyle: { backgroundColor: "transparent" },
+          headerStyle: { backgroundColor: colors.bg + "e6" },
           headerTintColor: colors.text,
           contentStyle: { backgroundColor: colors.bg },
         }}
