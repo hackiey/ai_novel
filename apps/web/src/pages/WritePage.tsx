@@ -272,7 +272,9 @@ export default function WritePage() {
                   onDelete={handleDeleteChapter}
                   deleteTitle={t("write.deleteChapter")}
                   variant="immersive"
-                  fontClass={font === "handwriting" ? "tiptap-font-handwriting" : undefined}
+                  fontClass={font !== "default" ? `tiptap-font-${font}` : undefined}
+                  font={font}
+                  onFontChange={setFont}
                   onStatsChange={handleStatsChange}
                 />
               )
@@ -319,8 +321,6 @@ export default function WritePage() {
         onOpenChat={() => setChatDrawerOpen(!chatDrawerOpen)}
         theme={theme}
         onThemeChange={setTheme}
-        font={font}
-        onFontChange={setFont}
         statCount={statCount}
         statIsCjk={statIsCjk}
         chapters={sorted}

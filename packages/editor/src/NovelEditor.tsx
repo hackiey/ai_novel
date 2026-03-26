@@ -5,7 +5,7 @@ import Typography from "@tiptap/extension-typography";
 import Underline from "@tiptap/extension-underline";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { marked } from "marked";
-import { EditorToolbar, type EditorVariant } from "./EditorToolbar";
+import { EditorToolbar, type EditorVariant, type EditorFont } from "./EditorToolbar";
 
 // Configure marked for synchronous rendering, no extra wrappers
 marked.use({
@@ -140,6 +140,8 @@ export interface NovelEditorProps {
   deleteTitle?: string;
   variant?: EditorVariant;
   fontClass?: string;
+  font?: EditorFont;
+  onFontChange?: (font: EditorFont) => void;
   onStatsChange?: (count: number, isCjk: boolean) => void;
 }
 
@@ -155,6 +157,8 @@ export function NovelEditor({
   deleteTitle,
   variant = "default",
   fontClass,
+  font,
+  onFontChange,
   onStatsChange,
 }: NovelEditorProps) {
   const [statCount, setStatCount] = useState(0);
@@ -319,6 +323,8 @@ export function NovelEditor({
         editor={editor}
         onDelete={onDelete}
         deleteTitle={deleteTitle}
+        font={font}
+        onFontChange={onFontChange}
         variant={variant}
       />
 

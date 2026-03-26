@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 
 export type WriteTheme = "rain" | "starfield";
-export type WriteFont = "default" | "handwriting";
+export type WriteFont = "default" | "longcang" | "liujianmaocao" | "zhimangxing" | "mashanzheng" | "zcoolkuaile" | "zcoolqingkehuangyou" | "zcoolxiaowei" | "xiaolai" | "neoxihei" | "markergothic";
 
 interface WriteThemeContextValue {
   theme: WriteTheme;
@@ -21,10 +21,12 @@ function loadTheme(): WriteTheme {
   return "starfield";
 }
 
+const VALID_FONTS: WriteFont[] = ["default", "longcang", "liujianmaocao", "zhimangxing", "mashanzheng", "zcoolkuaile", "zcoolqingkehuangyou", "zcoolxiaowei", "xiaolai", "neoxihei", "markergothic"];
+
 function loadFont(): WriteFont {
   try {
     const stored = localStorage.getItem(FONT_STORAGE_KEY);
-    if (stored === "default" || stored === "handwriting") return stored;
+    if (VALID_FONTS.includes(stored as WriteFont)) return stored as WriteFont;
   } catch { /* ignore */ }
   return "default";
 }

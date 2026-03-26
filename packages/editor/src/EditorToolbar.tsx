@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   Bold,
@@ -11,15 +12,19 @@ import {
   Undo,
   Redo,
   Trash2,
+  ChevronDown,
 } from "lucide-react";
 
 export type EditorVariant = "default" | "immersive";
+export type EditorFont = "default" | "longcang" | "liujianmaocao" | "zhimangxing" | "mashanzheng" | "zcoolkuaile" | "zcoolqingkehuangyou" | "zcoolxiaowei" | "xiaolai" | "neoxihei" | "markergothic";
 
 interface EditorToolbarProps {
   editor: Editor | null;
   onDelete?: () => void;
   deleteTitle?: string;
   variant?: EditorVariant;
+  font?: EditorFont;
+  onFontChange?: (font: EditorFont) => void;
 }
 
 interface ToolbarButtonProps {
@@ -70,12 +75,29 @@ function Separator({ variant = "default" }: { variant?: EditorVariant }) {
   return <div className={`w-px h-6 mx-1 ${variant === "immersive" ? "bg-white/20" : "bg-gray-200"}`} />;
 }
 
-export function EditorToolbar({ editor, onDelete, deleteTitle, variant = "default" }: EditorToolbarProps) {
+const FONT_OPTIONS: { key: EditorFont; label: string; family: string }[] = [
+  { key: "default", label: "楷体", family: '"LXGW WenKai", serif' },
+  { key: "longcang", label: "龙藏", family: '"Long Cang", cursive' },
+  { key: "liujianmaocao", label: "毛草", family: '"Liu Jian Mao Cao", cursive' },
+  { key: "zhimangxing", label: "芒行", family: '"Zhi Mang Xing", cursive' },
+  { key: "mashanzheng", label: "马善", family: '"Ma Shan Zheng", cursive' },
+  { key: "zcoolkuaile", label: "快乐", family: '"ZCOOL KuaiLe", cursive' },
+  { key: "zcoolqingkehuangyou", label: "黄油", family: '"ZCOOL QingKe HuangYou", cursive' },
+  { key: "zcoolxiaowei", label: "小薇", family: '"ZCOOL XiaoWei", serif' },
+  { key: "xiaolai", label: "小赖", family: '"Xiaolai SC", serif' },
+  { key: "neoxihei", label: "晰黑", family: '"LXGW Neo XiHei", sans-serif' },
+  { key: "markergothic", label: "漫黑", family: '"LXGW Marker Gothic", sans-serif' },
+];
+
+export function EditorToolbar({ editor, onDelete, deleteTitle, variant = "default", font, onFontChange }: EditorToolbarProps) {
+  const [fontMenuOpen, setFontMenuOpen] = useState(false);
+
   if (!editor) {
     return null;
   }
 
   const immersive = variant === "immersive";
+  const currentFont = FONT_OPTIONS.find((f) => f.key === font) ?? FONT_OPTIONS[0];
 
   return (
     <div className={`flex items-center gap-0.5 flex-wrap px-2 py-1.5 rounded-t-lg ${immersive ? "border-b border-white/10 bg-white/5" : "border-b border-gray-200 bg-gray-50"}`}>
@@ -218,18 +240,50 @@ export function EditorToolbar({ editor, onDelete, deleteTitle, variant = "defaul
         <Redo className="w-4 h-4" strokeWidth={2} />
       </ToolbarButton>
 
-      {onDelete && (
-        <>
-          <div className="flex-1" />
+      <div className="flex-1" />
+
+      {/* Font selector */}
+      {onFontChange && (
+        <div className="relative">
           <button
             type="button"
-            onClick={onDelete}
-            title={deleteTitle ?? "Delete"}
-            className={`px-2 py-1 rounded text-sm font-medium transition-colors ${immersive ? "text-white/50 hover:bg-white/10 hover:text-red-400" : "text-gray-400 hover:bg-red-50 hover:text-red-600"}`}
+            onClick={() => setFontMenuOpen(!fontMenuOpen)}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-sm transition-colors ${immersive ? "text-white/70 hover:bg-white/10 hover:text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"}`}
+            style={{ fontFamily: currentFont.family }}
           >
-            <Trash2 className="w-4 h-4" strokeWidth={2} />
+            {currentFont.label}
+            <ChevronDown className={`w-3 h-3 transition-transform ${fontMenuOpen ? "rotate-180" : ""}`} />
           </button>
-        </>
+          {fontMenuOpen && (
+            <div className={`absolute right-0 top-full mt-1 rounded-lg py-1 shadow-xl z-50 min-w-[100px] ${immersive ? "glass-panel-solid" : "bg-white border border-gray-200"}`}>
+              {FONT_OPTIONS.map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => { onFontChange(f.key); setFontMenuOpen(false); }}
+                  className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                    font === f.key
+                      ? immersive ? "text-white bg-white/15" : "text-teal-700 bg-teal-50"
+                      : immersive ? "text-white/70 hover:text-white hover:bg-white/10" : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                  style={{ fontFamily: f.family }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          title={deleteTitle ?? "Delete"}
+          className={`px-2 py-1 rounded text-sm font-medium transition-colors ${immersive ? "text-white/50 hover:bg-white/10 hover:text-red-400" : "text-gray-400 hover:bg-red-50 hover:text-red-600"}`}
+        >
+          <Trash2 className="w-4 h-4" strokeWidth={2} />
+        </button>
       )}
     </div>
   );

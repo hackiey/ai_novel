@@ -30,8 +30,35 @@
   font-family: "LXGW WenKai", serif;
 }
 
-.tiptap-font-handwriting .tiptap-immersive {
+.tiptap-font-longcang .tiptap-immersive {
+  font-family: "Long Cang", cursive;
+}
+.tiptap-font-liujianmaocao .tiptap-immersive {
+  font-family: "Liu Jian Mao Cao", cursive;
+}
+.tiptap-font-zhimangxing .tiptap-immersive {
+  font-family: "Zhi Mang Xing", cursive;
+}
+.tiptap-font-mashanzheng .tiptap-immersive {
   font-family: "Ma Shan Zheng", cursive;
+}
+.tiptap-font-zcoolkuaile .tiptap-immersive {
+  font-family: "ZCOOL KuaiLe", cursive;
+}
+.tiptap-font-zcoolqingkehuangyou .tiptap-immersive {
+  font-family: "ZCOOL QingKe HuangYou", cursive;
+}
+.tiptap-font-zcoolxiaowei .tiptap-immersive {
+  font-family: "ZCOOL XiaoWei", serif;
+}
+.tiptap-font-xiaolai .tiptap-immersive {
+  font-family: "Xiaolai SC", serif;
+}
+.tiptap-font-neoxihei .tiptap-immersive {
+  font-family: "LXGW Neo XiHei", sans-serif;
+}
+.tiptap-font-markergothic .tiptap-immersive {
+  font-family: "LXGW Marker Gothic", sans-serif;
 }
 
 .tiptap-immersive h1,

@@ -64,7 +64,9 @@
       "Bash(cat:*)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:deepwiki.com)"
+      "WebFetch(domain:deepwiki.com)",
+      "WebFetch(domain:www.shadertoy.com)",
+      "WebFetch(domain:cdn.jsdelivr.net)"
     ]
   }
 }
