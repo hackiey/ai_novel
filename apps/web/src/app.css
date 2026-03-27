@@ -12,15 +12,19 @@
 /* ─── Glassmorphism Panel ─── */
 .glass-panel {
   background: rgba(0, 0, 0, 0.18);
-  backdrop-filter: blur(10px) saturate(1.2);
-  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  @apply backdrop-blur-[10px] backdrop-saturate-[1.2];
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-panel-light {
+  background: rgba(0, 0, 0, 0.08);
+  @apply backdrop-blur-[6px] backdrop-saturate-[1.2];
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .glass-panel-solid {
   background: rgba(15, 15, 15, 0.88);
-  backdrop-filter: blur(24px) saturate(1.2);
-  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  @apply backdrop-blur-[24px] backdrop-saturate-[1.2];
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
