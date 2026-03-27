@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Pressable,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -386,8 +387,8 @@ export default function ChatScreen() {
 
       {/* Model Picker Modal */}
       <Modal visible={showModelPicker} transparent animationType="slide">
-        <View style={s.modalOverlay}>
-          <View style={s.modalContent}>
+        <Pressable style={s.modalOverlay} onPress={() => setShowModelPicker(false)}>
+          <Pressable style={s.modalContent} onPress={(e) => e.stopPropagation()}>
             <View style={s.modalHeader}>
               <Text style={s.modalTitle}>{t("chat.selectModel")}</Text>
               <TouchableOpacity onPress={() => setShowModelPicker(false)}>
@@ -424,14 +425,14 @@ export default function ChatScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {/* Memory Editor Modal */}
       <Modal visible={showMemory} transparent animationType="slide">
-        <View style={s.modalOverlay}>
-          <View style={[s.modalContent, { maxHeight: "80%" }]}>
+        <Pressable style={s.modalOverlay} onPress={() => setShowMemory(false)}>
+          <Pressable style={[s.modalContent, { maxHeight: "80%" }]} onPress={(e) => e.stopPropagation()}>
             <View style={s.modalHeader}>
               <Text style={s.modalTitle}>{t("chat.memory")}</Text>
               <TouchableOpacity onPress={() => setShowMemory(false)}>
@@ -507,14 +508,14 @@ export default function ChatScreen() {
                 </>
               )}
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {/* History Modal */}
       <Modal visible={showHistory} transparent animationType="slide">
-        <View style={s.modalOverlay}>
-          <View style={s.modalContent}>
+        <Pressable style={s.modalOverlay} onPress={() => setShowHistory(false)}>
+          <Pressable style={s.modalContent} onPress={(e) => e.stopPropagation()}>
             <View style={s.modalHeader}>
               <Text style={s.modalTitle}>{t("chat.history")}</Text>
               <TouchableOpacity onPress={() => setShowHistory(false)}>
@@ -563,8 +564,8 @@ export default function ChatScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
@@ -788,7 +789,7 @@ function createStyles(colors: any) {
       backgroundColor: colors.black50,
     },
     modalContent: {
-      backgroundColor: colors.card,
+      backgroundColor: colors.bg,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       borderTopWidth: 1,
@@ -803,6 +804,9 @@ function createStyles(colors: any) {
       paddingVertical: 16,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
+      backgroundColor: colors.bg,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
     },
     modalTitle: {
       fontSize: 15,

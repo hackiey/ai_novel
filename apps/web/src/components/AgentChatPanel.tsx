@@ -76,8 +76,12 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
   // Auto-resize textarea: grow with content, cap at 120px
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = "38px";
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+      if (!input) {
+        textareaRef.current.style.height = "38px";
+      } else {
+        textareaRef.current.style.height = "38px";
+        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+      }
     }
   }, [input]);
 
