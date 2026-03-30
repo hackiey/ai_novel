@@ -47,6 +47,8 @@ export default function CharactersTab({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editContent, setEditContent] = useState("");
+  const [importanceDropdownId, setImportanceDropdownId] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const editTextarea = useAutoResizeTextarea(editContent);
 
@@ -56,6 +58,9 @@ export default function CharactersTab({
   });
   const updateCharMut = trpc.character.update.useMutation({
     onSuccess: () => { charactersQuery.refetch(); setEditingId(null); },
+  });
+  const updateImportanceMut = trpc.character.update.useMutation({
+    onSuccess: () => { charactersQuery.refetch(); setImportanceDropdownId(null); },
   });
   const deleteCharMut = trpc.character.delete.useMutation({
     onSuccess: () => { charactersQuery.refetch(); },
@@ -76,6 +81,18 @@ export default function CharactersTab({
       setShowCharForm(true);
     }
   }, [createRequestKey]);
+
+  // Close importance dropdown on outside click
+  useEffect(() => {
+    if (!importanceDropdownId) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setImportanceDropdownId(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [importanceDropdownId]);
 
   const openEditMode = useCallback((char: any) => {
     setExpandedId(char._id);
@@ -181,9 +198,42 @@ export default function CharactersTab({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-xs transition-transform inline-block ${isExpanded ? "rotate-90" : ""}`}>▶</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full border ${badgeClass}`}>
-                        {t(`character.importance_${char.importance}`) || char.importance}
-                      </span>
+                      <div className="relative" ref={importanceDropdownId === char._id ? dropdownRef : undefined}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setImportanceDropdownId(importanceDropdownId === char._id ? null : char._id);
+                          }}
+                          className={`text-xs px-2 py-0.5 rounded-full border cursor-pointer hover:opacity-80 transition-opacity ${badgeClass}`}
+                        >
+                          {t(`character.importance_${char.importance}`) || char.importance}
+                        </button>
+                        {importanceDropdownId === char._id && (
+                          <div className="absolute top-full left-0 mt-1 z-20 rounded-lg border border-white/15 bg-[#1a1a2e] shadow-xl py-1 min-w-[80px]">
+                            {(["core", "major", "minor"] as const).map((level) => {
+                              const isActive = char.importance === level;
+                              const levelBadge = importanceBadgeColors[level];
+                              return (
+                                <button
+                                  key={level}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isActive) { setImportanceDropdownId(null); return; }
+                                    updateImportanceMut.mutate({ id: char._id, data: { importance: level } });
+                                  }}
+                                  className={`w-full text-left text-xs px-3 py-1.5 transition-colors ${isActive ? "bg-white/10" : "hover:bg-white/5"}`}
+                                >
+                                  <span className={`inline-block px-1.5 py-0.5 rounded-full border ${levelBadge}`}>
+                                    {t(`character.importance_${level}`)}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                       <h4 className="text-sm font-medium text-white/80">{char.name}</h4>
                       {char.aliases && char.aliases.length > 0 && (
                         <span className="text-xs text-white/40">({char.aliases.join(", ")})</span>

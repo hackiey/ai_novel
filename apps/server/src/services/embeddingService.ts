@@ -68,19 +68,9 @@ function extractExcerpt(collection: string, doc: any, maxLen = 200): string {
       const parts: string[] = [];
       if (doc.name) parts.push(`名称: ${doc.name}`);
       if (doc.aliases?.length) parts.push(`别名: ${doc.aliases.join(", ")}`);
-      if (doc.role) parts.push(`角色类型: ${doc.role}`);
       if (doc.importance) parts.push(`重要性: ${doc.importance}`);
-      const p = doc.profile;
-      if (p) {
-        if (p.appearance) parts.push(`外貌: ${p.appearance}`);
-        if (p.personality) parts.push(`性格: ${p.personality}`);
-        if (p.background) parts.push(`背景: ${p.background}`);
-        if (p.goals) parts.push(`目标: ${p.goals}`);
-        if (p.relationships?.length) {
-          const rels = p.relationships.map((r: any) => `${r.characterName}: ${r.relationship}`).join("; ");
-          parts.push(`关系: ${rels}`);
-        }
-      }
+      if (doc.tags?.length) parts.push(`标签: ${doc.tags.join(", ")}`);
+      if (doc.content) parts.push(doc.content);
       return parts.join("\n");
     }
     case "world_settings": {

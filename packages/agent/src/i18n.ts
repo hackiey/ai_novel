@@ -77,6 +77,7 @@ const zh = {
     update_character_importance: "重要性级别",
     update_character_summary: "一句话简介，不超过50字",
     update_character_aliases: "角色别名列表",
+    update_character_tags: "角色标签，如：反派、魔法师、皇族等",
     update_character_content: "角色的详细描述（自然语言）。建议涵盖以下维度：外貌特征、性格特点、背景故事、目标动机、与其他角色的关系等。",
 
     create_character: "创建新角色。worldId 和 projectId 已自动注入。",
@@ -84,6 +85,7 @@ const zh = {
     create_character_importance: "重要性级别，默认 minor",
     create_character_summary: "一句话简介，不超过50字",
     create_character_aliases: "角色别名",
+    create_character_tags: "角色标签，如：反派、魔法师、皇族等",
     create_character_content: "角色的详细描述（自然语言）。建议涵盖以下维度：外貌特征、性格特点、背景故事、目标动机、与其他角色的关系等。",
 
     delete_character: "删除指定角色。此操作不可撤销，会同时删除相关的嵌入数据。",
@@ -258,6 +260,7 @@ const en: typeof zh = {
     update_character_importance: "Importance level",
     update_character_summary: "One-line summary, max 50 characters",
     update_character_aliases: "Character aliases list",
+    update_character_tags: "Character tags, e.g.: villain, mage, royalty",
     update_character_content: "Detailed character description in natural language. Recommended dimensions: appearance, personality, background story, goals/motivations, relationships with other characters.",
 
     create_character: "Create a new character. worldId and projectId are auto-injected.",
@@ -265,6 +268,7 @@ const en: typeof zh = {
     create_character_importance: "Importance level, default: minor",
     create_character_summary: "One-line summary, max 50 characters",
     create_character_aliases: "Character aliases",
+    create_character_tags: "Character tags, e.g.: villain, mage, royalty",
     create_character_content: "Detailed character description in natural language. Recommended dimensions: appearance, personality, background story, goals/motivations, relationships with other characters.",
 
     delete_character: "Delete a character. This action is irreversible and will also delete related embedding data.",

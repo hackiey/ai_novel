@@ -71,6 +71,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         )),
         summary: Type.Optional(Type.String({ description: d.update_character_summary })),
         aliases: Type.Optional(Type.Array(Type.String(), { description: d.update_character_aliases })),
+        tags: Type.Optional(Type.Array(Type.String(), { description: d.update_character_tags })),
         content: Type.Optional(Type.String({ description: d.update_character_content })),
       }),
       async execute(_toolCallId, args) {
@@ -94,6 +95,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         )),
         summary: Type.Optional(Type.String({ description: d.create_character_summary })),
         aliases: Type.Optional(Type.Array(Type.String(), { description: d.create_character_aliases })),
+        tags: Type.Optional(Type.Array(Type.String(), { description: d.create_character_tags })),
         content: Type.Optional(Type.String({ description: d.create_character_content })),
       }),
       async execute(_toolCallId, args) {

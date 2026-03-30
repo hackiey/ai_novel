@@ -188,6 +188,7 @@
   "character.newCharacter": "新角色",
   "character.namePlaceholder": "角色名称",
   "character.name": "名称",
+  "character.importance": "重要程度",
   "character.importance_core": "核心",
   "character.importance_major": "重要",
   "character.importance_minor": "次要",

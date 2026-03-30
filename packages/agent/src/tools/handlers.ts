@@ -166,7 +166,7 @@ export async function semanticSearch(
 // ============ Character Handlers ============
 
 export async function createCharacter(
-  args: { worldId?: string; projectId?: string; name: string; aliases?: string[]; content?: string; importance?: string; summary?: string },
+  args: { worldId?: string; projectId?: string; name: string; aliases?: string[]; tags?: string[]; content?: string; importance?: string; summary?: string },
   db: Db,
   userId?: string
 ): Promise<unknown> {
@@ -178,6 +178,7 @@ export async function createCharacter(
     [ownerField]: new ObjectId(ownerId),
     name: args.name,
     aliases: args.aliases ?? [],
+    tags: args.tags ?? [],
     importance: args.importance ?? "minor",
     summary: args.summary ?? "",
     content: args.content ?? "",
@@ -190,7 +191,7 @@ export async function createCharacter(
 }
 
 export async function updateCharacter(
-  args: { id: string; name?: string; aliases?: string[]; content?: string; importance?: string; summary?: string },
+  args: { id: string; name?: string; aliases?: string[]; tags?: string[]; content?: string; importance?: string; summary?: string },
   db: Db
 ): Promise<unknown> {
   const { id, ...updates } = args;
@@ -198,6 +199,7 @@ export async function updateCharacter(
 
   if (updates.name !== undefined) setFields.name = updates.name;
   if (updates.aliases !== undefined) setFields.aliases = updates.aliases;
+  if (updates.tags !== undefined) setFields.tags = updates.tags;
   if (updates.importance !== undefined) setFields.importance = updates.importance;
   if (updates.summary !== undefined) setFields.summary = updates.summary;
   if (updates.content !== undefined) setFields.content = updates.content;

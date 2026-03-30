@@ -54,6 +54,7 @@ export const characterRouter = router({
         worldId: new ObjectId(input.worldId),
         name: input.name,
         aliases: input.aliases ?? [],
+        tags: input.tags ?? [],
         importance: input.importance ?? "minor",
         summary: input.summary ?? "",
         content,
@@ -79,6 +80,7 @@ export const characterRouter = router({
       };
       if (input.data.name !== undefined) updateFields.name = input.data.name;
       if (input.data.aliases !== undefined) updateFields.aliases = input.data.aliases;
+      if (input.data.tags !== undefined) updateFields.tags = input.data.tags;
       if (input.data.importance !== undefined) updateFields.importance = input.data.importance;
       if (input.data.summary !== undefined) updateFields.summary = input.data.summary;
       if (input.data.content !== undefined) {

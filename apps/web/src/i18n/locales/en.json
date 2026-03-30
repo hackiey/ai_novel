@@ -185,6 +185,7 @@
   "character.newCharacter": "New Character",
   "character.namePlaceholder": "Character name",
   "character.name": "Name",
+  "character.importance": "Importance",
   "character.importance_core": "Core",
   "character.importance_major": "Major",
   "character.importance_minor": "Minor",
