@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
-import { createProjectSchema, updateProjectSchema, objectIdSchema } from "@ai-novel/types";
+import { createProjectSchema, updateProjectSchema, objectIdSchema } from "@ai-creator/types";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 
 function serializeDoc(doc: any) {

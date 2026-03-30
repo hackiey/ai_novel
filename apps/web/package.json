@@ -1,5 +1,5 @@
 {
-  "name": "@ai-novel/web",
+  "name": "@ai-creator/web",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -9,8 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ai-novel/editor": "workspace:*",
-    "@ai-novel/types": "workspace:*",
+    "@ai-creator/editor": "workspace:*",
+    "@ai-creator/types": "workspace:*",
     "@tanstack/react-query": "^5.64.0",
     "@tanstack/react-router": "^1.95.0",
     "@trpc/client": "^11.0.0",

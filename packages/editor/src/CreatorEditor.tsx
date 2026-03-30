@@ -128,7 +128,7 @@ function handlePaste(
   return false;
 }
 
-export interface NovelEditorProps {
+export interface CreatorEditorProps {
   content: string;
   onUpdate: (content: string) => void;
   placeholder?: string;
@@ -145,7 +145,7 @@ export interface NovelEditorProps {
   onStatsChange?: (count: number, isCjk: boolean) => void;
 }
 
-export function NovelEditor({
+export function CreatorEditor({
   content,
   onUpdate,
   placeholder = "Start writing...",
@@ -160,7 +160,7 @@ export function NovelEditor({
   font,
   onFontChange,
   onStatsChange,
-}: NovelEditorProps) {
+}: CreatorEditorProps) {
   const [statCount, setStatCount] = useState(0);
   const [statIsCjk, setStatIsCjk] = useState(false);
 

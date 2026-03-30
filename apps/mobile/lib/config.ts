@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const STORAGE_KEY = "ai_novel_api_url";
+const STORAGE_KEY = "ai_creator_api_url";
 
 function getDefaultUrl(): string {
   if (Platform.OS === "android") {

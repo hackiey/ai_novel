@@ -1,8 +1,8 @@
-# AI Novel — AI-Assisted Novel Studio
+# AI Creator — AI-Assisted Novel Studio
 
 [中文文档](./README.zh-CN.md)
 
-AI Novel is a cross-platform writing studio for long-form fiction. It organizes work as `World -> Novel (Project) -> Chapter`, with a web editor/chat workspace, a mobile companion, and an Electron desktop shell. The built-in AI agent can manage story data, continue chapters, import reference files, and search across your world knowledge.
+AI Creator is a cross-platform writing studio for long-form fiction. It organizes work as `World -> Novel (Project) -> Chapter`, with a web editor/chat workspace, a mobile companion, and an Electron desktop shell. The built-in AI agent can manage story data, continue chapters, import reference files, and search across your world knowledge.
 
 ## Highlights
 
@@ -34,14 +34,14 @@ AI Novel is a cross-platform writing studio for long-form fiction. It organizes 
 ## Repository Layout
 
 ```text
-ai_novel/
+ai_creator/
 ├── apps/
 │   ├── server/     # Fastify + tRPC backend, SSE routes, auth, embeddings
 │   ├── web/        # React web app, main writing workspace
 │   ├── desktop/    # Electron shell for the web app
 │   └── mobile/     # Expo mobile app with chapter editor and AI chat
 └── packages/
-    ├── agent/      # NovelAgentSession, i18n prompts, MCP tools
+    ├── agent/      # CreatorAgentSession, i18n prompts, MCP tools
     ├── core/       # Embedding service and chunking utilities
     ├── editor/     # Reusable TipTap-based editor package
     └── types/      # Shared Zod schemas and TypeScript types
@@ -96,10 +96,10 @@ Useful optional variables:
 ```bash
 # Desktop: start the web dev server first, then Electron
 pnpm dev:web
-pnpm --filter @ai-novel/desktop dev
+pnpm --filter @ai-creator/desktop dev
 
 # Mobile: start Expo
-pnpm --filter @ai-novel/mobile dev
+pnpm --filter @ai-creator/mobile dev
 ```
 
 ## Core Flows

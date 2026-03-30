@@ -11,7 +11,7 @@ import { registerAgentRoutes } from "./routes/agentStream.js";
 import { registerFileImportRoutes } from "./routes/fileImport.js";
 
 const PORT = Number(process.env.PORT) || 3001;
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/ai_novel";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/ai_creator";
 
 async function main() {
   const fastify = Fastify({

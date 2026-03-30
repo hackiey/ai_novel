@@ -48,7 +48,7 @@ export default function RegisterScreen() {
     >
       <View style={s.container}>
         <Text style={[base.text3xl, base.textCenter, base.mb2]}>
-          AI Novel
+          AI Creator
         </Text>
         <Text style={[s.subtitle, base.textCenter, { marginBottom: 40 }]}>
           {t("register.title")}

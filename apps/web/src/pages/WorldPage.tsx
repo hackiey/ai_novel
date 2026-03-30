@@ -130,7 +130,7 @@ export default function WorldPage() {
             to="/"
             className="text-white/60 hover:text-white transition-colors font-bold shrink-0"
           >
-            AI Novel
+            AI Creator
           </Link>
           <span className="text-white/30 shrink-0">/</span>
           <span className="font-medium text-white/80 truncate">

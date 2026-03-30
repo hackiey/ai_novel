@@ -68,7 +68,8 @@
       "WebFetch(domain:www.shadertoy.com)",
       "WebFetch(domain:cdn.jsdelivr.net)",
       "Bash(./gradlew assembleRelease 2>&1 | tail -5)",
-      "Bash(./gradlew assembleRelease 2>&1 | tail -3)"
+      "Bash(./gradlew assembleRelease 2>&1 | tail -3)",
+      "Bash(chmod:*)"
     ]
   }
 }

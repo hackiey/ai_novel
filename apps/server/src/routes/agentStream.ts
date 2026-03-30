@@ -1,14 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import { ObjectId } from "mongodb";
-import { NovelAgentSession, getOrRefreshWorldSummary, resolveLocale } from "@ai-novel/agent";
-import type { VectorSearchFn, Locale, Message } from "@ai-novel/agent";
+import { CreatorAgentSession, getOrRefreshWorldSummary, resolveLocale } from "@ai-creator/agent";
+import type { VectorSearchFn, Locale, Message } from "@ai-creator/agent";
 import { getDb } from "../db.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 import { verifyToken, type JwtPayload } from "../auth/jwt.js";
 import { getUserAllowedModels } from "../auth/permissionGroups.js";
 
 // Store active sessions in memory (shared with router)
-export const sessions = new Map<string, NovelAgentSession>();
+export const sessions = new Map<string, CreatorAgentSession>();
 
 // Model format: "provider:modelId" (e.g. "openai:gpt-4o", "anthropic:claude-sonnet-4-6-20250514")
 const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "openai:gpt-4o";
@@ -132,7 +132,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     let session = sessions.get(sessionId);
     if (!session) {
       const embeddingSvc = getEmbeddingService();
-      session = new NovelAgentSession({
+      session = new CreatorAgentSession({
         apiKey,
         provider,
         modelId,

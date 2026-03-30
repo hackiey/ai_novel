@@ -10,7 +10,7 @@ function createWindow() {
     height: 900,
     minWidth: 900,
     minHeight: 600,
-    title: "AI Novel",
+    title: "AI Creator",
     titleBarStyle: "hiddenInset", // macOS native look
     webPreferences: {
       nodeIntegration: false,
@@ -29,7 +29,7 @@ function createWindow() {
   // Build a custom menu with File > Export
   const template = [
     {
-      label: "AI Novel",
+      label: "AI Creator",
       submenu: [
         { role: "about" },
         { type: "separator" },

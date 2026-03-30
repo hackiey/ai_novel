@@ -19,7 +19,7 @@ export interface SessionModelConfig {
   modelId: string;
 }
 
-export class NovelAgentSession {
+export class CreatorAgentSession {
   private model: Model<any>;
   private db: Db;
   private projectId: string;

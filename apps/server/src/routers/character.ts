@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
-import { createCharacterSchema, updateCharacterSchema, objectIdSchema } from "@ai-novel/types";
+import { createCharacterSchema, updateCharacterSchema, objectIdSchema } from "@ai-creator/types";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 

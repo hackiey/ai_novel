@@ -1,5 +1,5 @@
 {
-  "name": "@ai-novel/agent",
+  "name": "@ai-creator/agent",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -16,7 +16,7 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@ai-novel/types": "workspace:*",
+    "@ai-creator/types": "workspace:*",
     "@mariozechner/pi-ai": "^0.62.0",
     "@mariozechner/pi-agent-core": "^0.62.0",
     "@sinclair/typebox": "^0.34.0",

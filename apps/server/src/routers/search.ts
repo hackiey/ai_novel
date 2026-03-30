@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { objectIdSchema } from "@ai-novel/types";
+import { objectIdSchema } from "@ai-creator/types";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 

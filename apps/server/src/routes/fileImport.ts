@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { ObjectId } from "mongodb";
-import { NovelAgentSession, getOrRefreshWorldSummary, resolveLocale, t } from "@ai-novel/agent";
-import type { VectorSearchFn, Locale } from "@ai-novel/agent";
+import { CreatorAgentSession, getOrRefreshWorldSummary, resolveLocale, t } from "@ai-creator/agent";
+import type { VectorSearchFn, Locale } from "@ai-creator/agent";
 import { getDb } from "../db.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 import { verifyToken, type JwtPayload } from "../auth/jwt.js";
@@ -226,7 +226,7 @@ async function handleImportStream(
         || "";
       const baseURL = process.env[`${providerEnvPrefix}_BASE_URL`] || undefined;
 
-      const session = new NovelAgentSession({
+      const session = new CreatorAgentSession({
         apiKey,
         provider,
         modelId,

@@ -1,4 +1,4 @@
-const TOKEN_KEY = "ai_novel_token";
+const TOKEN_KEY = "ai_creator_token";
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);

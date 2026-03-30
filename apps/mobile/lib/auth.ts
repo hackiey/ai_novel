@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const TOKEN_KEY = "ai_novel_token";
+const TOKEN_KEY = "ai_creator_token";
 
 let cachedToken: string | null = null;
 

@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "AI Novel",
-    "slug": "ai-novel",
+    "name": "AI Creator",
+    "slug": "ai-creator",
     "version": "0.2.1",
-    "scheme": "ai-novel",
+    "scheme": "ai-creator",
     "platforms": [
       "ios",
       "android"
@@ -14,7 +14,7 @@
     },
     "android": {
       "usesCleartextTraffic": true,
-      "package": "com.anonymous.ainovel"
+      "package": "com.anonymous.aicreator"
     },
     "ios": {
       "infoPlist": {

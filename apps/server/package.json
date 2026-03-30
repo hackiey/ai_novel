@@ -1,5 +1,5 @@
 {
-  "name": "@ai-novel/server",
+  "name": "@ai-creator/server",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -9,9 +9,9 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@ai-novel/agent": "workspace:*",
-    "@ai-novel/core": "workspace:*",
-    "@ai-novel/types": "workspace:*",
+    "@ai-creator/agent": "workspace:*",
+    "@ai-creator/core": "workspace:*",
+    "@ai-creator/types": "workspace:*",
     "@fastify/cors": "^11.0.0",
     "@fastify/multipart": "^9.4.0",
     "@fastify/websocket": "^11.0.0",

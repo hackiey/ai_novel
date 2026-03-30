@@ -1,8 +1,8 @@
-# AI Novel — AI 辅助小说创作工作台
+# AI Creator — AI 辅助小说创作工作台
 
 [English](./README.md)
 
-AI Novel 是一个面向长篇小说创作的跨平台工作台。项目按 `世界观 -> 小说（Project）-> 章节` 组织，提供 Web 写作界面、移动端伴随应用和 Electron 桌面壳。内置 AI Agent 可以管理设定数据、续写章节、导入参考资料，并在你的创作知识库中做语义搜索。
+AI Creator 是一个面向长篇小说创作的跨平台工作台。项目按 `世界观 -> 小说（Project）-> 章节` 组织，提供 Web 写作界面、移动端伴随应用和 Electron 桌面壳。内置 AI Agent 可以管理设定数据、续写章节、导入参考资料，并在你的创作知识库中做语义搜索。
 
 ## 亮点
 
@@ -33,14 +33,14 @@ AI Novel 是一个面向长篇小说创作的跨平台工作台。项目按 `世
 ## 仓库结构
 
 ```text
-ai_novel/
+ai_creator/
 ├── apps/
 │   ├── server/     # Fastify + tRPC 后端、SSE 路由、鉴权、embedding
 │   ├── web/        # React Web 应用，主写作工作区
 │   ├── desktop/    # Web 应用的 Electron 外壳
 │   └── mobile/     # Expo 移动端
 └── packages/
-    ├── agent/      # NovelAgentSession、i18n 提示词、MCP 工具
+    ├── agent/      # CreatorAgentSession、i18n 提示词、MCP 工具
     ├── core/       # Embedding 服务与文本分块工具
     ├── editor/     # 可复用的 TipTap 编辑器包
     └── types/      # 共享 Zod Schema 与 TypeScript 类型
@@ -95,10 +95,10 @@ pnpm dev:all
 ```bash
 # 桌面端：先启动 Web dev server，再启动 Electron
 pnpm dev:web
-pnpm --filter @ai-novel/desktop dev
+pnpm --filter @ai-creator/desktop dev
 
 # 移动端：启动 Expo
-pnpm --filter @ai-novel/mobile dev
+pnpm --filter @ai-creator/mobile dev
 ```
 
 ## 核心流程

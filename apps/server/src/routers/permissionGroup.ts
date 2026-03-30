@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
-import { createPermissionGroupSchema, updatePermissionGroupSchema, objectIdSchema } from "@ai-novel/types";
+import { createPermissionGroupSchema, updatePermissionGroupSchema, objectIdSchema } from "@ai-creator/types";
 import { router, adminProcedure } from "../trpc.js";
 import { TRPCError } from "@trpc/server";
 import { isDefaultPermissionGroup } from "../auth/permissionGroups.js";

@@ -100,13 +100,13 @@ importers:
 
   apps/server:
     dependencies:
-      '@ai-novel/agent':
+      '@ai-creator/agent':
         specifier: workspace:*
         version: link:../../packages/agent
-      '@ai-novel/core':
+      '@ai-creator/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@ai-novel/types':
+      '@ai-creator/types':
         specifier: workspace:*
         version: link:../../packages/types
       '@fastify/cors':
@@ -164,10 +164,10 @@ importers:
 
   apps/web:
     dependencies:
-      '@ai-novel/editor':
+      '@ai-creator/editor':
         specifier: workspace:*
         version: link:../../packages/editor
-      '@ai-novel/types':
+      '@ai-creator/types':
         specifier: workspace:*
         version: link:../../packages/types
       '@tanstack/react-query':
@@ -240,7 +240,7 @@ importers:
 
   packages/agent:
     dependencies:
-      '@ai-novel/types':
+      '@ai-creator/types':
         specifier: workspace:*
         version: link:../types
       '@mariozechner/pi-agent-core':

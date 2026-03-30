@@ -17,8 +17,8 @@ import {
   getBaseStyles,
 } from "../lib/theme";
 
-const THEME_KEY = "ai_novel_theme";
-const FONT_KEY = "ai_novel_font";
+const THEME_KEY = "ai_creator_theme";
+const FONT_KEY = "ai_creator_font";
 
 interface ThemeContextValue {
   themeVariant: ThemeVariant;

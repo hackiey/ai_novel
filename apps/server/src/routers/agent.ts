@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
-import { objectIdSchema } from "@ai-novel/types";
+import { objectIdSchema } from "@ai-creator/types";
 import { sessions } from "../routes/agentStream.js";
 import { getUserAllowedModels } from "../auth/permissionGroups.js";
 

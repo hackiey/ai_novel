@@ -26,8 +26,8 @@ Turborepo + pnpm workspaces monorepo. Four apps, four shared packages.
 
 **Packages:**
 - `packages/types` — Zod schemas defining all domain models (World, Character, WorldSetting, Draft, Chapter, AgentSession, AgentMessage). Single source of truth for types used by both server and clients. Character and WorldSetting have `importance` (core/major/minor) and `summary` fields.
-- `packages/agent` — `NovelAgentSession` class using `@mariozechner/pi-ai` + `@mariozechner/pi-agent-core` for multi-provider LLM support (OpenAI, Anthropic, Google, etc.). Defines 18 AgentTools for character/world/chapter/draft CRUD + semantic_search + memory. Tool schemas use TypeBox. Streams events via AsyncGenerator. Supports locale-aware system prompts and tool descriptions (zh/en).
-- `packages/editor` — `NovelEditor` TipTap rich text component with auto-save (2s debounce), word/character counting, CJK support.
+- `packages/agent` — `CreatorAgentSession` class using `@mariozechner/pi-ai` + `@mariozechner/pi-agent-core` for multi-provider LLM support (OpenAI, Anthropic, Google, etc.). Defines 18 AgentTools for character/world/chapter/draft CRUD + semantic_search + memory. Tool schemas use TypeBox. Streams events via AsyncGenerator. Supports locale-aware system prompts and tool descriptions (zh/en).
+- `packages/editor` — `CreatorEditor` TipTap rich text component with auto-save (2s debounce), word/character counting, CJK support.
 - `packages/core` — `EmbeddingService` wrapping OpenAI-compatible embedding API (configurable model/dimensions). Handles text chunking (1000 chars, 200 overlap) with CJK-aware token estimation.
 
 ## Mobile App Structure

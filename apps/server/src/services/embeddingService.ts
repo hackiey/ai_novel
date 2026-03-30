@@ -1,6 +1,6 @@
 import { Db, ObjectId } from "mongodb";
-import { EmbeddingService } from "@ai-novel/core";
-import type { EmbeddingConfig } from "@ai-novel/core";
+import { EmbeddingService } from "@ai-creator/core";
+import type { EmbeddingConfig } from "@ai-creator/core";
 
 /** Supported collections for embedding */
 const EMBEDDABLE_COLLECTIONS = [

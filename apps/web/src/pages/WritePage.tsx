@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { FileEdit, Check, X } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
-import { NovelEditor } from "@ai-novel/editor";
+import { CreatorEditor } from "@ai-creator/editor";
 import AgentChatPanel from "../components/AgentChatPanel.js";
 import DiffViewer from "../components/DiffViewer.js";
 import { useBreadcrumb } from "../contexts/BreadcrumbContext.js";
@@ -202,7 +202,7 @@ export default function WritePage() {
             to="/"
             className="text-white/60 hover:text-white transition-colors font-bold shrink-0"
           >
-            AI Novel
+            AI Creator
           </Link>
           <span className="text-white/30 shrink-0">/</span>
           {project?.worldId && (
@@ -262,7 +262,7 @@ export default function WritePage() {
                   <DiffViewer oldContent={pendingEdit.oldContent} newContent={pendingEdit.newContent} />
                 </div>
               ) : (
-                <NovelEditor
+                <CreatorEditor
                   key={selectedChapterId}
                   content={editorContent}
                   onUpdate={handleContentUpdate}

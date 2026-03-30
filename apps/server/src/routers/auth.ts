@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
-import { registerSchema, loginSchema } from "@ai-novel/types";
+import { registerSchema, loginSchema } from "@ai-creator/types";
 import { router, publicProcedure, protectedProcedure } from "../trpc.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 import { signToken } from "../auth/jwt.js";

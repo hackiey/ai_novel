@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ObjectId, Filter } from "mongodb";
-import { createWorldSettingSchema, updateWorldSettingSchema, objectIdSchema } from "@ai-novel/types";
+import { createWorldSettingSchema, updateWorldSettingSchema, objectIdSchema } from "@ai-creator/types";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 
