@@ -19,6 +19,7 @@ export default function WritePage() {
   const [selectedChapterId, setSelectedChapterId] = useState<string>(chapterId ?? "");
   const [appendText, setAppendText] = useState<string>("");
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "idle">("idle");
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [pendingEdit, setPendingEdit] = useState<{ oldContent: string; newContent: string } | null>(null);
   const queryClient = useQueryClient();
   const trpcUtils = trpc.useUtils();
@@ -57,6 +58,7 @@ export default function WritePage() {
     onMutate: () => setSaveStatus("saving"),
     onSuccess: () => {
       setSaveStatus("saved");
+      setSavedAt(new Date());
       chaptersQuery.refetch();
     },
     onError: () => setSaveStatus("idle"),
@@ -224,7 +226,9 @@ export default function WritePage() {
             <span className="text-[10px] text-amber-400/80 ml-2">{t("write.saving")}</span>
           )}
           {saveStatus === "saved" && (
-            <span className="text-[10px] text-emerald-400/80 ml-2">{t("write.saved")}</span>
+            <span className="text-[10px] text-emerald-400/80 ml-2">
+              {t("write.saved")}{savedAt && ` ${savedAt.toLocaleTimeString()}`}
+            </span>
           )}
         </div>
       </div>

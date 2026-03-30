@@ -296,6 +296,23 @@ export function CreatorEditor({
     onUpdateRef.current(editorHtml);
   }, [appendText, editor]);
 
+  // Ctrl/Cmd+S: prevent browser save and flush immediately
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        if (debounceTimer.current) clearTimeout(debounceTimer.current);
+        const html = dirtyHtmlRef.current ?? editor?.getHTML();
+        if (html) {
+          dirtyHtmlRef.current = null;
+          onUpdateRef.current(html);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [editor]);
+
   // Flush pending save on unmount
   useEffect(() => {
     return () => {

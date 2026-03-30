@@ -135,7 +135,7 @@ function CollapsibleSection({ label, children, defaultOpen = false }: {
         <ChevronRight className={`w-3 h-3 shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
         {label}
       </button>
-      {open && <div className="mt-1 text-[11px] text-gray-600 max-h-60 overflow-y-auto">{children}</div>}
+      {open && <div className="mt-1 text-[11px] text-gray-600 max-h-60 overflow-y-auto scrollbar-none">{children}</div>}
     </div>
   );
 }
