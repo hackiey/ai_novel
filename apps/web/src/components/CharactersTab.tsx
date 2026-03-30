@@ -16,15 +16,11 @@ function useAutoResizeTextarea(value: string) {
   return { ref, onInput: adjust };
 }
 
-const roleBadgeColors: Record<string, string> = {
-  protagonist: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  antagonist: "bg-red-500/10 text-red-400 border-red-500/20",
-  supporting: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+const importanceBadgeColors: Record<string, string> = {
+  core: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  major: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   minor: "bg-white/5 text-white/60 border-white/10",
-  other: "bg-white/5 text-white/50 border-white/10",
 };
-
-const profileFields = ["appearance", "personality", "background", "goals"] as const;
 
 interface CharactersTabProps {
   worldId: string;
@@ -46,21 +42,17 @@ export default function CharactersTab({
   const { t } = useTranslation();
   const [showCharForm, setShowCharForm] = useState(false);
   const [charName, setCharName] = useState("");
-  const [charRole, setCharRole] = useState("other");
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
-  const [editRole, setEditRole] = useState("other");
-  const [editProfile, setEditProfile] = useState<Record<string, string>>({});
+  const [editContent, setEditContent] = useState("");
 
-  // Auto-resize for the currently focused textarea
-  const [activeField, setActiveField] = useState("");
-  const editTextarea = useAutoResizeTextarea(editProfile[activeField] || "");
+  const editTextarea = useAutoResizeTextarea(editContent);
 
   const charactersQuery = trpc.character.list.useQuery({ worldId });
   const createCharMut = trpc.character.create.useMutation({
-    onSuccess: () => { charactersQuery.refetch(); setShowCharForm(false); setCharName(""); setCharRole("other"); },
+    onSuccess: () => { charactersQuery.refetch(); setShowCharForm(false); setCharName(""); },
   });
   const updateCharMut = trpc.character.update.useMutation({
     onSuccess: () => { charactersQuery.refetch(); setEditingId(null); },
@@ -89,21 +81,15 @@ export default function CharactersTab({
     setExpandedId(char._id);
     setEditingId(char._id);
     setEditName(char.name || "");
-    setEditRole(char.role || "other");
-    setEditProfile({
-      appearance: char.profile?.appearance || "",
-      personality: char.profile?.personality || "",
-      background: char.profile?.background || "",
-      goals: char.profile?.goals || "",
-    });
+    setEditContent(char.content || "");
   }, []);
 
   const getSummary = (char: any) => {
-    return char.profile?.personality || char.profile?.background || "";
+    return char.content || "";
   };
 
-  const hasProfileContent = (char: any) => {
-    return profileFields.some((f) => char.profile?.[f]);
+  const hasContent = (char: any) => {
+    return !!char.content;
   };
 
   return (
@@ -131,7 +117,6 @@ export default function CharactersTab({
               createCharMut.mutate({
                 worldId,
                 name: charName.trim(),
-                role: charRole as any,
               });
             }}
             className="flex gap-3 flex-wrap"
@@ -142,17 +127,6 @@ export default function CharactersTab({
               placeholder={t("character.namePlaceholder")}
               className="flex-1 min-w-[200px] rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
-            <select
-              value={charRole}
-              onChange={(e) => setCharRole(e.target.value)}
-              className="rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-            >
-              <option value="protagonist">{t("character.protagonist")}</option>
-              <option value="antagonist">{t("character.antagonist")}</option>
-              <option value="supporting">{t("character.supporting")}</option>
-              <option value="minor">{t("character.minor")}</option>
-              <option value="other">{t("character.other")}</option>
-            </select>
             <button
               type="submit"
               disabled={createCharMut.isPending}
@@ -162,7 +136,7 @@ export default function CharactersTab({
             </button>
             <button
               type="button"
-              onClick={() => { setShowCharForm(false); setCharName(""); setCharRole("other"); }}
+              onClick={() => { setShowCharForm(false); setCharName(""); }}
               className="px-3 py-2 text-sm rounded-lg border border-white/20 text-white/60 hover:bg-white/5 transition-colors"
             >
               {t("character.cancel")}
@@ -188,7 +162,7 @@ export default function CharactersTab({
           {visibleCharacters.map((char: any) => {
             const isExpanded = expandedId === char._id;
             const isEditing = editingId === char._id;
-            const badgeClass = roleBadgeColors[char.role] ?? roleBadgeColors.other;
+            const badgeClass = importanceBadgeColors[char.importance] ?? importanceBadgeColors.minor;
             const summary = getSummary(char);
             return (
               <div
@@ -208,7 +182,7 @@ export default function CharactersTab({
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-xs transition-transform inline-block ${isExpanded ? "rotate-90" : ""}`}>▶</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full border ${badgeClass}`}>
-                        {t(`character.${char.role}`) || char.role}
+                        {t(`character.importance_${char.importance}`) || char.importance}
                       </span>
                       <h4 className="text-sm font-medium text-white/80">{char.name}</h4>
                       {char.aliases && char.aliases.length > 0 && (
@@ -245,66 +219,38 @@ export default function CharactersTab({
                             id: char._id,
                             data: {
                               name: editName.trim(),
-                              role: editRole as any,
-                              profile: {
-                                appearance: editProfile.appearance || "",
-                                personality: editProfile.personality || "",
-                                background: editProfile.background || "",
-                                goals: editProfile.goals || "",
-                                relationships: char.profile?.relationships || [],
-                                customFields: char.profile?.customFields || {},
-                              },
+                              content: editContent,
                             },
                           });
                         }}
                         className="space-y-4 pt-4"
                       >
-                        <div className="flex gap-3">
-                          <div className="flex-1">
-                            <label className="block text-xs font-medium text-white/50 mb-1.5">{t("character.name")}</label>
-                            <input
-                              value={editName}
-                              onChange={(e) => setEditName(e.target.value)}
-                              placeholder={t("character.namePlaceholder")}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-white/50 mb-1.5">{t("character.role")}</label>
-                            <select
-                              value={editRole}
-                              onChange={(e) => setEditRole(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            >
-                              <option value="protagonist">{t("character.protagonist")}</option>
-                              <option value="antagonist">{t("character.antagonist")}</option>
-                              <option value="supporting">{t("character.supporting")}</option>
-                              <option value="minor">{t("character.minor")}</option>
-                              <option value="other">{t("character.other")}</option>
-                            </select>
-                          </div>
+                        <div>
+                          <label className="block text-xs font-medium text-white/50 mb-1.5">{t("character.name")}</label>
+                          <input
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder={t("character.namePlaceholder")}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          />
                         </div>
-                        {profileFields.map((field) => (
-                          <div key={field}>
-                            <div className="flex items-center justify-between gap-3 mb-1.5">
-                              <label className="block text-xs font-medium text-white/50">{t(`character.${field}`)}</label>
-                              <span className="text-[11px] text-white/40">{t("character.supportsMarkdown")}</span>
-                            </div>
-                            <textarea
-                              ref={activeField === field ? editTextarea.ref : undefined}
-                              value={editProfile[field] || ""}
-                              onChange={(e) => setEditProfile((prev) => ({ ...prev, [field]: e.target.value }))}
-                              onFocus={() => setActiveField(field)}
-                              onInput={activeField === field ? editTextarea.onInput : undefined}
-                              onClick={(e) => e.stopPropagation()}
-                              placeholder={t(`character.${field}Placeholder`)}
-                              className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y leading-relaxed"
-                              style={{ minHeight: "80px" }}
-                            />
+                        <div>
+                          <div className="flex items-center justify-between gap-3 mb-1.5">
+                            <label className="block text-xs font-medium text-white/50">{t("character.content")}</label>
+                            <span className="text-[11px] text-white/40">{t("character.supportsMarkdown")}</span>
                           </div>
-                        ))}
+                          <textarea
+                            ref={editTextarea.ref}
+                            value={editContent}
+                            onChange={(e) => setEditContent(e.target.value)}
+                            onInput={editTextarea.onInput}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder={t("character.contentPlaceholder")}
+                            className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y leading-relaxed"
+                            style={{ minHeight: "120px" }}
+                          />
+                        </div>
                         <div className="flex gap-2 justify-end">
                           <button
                             type="button"
@@ -328,20 +274,11 @@ export default function CharactersTab({
                         onDoubleClick={() => openEditMode(char)}
                         title={t("character.doubleClickEdit")}
                       >
-                        {hasProfileContent(char) ? (
-                          <div className="rounded-xl bg-white/5 border border-white/5 px-4 py-3 space-y-3">
-                            {profileFields.map((field) => {
-                              const val = char.profile?.[field];
-                              if (!val) return null;
-                              return (
-                                <div key={field}>
-                                  <h5 className="text-xs font-medium text-white/50 mb-1">{t(`character.${field}`)}</h5>
-                                  <div className="world-setting-markdown text-sm text-white/70 leading-relaxed break-words">
-                                    <Markdown remarkPlugins={[remarkGfm]}>{val}</Markdown>
-                                  </div>
-                                </div>
-                              );
-                            })}
+                        {hasContent(char) ? (
+                          <div className="rounded-xl bg-white/5 border border-white/5 px-4 py-3">
+                            <div className="world-setting-markdown text-sm text-white/70 leading-relaxed break-words">
+                              <Markdown remarkPlugins={[remarkGfm]}>{char.content}</Markdown>
+                            </div>
                           </div>
                         ) : (
                           <div className="rounded-xl bg-white/5 border border-white/5 px-4 py-3">

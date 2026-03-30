@@ -13,17 +13,11 @@ import Markdown from "react-native-markdown-display";
 import { getMarkdownStyles } from "../lib/markdownStyles";
 import { useTheme } from "../contexts/ThemeContext";
 
-const roleBadgeColors: Record<string, { bg: string; text: string }> = {
-  protagonist: { bg: "#fef3c7", text: "#b45309" },
-  antagonist: { bg: "#fee2e2", text: "#dc2626" },
-  supporting: { bg: "#dbeafe", text: "#2563eb" },
+const importanceBadgeColors: Record<string, { bg: string; text: string }> = {
+  core: { bg: "#fef3c7", text: "#b45309" },
+  major: { bg: "#dbeafe", text: "#2563eb" },
   minor: { bg: "#f3f4f6", text: "#6b7280" },
-  other: { bg: "#f3f4f6", text: "#9ca3af" },
 };
-
-const profileFields = ["appearance", "personality", "background", "goals"] as const;
-
-const roles = ["protagonist", "antagonist", "supporting", "minor", "other"] as const;
 
 interface Props {
   worldId: string;
@@ -35,14 +29,11 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
   const { colors, baseStyles: base } = useTheme();
   const [showForm, setShowForm] = useState(false);
   const [charName, setCharName] = useState("");
-  const [charRole, setCharRole] = useState("other");
-  const [selectedRoleIdx, setSelectedRoleIdx] = useState(4);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
-  const [editRole, setEditRole] = useState("other");
-  const [editProfile, setEditProfile] = useState<Record<string, string>>({});
+  const [editContent, setEditContent] = useState("");
 
   const charactersQuery = trpc.character.list.useQuery({ worldId });
   const createMut = trpc.character.create.useMutation({
@@ -50,7 +41,6 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
       charactersQuery.refetch();
       setShowForm(false);
       setCharName("");
-      setCharRole("other");
     },
   });
   const updateMut = trpc.character.update.useMutation({
@@ -73,13 +63,7 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
     setExpandedId(char._id);
     setEditingId(char._id);
     setEditName(char.name || "");
-    setEditRole(char.role || "other");
-    setEditProfile({
-      appearance: char.profile?.appearance || "",
-      personality: char.profile?.personality || "",
-      background: char.profile?.background || "",
-      goals: char.profile?.goals || "",
-    });
+    setEditContent(char.content || "");
   }, []);
 
   function handleDelete(char: any) {
@@ -121,30 +105,6 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
             placeholderTextColor={colors.slate500}
             style={[base.input, base.mb3, { fontSize: 13 }]}
           />
-          <View style={[base.row, s.roleWrap, base.mb4]}>
-            {roles.map((r, idx) => (
-              <TouchableOpacity
-                key={r}
-                onPress={() => {
-                  setCharRole(r);
-                  setSelectedRoleIdx(idx);
-                }}
-                style={[
-                  s.roleChip,
-                  charRole === r ? s.roleChipActive : s.roleChipInactive,
-                ]}
-              >
-                <Text
-                  style={[
-                    s.roleChipText,
-                    charRole === r ? s.roleChipTextActive : s.roleChipTextInactive,
-                  ]}
-                >
-                  {t(`character.${r}`)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
           <View style={[base.row, base.gap2]}>
             <TouchableOpacity
               onPress={() => {
@@ -163,7 +123,6 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
                 createMut.mutate({
                   worldId,
                   name: charName.trim(),
-                  role: charRole as any,
                 });
               }}
               disabled={createMut.isPending || !charName.trim()}
@@ -193,9 +152,8 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
         characters.map((char: any) => {
           const isExpanded = expandedId === char._id;
           const isEditing = editingId === char._id;
-          const badge = roleBadgeColors[char.role] ?? roleBadgeColors.other;
-          const summary =
-            char.profile?.personality || char.profile?.background || "";
+          const badge = importanceBadgeColors[char.importance] ?? importanceBadgeColors.minor;
+          const summary = char.content || "";
 
           return (
             <View
@@ -218,7 +176,7 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
                     style={[s.badge, { backgroundColor: badge.bg }]}
                   >
                     <Text style={[s.badgeText, { color: badge.text }]}>
-                      {t(`character.${char.role}`) || char.role}
+                      {t(`character.importance_${char.importance ?? "minor"}`)}
                     </Text>
                   </View>
                   <Text style={[s.charName, base.flex1]}>
@@ -246,52 +204,22 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
                         placeholderTextColor={colors.slate500}
                         style={[base.input, base.mb3, { fontSize: 13 }]}
                       />
-                      <View style={[base.row, s.roleWrap, base.mb3]}>
-                        {roles.map((r) => (
-                          <TouchableOpacity
-                            key={r}
-                            onPress={() => setEditRole(r)}
-                            style={[
-                              s.roleChip,
-                              editRole === r ? s.roleChipActive : s.roleChipInactive,
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                s.roleChipText,
-                                editRole === r ? s.roleChipTextActive : s.roleChipTextInactive,
-                              ]}
-                            >
-                              {t(`character.${r}`)}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
+                      <View style={base.mb3}>
+                        <Text style={[s.fieldLabel]}>
+                          {t("character.content")}
+                        </Text>
+                        <TextInput
+                          value={editContent}
+                          onChangeText={setEditContent}
+                          placeholder={t("character.contentPlaceholder")}
+                          placeholderTextColor={colors.slate500}
+                          multiline
+                          style={[
+                            base.input,
+                            { fontSize: 13, minHeight: 120, textAlignVertical: "top" },
+                          ]}
+                        />
                       </View>
-                      {profileFields.map((field) => (
-                        <View key={field} style={base.mb3}>
-                          <Text style={[s.fieldLabel]}>
-                            {t(`character.${field}`)}
-                          </Text>
-                          <TextInput
-                            value={editProfile[field] || ""}
-                            onChangeText={(v) =>
-                              setEditProfile((prev) => ({
-                                ...prev,
-                                [field]: v,
-                              }))
-                            }
-                            placeholder={t(
-                              `character.${field}Placeholder`
-                            )}
-                            placeholderTextColor={colors.slate500}
-                            multiline
-                            style={[
-                              base.input,
-                              { fontSize: 13, minHeight: 80, textAlignVertical: "top" },
-                            ]}
-                          />
-                        </View>
-                      ))}
                       <View style={[base.row, base.gap2]}>
                         <TouchableOpacity
                           onPress={() => setEditingId(null)}
@@ -308,20 +236,7 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
                               id: char._id,
                               data: {
                                 name: editName.trim(),
-                                role: editRole as any,
-                                profile: {
-                                  appearance:
-                                    editProfile.appearance || "",
-                                  personality:
-                                    editProfile.personality || "",
-                                  background:
-                                    editProfile.background || "",
-                                  goals: editProfile.goals || "",
-                                  relationships:
-                                    char.profile?.relationships || [],
-                                  customFields:
-                                    char.profile?.customFields || {},
-                                },
+                                content: editContent,
                               },
                             });
                           }}
@@ -342,22 +257,11 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
                     </View>
                   ) : (
                     <View style={s.editContainer}>
-                      {profileFields.some((f) => char.profile?.[f]) ? (
+                      {char.content ? (
                         <View style={s.profileBox}>
-                          {profileFields.map((field) => {
-                            const val = char.profile?.[field];
-                            if (!val) return null;
-                            return (
-                              <View key={field} style={base.mb3}>
-                                <Text style={s.profileFieldLabel}>
-                                  {t(`character.${field}`)}
-                                </Text>
-                                <Markdown style={mdStyles}>
-                                  {val}
-                                </Markdown>
-                              </View>
-                            );
-                          })}
+                          <Markdown style={mdStyles}>
+                            {char.content}
+                          </Markdown>
                         </View>
                       ) : (
                         <View style={s.profileBox}>
@@ -405,32 +309,6 @@ function createStyles(colors: any) {
       fontSize: 13,
       fontWeight: "600",
       color: colors.text,
-    },
-    roleWrap: {
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    roleChip: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 999,
-      borderWidth: 1,
-    },
-    roleChipActive: {
-      borderColor: colors.teal,
-      backgroundColor: "rgba(20,184,166,0.2)",
-    },
-    roleChipInactive: {
-      borderColor: colors.border,
-    },
-    roleChipText: {
-      fontSize: 11,
-    },
-    roleChipTextActive: {
-      color: colors.teal,
-    },
-    roleChipTextInactive: {
-      color: colors.muted,
     },
     submitText: {
       color: colors.white,

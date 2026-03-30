@@ -1,13 +1,13 @@
 import { useState, useRef, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Upload, X, FileText, Check, Loader2 } from "lucide-react";
+import { Upload, X, FileText, Check, Loader2, RotateCcw } from "lucide-react";
 import { getToken } from "../lib/auth.js";
 import { AgentEvent, AssistantMessageContent } from "./AgentMessageDisplay.js";
 
 const API_BASE = "";
 
-type Stage = "select" | "importing" | "done";
+type Stage = "select" | "importing" | "done" | "already_done";
 
 interface ImportEvent {
   type: string;
@@ -42,9 +42,12 @@ export default function FileImportDialog({
   // Import progress state
   const [totalChunks, setTotalChunks] = useState(0);
   const [currentChunk, setCurrentChunk] = useState(-1);
+  const [skippedChunks, setSkippedChunks] = useState(0);
+  const [resuming, setResuming] = useState(false);
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [chunkText, setChunkText] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [fileHash, setFileHash] = useState("");
 
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -73,6 +76,9 @@ export default function FileImportDialog({
     setChunkText("");
     setEvents([]);
     setErrorMsg("");
+    setSkippedChunks(0);
+    setResuming(false);
+    setFileHash("");
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -144,6 +150,17 @@ export default function FileImportDialog({
     switch (evt.type) {
       case "import_start":
         setTotalChunks(evt.totalChunks || 0);
+        if ((evt as any).resumeFromChunk > 0) {
+          setResuming(true);
+        }
+        break;
+      case "import_already_done":
+        setFileHash((evt as any).fileHash || "");
+        setStage("already_done");
+        break;
+      case "chunk_skipped":
+        setSkippedChunks((prev) => prev + 1);
+        setCurrentChunk(evt.chunkIndex ?? 0);
         break;
       case "chunk_start":
         setCurrentChunk(evt.chunkIndex ?? 0);
@@ -181,6 +198,26 @@ export default function FileImportDialog({
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
+    }
+  };
+
+  const handleReimport = async () => {
+    if (!fileHash || !file) return;
+    try {
+      const token = getToken();
+      await fetch(`${API_BASE}/api/world/import-file/${fileHash}?worldId=${worldId}`, {
+        method: "DELETE",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      setStage("select");
+      setFileHash("");
+      // Re-trigger import with the same file
+      startImport();
+    } catch (err: any) {
+      setErrorMsg(err?.message || String(err));
+      setStage("done");
     }
   };
 
@@ -266,7 +303,9 @@ export default function FileImportDialog({
               <div>
                 <div className="flex items-center justify-between text-sm mb-2">
                   <span className="text-white/60">
-                    {t("import.processing", { current: currentChunk + 1, total: totalChunks })}
+                    {resuming
+                      ? t("import.resuming", { current: currentChunk + 1, total: totalChunks, skipped: skippedChunks })
+                      : t("import.processing", { current: currentChunk + 1, total: totalChunks })}
                   </span>
                   <span className="text-white/40">
                     {totalChunks > 0 ? `${Math.round(((currentChunk + 1) / totalChunks) * 100)}%` : ""}
@@ -292,6 +331,14 @@ export default function FileImportDialog({
                   {errorMsg}
                 </div>
               )}
+            </div>
+          )}
+
+          {stage === "already_done" && (
+            <div className="text-center py-8">
+              <Check className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
+              <p className="text-white/90 font-medium">{t("import.alreadyDone")}</p>
+              <p className="text-sm text-white/50 mt-1">{t("import.alreadyDoneHint")}</p>
             </div>
           )}
 
@@ -341,6 +388,23 @@ export default function FileImportDialog({
             >
               {t("import.cancel")}
             </button>
+          )}
+          {stage === "already_done" && (
+            <>
+              <button
+                onClick={handleClose}
+                className="px-4 py-2 text-sm text-white/60 hover:text-white/80 transition-colors"
+              >
+                {t("import.close")}
+              </button>
+              <button
+                onClick={handleReimport}
+                className="px-4 py-2 text-sm bg-white/10 border border-white/15 text-white/80 rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                {t("import.reimport")}
+              </button>
+            </>
           )}
           {stage === "done" && (
             <button

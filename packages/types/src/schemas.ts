@@ -120,21 +120,6 @@ export type UpdateProject = z.infer<typeof updateProjectSchema>;
 
 // ============ Character (角色人设) ============
 
-export const characterRelationshipSchema = z.object({
-  characterId: objectIdSchema,
-  characterName: z.string(),
-  relationship: z.string().max(500),
-});
-
-export const characterProfileSchema = z.object({
-  appearance: z.string().max(5000).default(""),
-  personality: z.string().max(5000).default(""),
-  background: z.string().max(10000).default(""),
-  goals: z.string().max(5000).default(""),
-  relationships: z.array(characterRelationshipSchema).default([]),
-  customFields: z.record(z.string(), z.string()).default({}),
-});
-
 export const importanceSchema = z.enum(["core", "major", "minor"]);
 
 export const characterSchema = z.object({
@@ -143,10 +128,9 @@ export const characterSchema = z.object({
   worldId: objectIdSchema,
   name: z.string().min(1).max(200),
   aliases: z.array(z.string().max(200)).default([]),
-  role: z.enum(["protagonist", "antagonist", "supporting", "minor", "other"]).default("other"),
   importance: importanceSchema.default("minor"),
   summary: z.string().max(100).default(""),
-  profile: characterProfileSchema.default({}),
+  content: z.string().max(20000).default(""),
   embedding: z.array(z.number()).optional(),
   embeddingText: z.string().optional(),
   ...timestampsSchema.shape,
@@ -156,10 +140,9 @@ export const createCharacterSchema = z.object({
   worldId: objectIdSchema,
   name: z.string().min(1).max(200),
   aliases: z.array(z.string().max(200)).optional(),
-  role: z.enum(["protagonist", "antagonist", "supporting", "minor", "other"]).optional(),
   importance: importanceSchema.optional(),
   summary: z.string().max(100).optional(),
-  profile: characterProfileSchema.partial().optional(),
+  content: z.string().max(20000).optional(),
 });
 
 export const updateCharacterSchema = createCharacterSchema.omit({ worldId: true }).partial();
@@ -282,6 +265,23 @@ export const embeddingChunkSchema = z.object({
 });
 
 export type EmbeddingChunk = z.infer<typeof embeddingChunkSchema>;
+
+// ============ File Import (断点续传) ============
+
+export const fileImportSchema = z.object({
+  _id: objectIdSchema,
+  userId: objectIdSchema,
+  worldId: objectIdSchema,
+  fileHash: z.string(),
+  fileName: z.string(),
+  fileSize: z.number().int(),
+  totalChunks: z.number().int(),
+  completedChunks: z.array(z.number().int()),
+  status: z.enum(["in_progress", "completed"]),
+  ...timestampsSchema.shape,
+});
+
+export type FileImport = z.infer<typeof fileImportSchema>;
 
 // ============ Agent Session ============
 

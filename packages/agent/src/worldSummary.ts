@@ -4,7 +4,6 @@ import { t, type Locale } from "./i18n.js";
 
 interface SummaryItem {
   name: string;
-  role?: string;
   category?: string;
   importance: "core" | "major" | "minor";
   summary: string;
@@ -47,11 +46,10 @@ export function buildWorldSummary(
       const label = texts.importanceLabel[imp] || imp;
       lines.push(`**${label}${locale === "zh" ? "角色" : " Characters"}：**`);
       for (const c of group) {
-        const roleTag = c.role ? `[${c.role}]` : "";
         const summary = compress && imp === "minor"
           ? (c.summary || "").slice(0, 30)
           : (c.summary || "").slice(0, 50);
-        lines.push(`- ${roleTag} ${c.name}${summary ? ": " + summary : ""}`);
+        lines.push(`- ${c.name}${summary ? ": " + summary : ""}`);
       }
     }
   }
@@ -115,7 +113,7 @@ export async function getOrRefreshWorldSummary(
   const [characters, settings] = await Promise.all([
     db.collection("characters")
       .find({ worldId: wid })
-      .project({ name: 1, role: 1, importance: 1, summary: 1 })
+      .project({ name: 1, importance: 1, summary: 1 })
       .sort({ name: 1 })
       .toArray(),
     db.collection("world_settings")
@@ -127,7 +125,6 @@ export async function getOrRefreshWorldSummary(
 
   const charItems: SummaryItem[] = characters.map((c) => ({
     name: c.name as string,
-    role: c.role as string | undefined,
     importance: (c.importance as "core" | "major" | "minor") || "minor",
     summary: (c.summary as string) || "",
   }));

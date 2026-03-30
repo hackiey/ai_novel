@@ -21,7 +21,7 @@ const zh = {
 - 所有查询请使用 projectId: ${projectId}`,
   coreAbilities: `## 你的核心能力
 
-1. **角色管理** - 创建、更新、删除角色人设（外貌、性格、背景、目标、人物关系等）
+1. **角色管理** - 创建、更新、删除角色，使用自然语言描述角色详情（外貌、性格、背景、目标、关系等）
 2. **世界观构建** - 管理世界观设定（地理、历史、魔法体系、社会制度、科技水平等），支持增删改查
 3. **章节管理** - 创建、查询、更新、删除章节，以及根据上下文续写章节内容
 4. **语义搜索** - 在角色、世界观、讨论记录、章节中搜索相关信息。搜索角色或世界设定时会返回完整详情
@@ -71,26 +71,20 @@ const zh = {
     semantic_search_scope: "搜索范围，可选。默认搜索所有类型。可指定一个或多个: character, world, draft, chapter",
     semantic_search_limit: "返回结果数量上限，默认5",
 
-    update_character: "更新角色信息。可以更新名称、角色类型、人设详情等。profile 中的字段会合并更新而非整体替换。",
+    update_character: "更新角色信息。可以更新名称、重要性、别名、描述内容等。",
     update_character_id: "角色ID",
     update_character_name: "角色名称",
-    update_character_role: "角色类型",
     update_character_importance: "重要性级别",
     update_character_summary: "一句话简介，不超过50字",
     update_character_aliases: "角色别名列表",
-    update_character_profile: "角色详细信息",
-    update_character_appearance: "外貌描述",
-    update_character_personality: "性格特点",
-    update_character_background: "背景故事",
-    update_character_goals: "目标动机",
+    update_character_content: "角色的详细描述（自然语言）。建议涵盖以下维度：外貌特征、性格特点、背景故事、目标动机、与其他角色的关系等。",
 
     create_character: "创建新角色。worldId 和 projectId 已自动注入。",
     create_character_name: "角色名称",
-    create_character_role: "角色类型，默认 other",
     create_character_importance: "重要性级别，默认 minor",
     create_character_summary: "一句话简介，不超过50字",
     create_character_aliases: "角色别名",
-    create_character_profile: "角色详细信息",
+    create_character_content: "角色的详细描述（自然语言）。建议涵盖以下维度：外貌特征、性格特点、背景故事、目标动机、与其他角色的关系等。",
 
     delete_character: "删除指定角色。此操作不可撤销，会同时删除相关的嵌入数据。",
     delete_character_id: "要删除的角色ID",
@@ -177,7 +171,7 @@ const zh = {
       `你正在帮助用户从上传的文件中提取角色和世界观设定。这是文件的第 ${chunkIndex + 1}/${totalChunks} 段。
 
 请仔细阅读以下文本，从中提取：
-1. **角色** — 提取明确出现的角色，包括名称(name)、角色类型(role)、重要性(importance)、一句话简介(summary)、以及详细信息(profile: appearance/personality/background/goals)
+1. **角色** — 提取明确出现的角色，包括名称(name)、重要性(importance)、一句话简介(summary)、以及详细描述(content)，描述建议涵盖外貌、性格、背景、目标、关系等维度
 2. **世界观设定** — 提取明确描述的世界观设定，包括分类(category)、标题(title)、内容(content)、重要性(importance)、一句话简介(summary)
 
 **重要规则：**
@@ -208,7 +202,7 @@ const en: typeof zh = {
 - Use projectId: ${projectId} for all queries`,
   coreAbilities: `## Core Abilities
 
-1. **Character Management** — Create, update, and delete character profiles (appearance, personality, background, goals, relationships, etc.)
+1. **Character Management** — Create, update, and delete characters with natural language descriptions (appearance, personality, background, goals, relationships, etc.)
 2. **World Building** — Manage world settings (geography, history, magic systems, social structure, technology, etc.) with full CRUD support
 3. **Chapter Management** — Create, query, update, delete chapters, and continue writing based on context
 4. **Semantic Search** — Search across characters, world settings, drafts, and chapters. Searching characters or world settings returns full details
@@ -258,26 +252,20 @@ const en: typeof zh = {
     semantic_search_scope: "Search scope, optional. Defaults to all types. Specify one or more: character, world, draft, chapter",
     semantic_search_limit: "Maximum number of results, default 5",
 
-    update_character: "Update character information. Can update name, role type, profile details, etc. Fields in profile are merged rather than replaced entirely.",
+    update_character: "Update character information. Can update name, importance, aliases, description content, etc.",
     update_character_id: "Character ID",
     update_character_name: "Character name",
-    update_character_role: "Character role type",
     update_character_importance: "Importance level",
     update_character_summary: "One-line summary, max 50 characters",
     update_character_aliases: "Character aliases list",
-    update_character_profile: "Character details",
-    update_character_appearance: "Appearance description",
-    update_character_personality: "Personality traits",
-    update_character_background: "Background story",
-    update_character_goals: "Goals and motivations",
+    update_character_content: "Detailed character description in natural language. Recommended dimensions: appearance, personality, background story, goals/motivations, relationships with other characters.",
 
     create_character: "Create a new character. worldId and projectId are auto-injected.",
     create_character_name: "Character name",
-    create_character_role: "Character role type, default: other",
     create_character_importance: "Importance level, default: minor",
     create_character_summary: "One-line summary, max 50 characters",
     create_character_aliases: "Character aliases",
-    create_character_profile: "Character details",
+    create_character_content: "Detailed character description in natural language. Recommended dimensions: appearance, personality, background story, goals/motivations, relationships with other characters.",
 
     delete_character: "Delete a character. This action is irreversible and will also delete related embedding data.",
     delete_character_id: "Character ID to delete",
@@ -364,7 +352,7 @@ const en: typeof zh = {
       `You are helping the user extract characters and world settings from an uploaded file. This is chunk ${chunkIndex + 1}/${totalChunks} of the file.
 
 Please carefully read the following text and extract:
-1. **Characters** — Extract explicitly mentioned characters, including name, role, importance, summary, and profile details (appearance/personality/background/goals)
+1. **Characters** — Extract explicitly mentioned characters, including name, importance, summary, and detailed description (content) covering dimensions like appearance, personality, background, goals, and relationships
 2. **World Settings** — Extract explicitly described world settings, including category, title, content, importance, and summary
 
 **Important rules:**

@@ -19,14 +19,7 @@ type EmbeddableCollection = (typeof EMBEDDABLE_COLLECTIONS)[number];
 function buildEmbeddingText(collection: string, doc: any): string {
   switch (collection) {
     case "characters":
-      return [
-        doc.name,
-        doc.profile?.personality,
-        doc.profile?.background,
-        doc.profile?.goals,
-      ]
-        .filter(Boolean)
-        .join("\n");
+      return [doc.name, doc.content].filter(Boolean).join("\n");
 
     case "world_settings":
       return [doc.title, doc.content].filter(Boolean).join("\n");

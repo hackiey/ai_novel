@@ -65,22 +65,13 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       parameters: Type.Object({
         id: Type.String({ description: d.update_character_id }),
         name: Type.Optional(Type.String({ description: d.update_character_name })),
-        role: Type.Optional(StringEnum(
-          ["protagonist", "antagonist", "supporting", "minor", "other"] as const,
-          { description: d.update_character_role },
-        )),
         importance: Type.Optional(StringEnum(
           ["core", "major", "minor"] as const,
           { description: d.update_character_importance },
         )),
         summary: Type.Optional(Type.String({ description: d.update_character_summary })),
         aliases: Type.Optional(Type.Array(Type.String(), { description: d.update_character_aliases })),
-        profile: Type.Optional(Type.Object({
-          appearance: Type.Optional(Type.String({ description: d.update_character_appearance })),
-          personality: Type.Optional(Type.String({ description: d.update_character_personality })),
-          background: Type.Optional(Type.String({ description: d.update_character_background })),
-          goals: Type.Optional(Type.String({ description: d.update_character_goals })),
-        }, { description: d.update_character_profile })),
+        content: Type.Optional(Type.String({ description: d.update_character_content })),
       }),
       async execute(_toolCallId, args) {
         const result = await handlers.updateCharacter(args, db);
@@ -97,22 +88,13 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       description: d.create_character,
       parameters: Type.Object({
         name: Type.String({ description: d.create_character_name }),
-        role: Type.Optional(StringEnum(
-          ["protagonist", "antagonist", "supporting", "minor", "other"] as const,
-          { description: d.create_character_role },
-        )),
         importance: Type.Optional(StringEnum(
           ["core", "major", "minor"] as const,
           { description: d.create_character_importance },
         )),
         summary: Type.Optional(Type.String({ description: d.create_character_summary })),
         aliases: Type.Optional(Type.Array(Type.String(), { description: d.create_character_aliases })),
-        profile: Type.Optional(Type.Object({
-          appearance: Type.Optional(Type.String()),
-          personality: Type.Optional(Type.String()),
-          background: Type.Optional(Type.String()),
-          goals: Type.Optional(Type.String()),
-        }, { description: d.create_character_profile })),
+        content: Type.Optional(Type.String({ description: d.create_character_content })),
       }),
       async execute(_toolCallId, args) {
         const result = await handlers.createCharacter({ ...args, worldId, projectId }, db, userId);

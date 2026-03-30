@@ -4,31 +4,25 @@ interface CharacterCardProps {
   character: {
     _id: string;
     name: string;
-    role: string;
+    importance?: string;
     aliases?: string[];
-    profile?: {
-      appearance?: string;
-      personality?: string;
-      background?: string;
-    };
+    content?: string;
   };
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
 }
 
-const roleBadgeColors: Record<string, string> = {
-  protagonist: "bg-amber-50 text-amber-700 border-amber-200",
-  antagonist: "bg-red-50 text-red-700 border-red-200",
-  supporting: "bg-blue-50 text-blue-700 border-blue-200",
+const importanceBadgeColors: Record<string, string> = {
+  core: "bg-amber-50 text-amber-700 border-amber-200",
+  major: "bg-blue-50 text-blue-700 border-blue-200",
   minor: "bg-gray-50 text-gray-600 border-gray-200",
-  other: "bg-gray-50 text-gray-500 border-gray-200",
 };
 
 export default function CharacterCard({ character, onEdit, onDelete }: CharacterCardProps) {
   const { t } = useTranslation();
-  const badgeClass = roleBadgeColors[character.role] ?? roleBadgeColors.other;
+  const badgeClass = importanceBadgeColors[character.importance ?? "minor"] ?? importanceBadgeColors.minor;
   const summary =
-    character.profile?.personality || character.profile?.background || t("character.noDescription");
+    character.content?.slice(0, 200) || t("character.noDescription");
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 hover:border-gray-300 hover:shadow-sm transition-all group">
@@ -49,7 +43,7 @@ export default function CharacterCard({ character, onEdit, onDelete }: Character
         <span
           className={`text-xs px-2 py-0.5 rounded-full border shrink-0 ${badgeClass}`}
         >
-          {character.role}
+          {t(`character.importance_${character.importance ?? "minor"}`)}
         </span>
       </div>
 

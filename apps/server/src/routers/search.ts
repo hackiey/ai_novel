@@ -59,7 +59,7 @@ export const searchRouter = router({
 
           // Build search filter based on collection type
           const textFields: Record<string, string[]> = {
-            characters: ["name", "profile.personality", "profile.background", "profile.goals"],
+            characters: ["name", "content"],
             world_settings: ["title", "content"],
             drafts: ["title", "content"],
             chapters: ["title", "synopsis", "content"],
@@ -95,7 +95,7 @@ export const searchRouter = router({
             switch (collName) {
               case "characters":
                 title = doc.name || "Untitled Character";
-                excerpt = doc.profile?.background || doc.profile?.personality || "";
+                excerpt = doc.content?.slice(0, 200) || "";
                 break;
               case "chapters":
                 title = doc.title || `Chapter ${doc.order ?? ""}`.trim();

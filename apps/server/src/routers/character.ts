@@ -19,18 +19,8 @@ function countWords(text: string): number {
   return cjkCount + words.length;
 }
 
-function computeCharacterWordCount(profile: any): number {
-  if (!profile) return 0;
-  let total = 0;
-  for (const key of ["appearance", "personality", "background", "goals"]) {
-    if (profile[key]) total += countWords(profile[key]);
-  }
-  if (profile.customFields) {
-    for (const val of Object.values(profile.customFields)) {
-      if (typeof val === "string") total += countWords(val);
-    }
-  }
-  return total;
+function computeCharacterWordCount(content: string): number {
+  return countWords(content);
 }
 
 export const characterRouter = router({
@@ -58,24 +48,16 @@ export const characterRouter = router({
     .input(createCharacterSchema)
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
-      const profile = {
-        appearance: input.profile?.appearance ?? "",
-        personality: input.profile?.personality ?? "",
-        background: input.profile?.background ?? "",
-        goals: input.profile?.goals ?? "",
-        relationships: input.profile?.relationships ?? [],
-        customFields: input.profile?.customFields ?? {},
-      };
+      const content = input.content ?? "";
       const doc = {
         userId: ctx.user.userId,
         worldId: new ObjectId(input.worldId),
         name: input.name,
         aliases: input.aliases ?? [],
-        role: input.role ?? "other",
         importance: input.importance ?? "minor",
         summary: input.summary ?? "",
-        profile,
-        wordCount: computeCharacterWordCount(profile),
+        content,
+        wordCount: computeCharacterWordCount(content),
         createdAt: now,
         updatedAt: now,
       };
@@ -97,12 +79,11 @@ export const characterRouter = router({
       };
       if (input.data.name !== undefined) updateFields.name = input.data.name;
       if (input.data.aliases !== undefined) updateFields.aliases = input.data.aliases;
-      if (input.data.role !== undefined) updateFields.role = input.data.role;
       if (input.data.importance !== undefined) updateFields.importance = input.data.importance;
       if (input.data.summary !== undefined) updateFields.summary = input.data.summary;
-      if (input.data.profile !== undefined) {
-        updateFields.profile = input.data.profile;
-        updateFields.wordCount = computeCharacterWordCount(input.data.profile);
+      if (input.data.content !== undefined) {
+        updateFields.content = input.data.content;
+        updateFields.wordCount = computeCharacterWordCount(input.data.content);
       }
 
       const result = await ctx.db
@@ -112,16 +93,6 @@ export const characterRouter = router({
           { $set: updateFields },
           { returnDocument: "after" }
         );
-
-      if (result && input.data.profile !== undefined) {
-        const wordCount = computeCharacterWordCount(result.profile);
-        if (wordCount !== result.wordCount) {
-          await ctx.db
-            .collection("characters")
-            .updateOne({ _id: new ObjectId(input.id) }, { $set: { wordCount } });
-          result.wordCount = wordCount;
-        }
-      }
 
       if (result) {
         getEmbeddingService()?.enqueue("characters", input.id);

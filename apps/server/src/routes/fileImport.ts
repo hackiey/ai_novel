@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { createHash } from "crypto";
 import { ObjectId } from "mongodb";
 import { CreatorAgentSession, getOrRefreshWorldSummary, resolveLocale, t } from "@ai-creator/agent";
 import type { VectorSearchFn, Locale } from "@ai-creator/agent";
@@ -161,6 +162,10 @@ async function fileToText(buffer: Buffer, filename: string): Promise<string> {
 
 const ALLOWED_EXTENSIONS = new Set(["txt", "md", "docx", "pdf"]);
 
+function computeMd5(buffer: Buffer): string {
+  return createHash("md5").update(buffer).digest("hex");
+}
+
 async function handleImportStream(
   request: any,
   reply: any,
@@ -170,6 +175,8 @@ async function handleImportStream(
   worldId: string,
   locale: Locale,
   model: string | undefined,
+  importRecordId: ObjectId,
+  completedChunksSet: Set<number>,
 ) {
   const chunks = chunkText(text, IMPORT_CHUNK_SIZE_CHARS, IMPORT_CHUNK_SIZE_WORDS);
   const totalChunks = chunks.length;
@@ -187,9 +194,17 @@ async function handleImportStream(
     }
   });
 
-  send({ type: "import_start", totalChunks, fileName: filename });
+  const resumeFromChunk = completedChunksSet.size;
+  send({ type: "import_start", totalChunks, fileName: filename, resumeFromChunk, completedChunksCount: completedChunksSet.size });
 
   const db = getDb();
+
+  // Update totalChunks in record (may differ if chunk config changed)
+  await db.collection("file_imports").updateOne(
+    { _id: importRecordId },
+    { $set: { totalChunks, updatedAt: new Date() } },
+  );
+
   const embeddingService = getEmbeddingService();
   let vectorSearchFn: VectorSearchFn | undefined;
   if (embeddingService) {
@@ -207,6 +222,12 @@ async function handleImportStream(
 
   for (let i = 0; i < totalChunks; i++) {
     if (cancelled) break;
+
+    // Skip already completed chunks
+    if (completedChunksSet.has(i)) {
+      send({ type: "chunk_skipped", chunkIndex: i, totalChunks });
+      continue;
+    }
 
     send({ type: "chunk_start", chunkIndex: i, totalChunks });
 
@@ -271,12 +292,27 @@ async function handleImportStream(
 
       console.log(`[FileImport] Chunk ${i}: completed with ${eventCount} events`);
       session.close();
+
+      // Persist chunk completion
+      await db.collection("file_imports").updateOne(
+        { _id: importRecordId },
+        { $addToSet: { completedChunks: i }, $set: { updatedAt: new Date() } },
+      );
+
       send({ type: "chunk_done", chunkIndex: i });
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.error(`[FileImport] Chunk ${i} error:`, err);
       send({ type: "chunk_error", chunkIndex: i, error: errorMsg });
     }
+  }
+
+  // Mark as completed if all chunks done and not cancelled
+  if (!cancelled) {
+    await db.collection("file_imports").updateOne(
+      { _id: importRecordId },
+      { $set: { status: "completed", updatedAt: new Date() } },
+    );
   }
 
   send({ type: "import_done" });
@@ -330,6 +366,17 @@ export function registerFileImportRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: "File is empty" });
     }
 
+    // Compute MD5 hash of the raw file buffer
+    const fileHash = computeMd5(fileBuffer);
+
+    // Check for existing import record
+    const db = getDb();
+    const existing = await db.collection("file_imports").findOne({
+      userId: user.userId,
+      worldId,
+      fileHash,
+    });
+
     // Set SSE headers (same pattern as agentStream.ts)
     reply.raw.writeHead(200, {
       "Content-Type": "text/event-stream",
@@ -338,7 +385,69 @@ export function registerFileImportRoutes(fastify: FastifyInstance) {
       "Access-Control-Allow-Origin": "*",
     });
 
+    const send = (payload: unknown) => {
+      reply.raw.write(`data: ${JSON.stringify(payload)}\n\n`);
+    };
+
+    if (existing && existing.status === "completed") {
+      // File already fully imported
+      send({ type: "import_already_done", fileHash, fileName: filename });
+      reply.raw.write("data: [DONE]\n\n");
+      reply.raw.end();
+      return;
+    }
+
+    let importRecordId: ObjectId;
+    let completedChunksSet: Set<number>;
+
+    if (existing) {
+      // Resume in-progress import
+      importRecordId = existing._id;
+      completedChunksSet = new Set(existing.completedChunks || []);
+    } else {
+      // Create new import record
+      const now = new Date();
+      const chunks = chunkText(text, IMPORT_CHUNK_SIZE_CHARS, IMPORT_CHUNK_SIZE_WORDS);
+      const result = await db.collection("file_imports").insertOne({
+        userId: user.userId,
+        worldId,
+        fileHash,
+        fileName: filename,
+        fileSize: fileBuffer.length,
+        totalChunks: chunks.length,
+        completedChunks: [],
+        status: "in_progress",
+        createdAt: now,
+        updatedAt: now,
+      });
+      importRecordId = result.insertedId;
+      completedChunksSet = new Set();
+    }
+
     // Await the full stream — same pattern as agentStream.ts
-    await handleImportStream(request, reply, user, filename, text, worldId, locale, model);
+    await handleImportStream(request, reply, user, filename, text, worldId, locale, model, importRecordId, completedChunksSet);
+  });
+
+  // DELETE endpoint to allow re-import of a previously completed file
+  fastify.delete("/api/world/import-file/:fileHash", async (request, reply) => {
+    const user = extractUser(request);
+    if (!user) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+
+    const { fileHash } = request.params as { fileHash: string };
+    const worldId = (request.query as { worldId?: string }).worldId;
+    if (!worldId) {
+      return reply.status(400).send({ error: "worldId query parameter is required" });
+    }
+
+    const db = getDb();
+    await db.collection("file_imports").deleteOne({
+      userId: user.userId,
+      worldId,
+      fileHash,
+    });
+
+    return reply.send({ ok: true });
   });
 }

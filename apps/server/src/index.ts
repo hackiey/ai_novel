@@ -53,6 +53,7 @@ async function main() {
     "drafts", "chapters", "agent_sessions", "agent_messages"]) {
     await db.collection(col).createIndex({ userId: 1 });
   }
+  await db.collection("file_imports").createIndex({ userId: 1, worldId: 1, fileHash: 1 });
 
   // Ensure vector search indexes (Atlas Search)
   if (embeddingApiKey) {
