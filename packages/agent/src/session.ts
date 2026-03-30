@@ -110,7 +110,7 @@ export class CreatorAgentSession {
     const config: AgentLoopConfig = {
       model: this.model,
       apiKey,
-      maxTokens: 8192,
+      maxTokens: 32000,
       reasoning: this.reasoning,
       convertToLlm: (messages: AgentMessage[]) => {
         const llmMessages = messages.filter((m): m is Message =>
