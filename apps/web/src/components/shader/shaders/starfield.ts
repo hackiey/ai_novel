@@ -57,8 +57,8 @@ void main() {
   v = mix(vec3(length(v)), v, saturation);
 
   // Darken overall and add deep blue tint
-  v *= 0.01;
-  v += vec3(0.04, 0.05, 0.10);
+  v *= 0.008;
+  v += vec3(0.01, 0.015, 0.04);
 
   fragColor = vec4(v, 1.0);
 }

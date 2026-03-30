@@ -3,9 +3,12 @@ import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { Trash2, FileEdit } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
+import { useWriteTheme } from "../contexts/WriteThemeContext.js";
 
 export default function HomePage() {
   const { t } = useTranslation();
+  const { theme } = useWriteTheme();
+  const cardClass = theme === "starfield" ? "glass-panel-lighter" : "glass-panel-light";
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -48,7 +51,7 @@ export default function HomePage() {
                 to="/project/$projectId/write"
                 params={{ projectId: project._id }}
                 search={{ chapterId: undefined }}
-                className="flex-shrink-0 group relative px-4 py-3 rounded-xl glass-panel-light hover:border-teal-400/30 hover:bg-white/10 transition-all min-w-[180px] max-w-[240px]"
+                className={`flex-shrink-0 group relative px-4 py-3 rounded-xl ${cardClass} hover:border-teal-400/30 hover:bg-white/10 transition-all min-w-[180px] max-w-[240px]`}
               >
                 <div className="flex items-center gap-2 mb-1">
                   <FileEdit className="w-3.5 h-3.5 text-teal-400/60 shrink-0" />
@@ -184,7 +187,7 @@ export default function HomePage() {
               key={world._id}
               to="/world/$worldId"
               params={{ worldId: world._id }}
-              className="block rounded-2xl glass-panel-light p-6 hover:border-teal-400/30 hover:bg-white/12 transition-all group"
+              className={`block rounded-2xl ${cardClass} p-6 hover:border-teal-400/30 hover:bg-white/12 transition-all group`}
             >
               <div className="flex items-start justify-between gap-3 mb-3">
                 <h3 className="text-lg font-semibold text-white/90 group-hover:text-teal-400 transition-colors">

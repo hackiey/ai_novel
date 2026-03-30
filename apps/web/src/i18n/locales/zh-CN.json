@@ -127,6 +127,7 @@
   "chat.results": "结果",
   "chat.inputPlaceholder": "向 AI 助手提问...",
   "chat.send": "发送",
+  "chat.stop": "停止",
   "chat.selectModel": "选择模型",
   "chat.memory": "记忆",
   "chat.memoryWorld": "世界观",

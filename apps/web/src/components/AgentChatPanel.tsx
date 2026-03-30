@@ -57,6 +57,8 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const userScrolledUp = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
@@ -99,8 +101,16 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
     { enabled: !!worldId },
   );
 
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Consider "at bottom" if within 50px of the bottom
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+    userScrolledUp.current = !atBottom;
+  }, []);
+
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && !userScrolledUp.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isLoading]);
@@ -141,6 +151,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
   async function sendMessage(text: string) {
     if (!text || isLoading) return;
 
+    userScrolledUp.current = false;
     setIsLoading(true);
 
     const userMsg: ChatMessage = { role: "user", content: text };
@@ -151,6 +162,8 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
 
     try {
       const token = getToken();
+      const controller = new AbortController();
+      abortRef.current = controller;
       const response = await fetch(`${API_BASE}/api/agent/chat`, {
         method: "POST",
         headers: {
@@ -158,6 +171,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ projectId, worldId, message: text, sessionId, locale: i18n.language, model: selectedModel, currentChapterId }),
+        signal: controller.signal,
       });
 
       if (!response.ok || !response.body) {
@@ -306,20 +320,29 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
       // Refresh session list
       sessionsQuery.refetch();
     } catch (err: any) {
-      setMessages((prev) => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last && last.role === "assistant") {
-          updated[updated.length - 1] = {
-            ...last,
-            content: `Error: ${err.message || "Failed to get response"}`,
-          };
-        }
-        return updated;
-      });
+      if (err.name === "AbortError") {
+        // User stopped generation — keep partial content as-is
+      } else {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last && last.role === "assistant") {
+            updated[updated.length - 1] = {
+              ...last,
+              content: `Error: ${err.message || "Failed to get response"}`,
+            };
+          }
+          return updated;
+        });
+      }
     } finally {
+      abortRef.current = null;
       setIsLoading(false);
     }
+  }
+
+  function handleStop() {
+    abortRef.current?.abort();
   }
 
   async function handleSend() {
@@ -569,7 +592,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
           )}
 
           {/* Messages */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-none p-4 space-y-4">
+          <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto scrollbar-none p-4 space-y-4">
             {messages.length === 0 && (
               <div className="text-center py-8">
                 <p className={`text-sm mb-1 ${imm ? "text-white/70" : "text-gray-600"}`}>{t("chat.emptyTitle")}</p>
@@ -700,13 +723,25 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                 }`}
                 style={{ height: "38px", maxHeight: "120px" }}
               />
-              <button
-                onClick={handleSend}
-                disabled={isLoading || !input.trim()}
-                className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-white/80 text-sm hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
-              >
-                {t("chat.send")}
-              </button>
+              {isLoading ? (
+                <button
+                  onClick={handleStop}
+                  className="px-3 py-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-sm hover:bg-red-500/30 transition-colors shrink-0"
+                  title={t("chat.stop")}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                    <rect x="6" y="6" width="12" height="12" rx="1" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim()}
+                  className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-white/80 text-sm hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                >
+                  {t("chat.send")}
+                </button>
+              )}
             </div>
           </div>
         </>
