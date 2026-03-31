@@ -6,11 +6,22 @@ import { createNovelTools } from "./tools/index.js";
 import type { VectorSearchFn, OnDocumentChangedFn, OnWorldSummaryStaleFn } from "./tools/index.js";
 import type { Locale } from "./i18n.js";
 
+export interface TokenUsage {
+  model: string;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  totalTokens: number;
+  cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
+}
+
 export type AgentEvent =
   | { type: "text"; text: string }
   | { type: "tool_use"; toolName: string; toolInput: unknown }
   | { type: "tool_result"; toolName?: string; result: unknown }
   | { type: "messages"; messages: Message[] }
+  | { type: "usage"; usage: TokenUsage }
   | { type: "done"; fullResponse: string }
   | { type: "error"; error: string };
 
@@ -192,6 +203,22 @@ export class CreatorAgentSession {
               result: event.result,
             };
           } else if (event.type === "agent_end") {
+            // Emit token usage for each assistant message
+            for (const m of event.messages) {
+              if (typeof m === "object" && m !== null && "role" in m && m.role === "assistant" && "usage" in m) {
+                const msg = m as any;
+                yield { type: "usage", usage: {
+                  model: msg.model ?? "unknown",
+                  input: msg.usage.input,
+                  output: msg.usage.output,
+                  cacheRead: msg.usage.cacheRead,
+                  cacheWrite: msg.usage.cacheWrite,
+                  totalTokens: msg.usage.totalTokens,
+                  cost: msg.usage.cost,
+                } satisfies TokenUsage } as const;
+              }
+            }
+
             // Yield the new messages from this turn for the caller to store
             const newMessages = event.messages.filter(
               (m): m is Message =>

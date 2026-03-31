@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 
 export interface AgentEvent {
-  type: "text" | "tool_use" | "tool_result" | "done" | "error" | "session";
+  type: "text" | "tool_use" | "tool_result" | "done" | "error" | "session" | "usage";
   text?: string;
   toolName?: string;
   toolInput?: any;
@@ -14,6 +14,15 @@ export interface AgentEvent {
   fullResponse?: string;
   error?: string;
   sessionId?: string;
+  usage?: {
+    model: string;
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    totalTokens: number;
+    cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
+  };
 }
 
 type Segment =

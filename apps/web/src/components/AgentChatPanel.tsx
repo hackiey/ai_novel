@@ -256,6 +256,15 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
               fullText = event.fullResponse;
             }
 
+            if (event.type === "usage" && event.usage) {
+              const u = event.usage;
+              console.log(
+                `%c[Token Usage]%c ${u.model} | input: ${u.input} | output: ${u.output} | cache_read: ${u.cacheRead} | cache_write: ${u.cacheWrite} | total: ${u.totalTokens} | cost: $${u.cost.total.toFixed(4)}`,
+                "color: #2dd4bf; font-weight: bold",
+                "color: inherit",
+              );
+            }
+
             if (event.type === "error") {
               fullText = fullText || `Error: ${event.error}`;
             }
