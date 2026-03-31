@@ -22,6 +22,7 @@ export interface AgentEvent {
     cacheWrite: number;
     totalTokens: number;
     cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
+    isSummary?: boolean;
   };
 }
 

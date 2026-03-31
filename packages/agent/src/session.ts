@@ -14,6 +14,7 @@ export interface TokenUsage {
   cacheWrite: number;
   totalTokens: number;
   cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
+  isSummary?: boolean;
 }
 
 export type AgentEvent =
@@ -98,6 +99,12 @@ export class CreatorAgentSession {
     this.abortController = abortController;
 
     let fullResponse = "";
+    let turnCount = 0;
+    const totalUsage: TokenUsage = {
+      model: "unknown",
+      input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    };
 
     // Collect events from the agent loop via the emit callback
     const eventQueue: PiAgentEvent[] = [];
@@ -202,23 +209,36 @@ export class CreatorAgentSession {
               toolName: event.toolName,
               result: event.result,
             };
-          } else if (event.type === "agent_end") {
-            // Emit token usage for each assistant message
-            for (const m of event.messages) {
-              if (typeof m === "object" && m !== null && "role" in m && m.role === "assistant" && "usage" in m) {
-                const msg = m as any;
-                yield { type: "usage", usage: {
-                  model: msg.model ?? "unknown",
-                  input: msg.usage.input,
-                  output: msg.usage.output,
-                  cacheRead: msg.usage.cacheRead,
-                  cacheWrite: msg.usage.cacheWrite,
-                  totalTokens: msg.usage.totalTokens,
-                  cost: msg.usage.cost,
-                } satisfies TokenUsage } as const;
+          } else if (event.type === "turn_end") {
+            // Emit per-turn usage and accumulate for summary
+            const m = event.message as any;
+            if (m?.role === "assistant" && m.usage) {
+              const u = m.usage;
+              yield { type: "usage", usage: {
+                model: m.model ?? "unknown",
+                input: u.input ?? 0,
+                output: u.output ?? 0,
+                cacheRead: u.cacheRead ?? 0,
+                cacheWrite: u.cacheWrite ?? 0,
+                totalTokens: u.totalTokens ?? 0,
+                cost: u.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+              } };
+              totalUsage.model = m.model ?? totalUsage.model;
+              totalUsage.input += u.input ?? 0;
+              totalUsage.output += u.output ?? 0;
+              totalUsage.cacheRead += u.cacheRead ?? 0;
+              totalUsage.cacheWrite += u.cacheWrite ?? 0;
+              totalUsage.totalTokens += u.totalTokens ?? 0;
+              if (u.cost) {
+                totalUsage.cost.input += u.cost.input ?? 0;
+                totalUsage.cost.output += u.cost.output ?? 0;
+                totalUsage.cost.cacheRead += u.cost.cacheRead ?? 0;
+                totalUsage.cost.cacheWrite += u.cost.cacheWrite ?? 0;
+                totalUsage.cost.total += u.cost.total ?? 0;
               }
+              turnCount++;
             }
-
+          } else if (event.type === "agent_end") {
             // Yield the new messages from this turn for the caller to store
             const newMessages = event.messages.filter(
               (m): m is Message =>
@@ -244,6 +264,9 @@ export class CreatorAgentSession {
       }
 
       this.abortController = undefined;
+      if (turnCount > 1 && totalUsage.totalTokens > 0) {
+        yield { type: "usage", usage: { ...totalUsage, isSummary: true } };
+      }
       yield { type: "done", fullResponse };
     } catch (err) {
       this.abortController = undefined;

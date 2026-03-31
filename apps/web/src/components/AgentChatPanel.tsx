@@ -258,9 +258,13 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
 
             if (event.type === "usage" && event.usage) {
               const u = event.usage;
+              const label = u.isSummary ? "[Token Usage Summary]" : "[Token Usage]";
+              const style = u.isSummary
+                ? "color: #f59e0b; font-weight: bold"
+                : "color: #2dd4bf; font-weight: bold";
               console.log(
-                `%c[Token Usage]%c ${u.model} | input: ${u.input} | output: ${u.output} | cache_read: ${u.cacheRead} | cache_write: ${u.cacheWrite} | total: ${u.totalTokens} | cost: $${u.cost.total.toFixed(4)}`,
-                "color: #2dd4bf; font-weight: bold",
+                `%c${label}%c ${u.model} | input: ${u.input} | output: ${u.output} | cache_read: ${u.cacheRead} | cache_write: ${u.cacheWrite} | total: ${u.totalTokens} | cost: $${u.cost.total.toFixed(4)}`,
+                style,
                 "color: inherit",
               );
             }
