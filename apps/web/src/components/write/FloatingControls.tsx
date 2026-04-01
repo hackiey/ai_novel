@@ -16,6 +16,7 @@ interface FloatingControlsProps {
   onChapterSelect: (id: string) => void;
   onChapterCreate: () => void;
   onChapterRename: (id: string, title: string) => void;
+  onChapterDelete: (id: string) => void;
   chapterCreating: boolean;
   chatOpen?: boolean;
 }
@@ -31,6 +32,7 @@ export default function FloatingControls({
   onChapterSelect,
   onChapterCreate,
   onChapterRename,
+  onChapterDelete,
   chapterCreating,
   chatOpen = false,
 }: FloatingControlsProps) {
@@ -54,6 +56,7 @@ export default function FloatingControls({
             onSelect={onChapterSelect}
             onCreate={onChapterCreate}
             onRename={onChapterRename}
+            onDelete={onChapterDelete}
             creating={chapterCreating}
           />
           <button

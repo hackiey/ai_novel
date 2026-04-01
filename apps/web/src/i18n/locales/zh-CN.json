@@ -59,6 +59,9 @@
   "home.novels": "小说",
   "home.noNovels": "还没有小说",
   "home.deleteConfirm": "删除 \"{{name}}\" 及其所有数据？",
+  "home.editWorld": "编辑世界",
+  "home.saving": "保存中...",
+  "home.save": "保存",
 
   "write.back": "返回",
   "write.loading": "加载中...",

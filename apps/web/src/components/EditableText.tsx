@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 interface EditableTextProps {
   value: string;
   onSave: (newValue: string) => void;
+  onClick?: () => void;
   className?: string;
   inputClassName?: string;
   placeholder?: string;
@@ -12,6 +13,7 @@ interface EditableTextProps {
 export default function EditableText({
   value,
   onSave,
+  onClick,
   className = "",
   inputClassName = "",
   placeholder,
@@ -70,6 +72,7 @@ export default function EditableText({
 
   return (
     <span
+      onClick={onClick}
       onDoubleClick={(e) => {
         e.stopPropagation();
         setEditing(true);

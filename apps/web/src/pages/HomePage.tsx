@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { Trash2, FileEdit } from "lucide-react";
+import { Trash2, FileEdit, Pencil } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import { useWriteTheme } from "../contexts/WriteThemeContext.js";
 
@@ -12,6 +12,9 @@ export default function HomePage() {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [editingWorld, setEditingWorld] = useState<{ _id: string; name: string; description?: string } | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
 
   const projectsQuery = trpc.project.list.useQuery();
   const worldsQuery = trpc.world.list.useQuery();
@@ -26,6 +29,12 @@ export default function HomePage() {
   const deleteMutation = trpc.world.delete.useMutation({
     onSuccess: () => {
       worldsQuery.refetch();
+    },
+  });
+  const updateMutation = trpc.world.update.useMutation({
+    onSuccess: () => {
+      worldsQuery.refetch();
+      setEditingWorld(null);
     },
   });
 
@@ -193,19 +202,34 @@ export default function HomePage() {
                 <h3 className="text-lg font-semibold text-white/90 group-hover:text-teal-400 transition-colors">
                   {world.name}
                 </h3>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (confirm(t("home.deleteConfirm", { name: world.name }))) {
-                      deleteMutation.mutate({ id: world._id });
-                    }
-                  }}
-                  className="text-white/20 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
-                  title={t("common.delete")}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setEditingWorld(world);
+                      setEditName(world.name);
+                      setEditDescription(world.description ?? "");
+                    }}
+                    className="text-white/20 hover:text-teal-400 transition-colors"
+                    title={t("common.edit")}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (confirm(t("home.deleteConfirm", { name: world.name }))) {
+                        deleteMutation.mutate({ id: world._id });
+                      }
+                    }}
+                    className="text-white/20 hover:text-red-400 transition-colors"
+                    title={t("common.delete")}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               {world.description && (
                 <p className="text-sm text-white/50 line-clamp-3 mb-4">{world.description}</p>
@@ -220,6 +244,75 @@ export default function HomePage() {
               </div>
             </Link>
           ))}
+        </div>
+      )}
+
+      {/* Edit World Modal */}
+      {editingWorld && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setEditingWorld(null)}
+        >
+          <div
+            className="glass-panel rounded-xl p-6 w-full max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-white/90 mb-4">{t("home.editWorld")}</h2>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!editName.trim()) return;
+                updateMutation.mutate({
+                  id: editingWorld._id,
+                  data: {
+                    name: editName.trim(),
+                    description: editDescription.trim() || undefined,
+                  },
+                });
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">{t("home.worldName")}</label>
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder={t("home.worldNamePlaceholder")}
+                  required
+                  maxLength={200}
+                  autoFocus
+                  className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">{t("home.description")}</label>
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder={t("home.descriptionPlaceholder")}
+                  rows={3}
+                  maxLength={2000}
+                  className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
+                />
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setEditingWorld(null)}
+                  className="px-4 py-2 text-sm rounded-lg border border-white/20 text-white/60 hover:bg-white/10 transition-colors"
+                >
+                  {t("home.cancel")}
+                </button>
+                <button
+                  type="submit"
+                  disabled={updateMutation.isPending || !editName.trim()}
+                  className="px-4 py-2 text-sm rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 disabled:opacity-50 transition-colors"
+                >
+                  {updateMutation.isPending ? t("home.saving") : t("home.save")}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import EditableText from "../EditableText.js";
 
 interface ChapterDrawerProps {
@@ -11,6 +11,7 @@ interface ChapterDrawerProps {
   onSelect: (id: string) => void;
   onCreate: () => void;
   onRename: (id: string, title: string) => void;
+  onDelete: (id: string) => void;
   creating: boolean;
 }
 
@@ -22,6 +23,7 @@ export default function ChapterDrawer({
   onSelect,
   onCreate,
   onRename,
+  onDelete,
   creating,
 }: ChapterDrawerProps) {
   const { t } = useTranslation();
@@ -72,27 +74,40 @@ export default function ChapterDrawer({
           </div>
         ) : (
           chapters.map((ch) => (
-            <button
+            <div
               key={ch._id}
-              onClick={() => {
-                onSelect(ch._id);
-                onClose();
-              }}
-              className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+              className={`group/ch flex items-center gap-1 px-3 py-2 text-sm transition-colors cursor-pointer ${
                 selectedChapterId === ch._id
                   ? "bg-white/15 text-white font-medium"
                   : "text-white/70 hover:bg-white/10 hover:text-white"
               }`}
+              onClick={() => onSelect(ch._id)}
             >
-              <EditableText
-                value={ch.title}
-                onSave={(title) => onRename(ch._id, title)}
-                className={`truncate ${
-                  selectedChapterId === ch._id ? "text-white" : "text-white/70"
-                }`}
-                inputClassName="text-sm w-full bg-white/10 text-white border-white/20 rounded px-1"
-              />
-            </button>
+              <div className="flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+                <EditableText
+                  value={ch.title}
+                  onSave={(title) => onRename(ch._id, title)}
+                  onClick={() => {
+                    onSelect(ch._id);
+                    onClose();
+                  }}
+                  className={`truncate block ${
+                    selectedChapterId === ch._id ? "text-white" : "text-white/70"
+                  }`}
+                  inputClassName="text-sm w-full bg-white/10 text-white border-white/20 rounded px-1"
+                />
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(ch._id);
+                }}
+                className="shrink-0 p-0.5 text-white/0 group-hover/ch:text-white/30 hover:!text-red-400 transition-colors"
+                title={t("common.delete")}
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
           ))
         )}
       </div>

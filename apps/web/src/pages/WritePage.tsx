@@ -173,6 +173,21 @@ export default function WritePage() {
     deleteChapter.mutate({ id: selectedChapterId });
   }, [selectedChapterId, chapter, deleteChapter, t]);
 
+  const handleDeleteChapterById = useCallback((id: string) => {
+    const ch = sorted.find((c) => c._id === id);
+    if (!ch) return;
+    if (!window.confirm(t("write.deleteChapterConfirm", { name: ch.title }))) return;
+    if (id === selectedChapterId) {
+      deleteChapter.mutate({ id });
+    } else {
+      deleteChapter.mutate({ id }, {
+        onSuccess: () => {
+          chaptersQuery.refetch();
+        },
+      });
+    }
+  }, [sorted, selectedChapterId, deleteChapter, chaptersQuery, t]);
+
   const handleChapterSelect = useCallback((nextChapterId: string) => {
     setSelectedChapterId(nextChapterId);
     setSaveStatus("idle");
@@ -332,6 +347,7 @@ export default function WritePage() {
         onChapterSelect={handleChapterSelect}
         onChapterCreate={() => createChapter.mutate({ projectId, title: t("write.newChapter") })}
         onChapterRename={(id, title) => updateChapter.mutate({ id, data: { title } })}
+        onChapterDelete={handleDeleteChapterById}
         chapterCreating={createChapter.isPending}
         chatOpen={chatDrawerOpen}
       />
