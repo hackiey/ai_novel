@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import CharactersTab from "../components/CharactersTab.js";
 import WorldSettingsTab from "../components/WorldSettingsTab.js";
@@ -24,6 +24,11 @@ export default function WorldPage() {
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [showImportDialog, setShowImportDialog] = useState(false);
+
+  // Project editing
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [editProjectName, setEditProjectName] = useState("");
+  const [editProjectGenre, setEditProjectGenre] = useState("");
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -66,6 +71,9 @@ export default function WorldPage() {
   });
   const deleteProjectMut = trpc.project.delete.useMutation({
     onSuccess: () => { projectsQuery.refetch(); },
+  });
+  const updateProjectMut = trpc.project.update.useMutation({
+    onSuccess: () => { projectsQuery.refetch(); setEditingProjectId(null); },
   });
   const world = worldQuery.data;
   const projects = (projectsQuery.data ?? []) as any[];
@@ -164,32 +172,93 @@ export default function WorldPage() {
                 </div>
                 <div className="flex items-center gap-3 overflow-x-auto pb-2">
                   {projects.map((project: any) => (
-                    <Link
-                      key={project._id}
-                      to="/project/$projectId/write"
-                      params={{ projectId: project._id }}
-                      search={{ chapterId: undefined }}
-                      className="flex-shrink-0 group relative px-4 py-3 rounded-xl border border-white/10 bg-white/5 hover:border-teal-400/30 hover:bg-white/10 transition-all min-w-[160px] max-w-[220px]"
-                    >
-                      <div className="text-sm font-medium text-white/80 group-hover:text-teal-400 truncate pr-5">
-                        {project.name}
-                      </div>
-                      {project.settings?.genre && (
-                        <div className="text-[10px] text-white/40 mt-1 truncate">{project.settings.genre}</div>
-                      )}
-                      <button
-                        onClick={(e) => {
+                    editingProjectId === project._id ? (
+                      <form
+                        key={project._id}
+                        className="flex-shrink-0 flex items-center gap-2"
+                        onSubmit={(e) => {
                           e.preventDefault();
-                          e.stopPropagation();
-                          if (confirm(t("world.deleteConfirm", { name: project.name }))) {
-                            deleteProjectMut.mutate({ id: project._id });
-                          }
+                          if (!editProjectName.trim()) return;
+                          updateProjectMut.mutate({
+                            id: project._id,
+                            data: {
+                              name: editProjectName.trim(),
+                              settings: { genre: editProjectGenre.trim() },
+                            },
+                          });
                         }}
-                        className="absolute top-2 right-2 text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </Link>
+                        <input
+                          value={editProjectName}
+                          onChange={(e) => setEditProjectName(e.target.value)}
+                          placeholder={t("world.novelNamePlaceholder")}
+                          autoFocus
+                          className="w-36 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        />
+                        <input
+                          value={editProjectGenre}
+                          onChange={(e) => setEditProjectGenre(e.target.value)}
+                          placeholder={t("world.genrePlaceholder")}
+                          className="w-44 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        />
+                        <button
+                          type="submit"
+                          disabled={updateProjectMut.isPending || !editProjectName.trim()}
+                          className="px-3 py-2 text-sm rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 disabled:opacity-50 transition-colors"
+                        >
+                          {updateProjectMut.isPending ? "..." : t("world.save")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingProjectId(null)}
+                          className="px-2 py-2 text-sm text-white/40 hover:text-white/60"
+                        >
+                          {t("world.cancel")}
+                        </button>
+                      </form>
+                    ) : (
+                      <Link
+                        key={project._id}
+                        to="/project/$projectId/write"
+                        params={{ projectId: project._id }}
+                        search={{ chapterId: undefined }}
+                        className="flex-shrink-0 group relative px-4 py-3 rounded-xl border border-white/10 bg-white/5 hover:border-teal-400/30 hover:bg-white/10 transition-all min-w-[160px] max-w-[220px]"
+                      >
+                        <div className="text-sm font-medium text-white/80 group-hover:text-teal-400 truncate pr-10">
+                          {project.name}
+                        </div>
+                        {project.settings?.genre && (
+                          <div className="text-[10px] text-white/40 mt-1 truncate">{project.settings.genre}</div>
+                        )}
+                        <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setEditingProjectId(project._id);
+                              setEditProjectName(project.name);
+                              setEditProjectGenre(project.settings?.genre ?? "");
+                            }}
+                            className="text-white/20 hover:text-teal-400 transition-colors"
+                            title={t("common.edit")}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (confirm(t("world.deleteConfirm", { name: project.name }))) {
+                                deleteProjectMut.mutate({ id: project._id });
+                              }
+                            }}
+                            className="text-white/20 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </Link>
+                    )
                   ))}
 
                   {/* New Project button / form */}

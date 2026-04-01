@@ -81,6 +81,8 @@
   "world.backToHome": "Back to home",
   "world.novels": "Novels",
   "world.novelNamePlaceholder": "Novel name",
+  "world.genrePlaceholder": "Genre tags, e.g. Fantasy, Urban...",
+  "world.save": "Save",
   "world.add": "Add",
   "world.cancel": "Cancel",
   "world.newNovel": "New Novel",

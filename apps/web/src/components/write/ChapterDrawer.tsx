@@ -1,7 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Trash2 } from "lucide-react";
-import EditableText from "../EditableText.js";
+import { Pencil, Plus } from "lucide-react";
 
 interface ChapterDrawerProps {
   open: boolean;
@@ -11,7 +10,7 @@ interface ChapterDrawerProps {
   onSelect: (id: string) => void;
   onCreate: () => void;
   onRename: (id: string, title: string) => void;
-  onDelete: (id: string) => void;
+  onDelete?: (id: string) => void;
   creating: boolean;
 }
 
@@ -23,11 +22,13 @@ export default function ChapterDrawer({
   onSelect,
   onCreate,
   onRename,
-  onDelete,
   creating,
 }: ChapterDrawerProps) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   // Close on any click outside the popover
   useEffect(() => {
@@ -81,32 +82,55 @@ export default function ChapterDrawer({
                   ? "bg-white/15 text-white font-medium"
                   : "text-white/70 hover:bg-white/10 hover:text-white"
               }`}
-              onClick={() => onSelect(ch._id)}
+              onClick={() => {
+                if (editingId !== ch._id) {
+                  onSelect(ch._id);
+                  onClose();
+                }
+              }}
             >
-              <div className="flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
-                <EditableText
-                  value={ch.title}
-                  onSave={(title) => onRename(ch._id, title)}
-                  onClick={() => {
-                    onSelect(ch._id);
-                    onClose();
+              {editingId === ch._id ? (
+                <input
+                  ref={editInputRef}
+                  value={editDraft}
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  onBlur={() => {
+                    const trimmed = editDraft.trim();
+                    if (trimmed && trimmed !== ch.title) onRename(ch._id, trimmed);
+                    setEditingId(null);
                   }}
-                  className={`truncate block ${
-                    selectedChapterId === ch._id ? "text-white" : "text-white/70"
-                  }`}
-                  inputClassName="text-sm w-full bg-white/10 text-white border-white/20 rounded px-1"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const trimmed = editDraft.trim();
+                      if (trimmed && trimmed !== ch.title) onRename(ch._id, trimmed);
+                      setEditingId(null);
+                    }
+                    if (e.key === "Escape") setEditingId(null);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 min-w-0 text-sm bg-white/10 text-white border border-white/20 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-teal-400"
                 />
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(ch._id);
-                }}
-                className="shrink-0 p-0.5 text-white/0 group-hover/ch:text-white/30 hover:!text-red-400 transition-colors"
-                title={t("common.delete")}
-              >
-                <Trash2 className="w-3 h-3" />
-              </button>
+              ) : (
+                <>
+                  <span className={`flex-1 min-w-0 truncate ${
+                    selectedChapterId === ch._id ? "text-white" : "text-white/70"
+                  }`}>
+                    {ch.title}
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingId(ch._id);
+                      setEditDraft(ch.title);
+                      setTimeout(() => editInputRef.current?.focus(), 0);
+                    }}
+                    className="shrink-0 p-0.5 text-white/0 group-hover/ch:text-white/30 hover:!text-teal-400 transition-colors"
+                    title={t("common.edit")}
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                </>
+              )}
             </div>
           ))
         )}

@@ -87,6 +87,8 @@
   "world.backToHome": "返回首页",
   "world.novels": "小说",
   "world.novelNamePlaceholder": "小说名称",
+  "world.genrePlaceholder": "类型标签，如：奇幻、科幻...",
+  "world.save": "保存",
   "world.add": "添加",
   "world.cancel": "取消",
   "world.newNovel": "新建小说",
