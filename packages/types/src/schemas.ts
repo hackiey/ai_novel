@@ -222,6 +222,7 @@ export type UpdateDraft = z.infer<typeof updateDraftSchema>;
 // ============ Chapter (章节) ============
 
 export const chapterStatusSchema = z.enum(["draft", "revision", "final"]);
+export const synopsisStatusSchema = z.enum(["pending", "processing", "ready", "error"]);
 
 export const chapterSchema = z.object({
   _id: objectIdSchema,
@@ -230,7 +231,14 @@ export const chapterSchema = z.object({
   order: z.number().int().nonnegative(),
   title: z.string().min(1).max(200),
   content: z.string().default(""),
-  synopsis: z.string().max(5000).default(""),
+  synopsis: z.string().default(""),
+  synopsisSourceHash: z.string().optional(),
+  synopsisStatus: synopsisStatusSchema.optional(),
+  synopsisUpdatedAt: z.date().optional(),
+  synopsisLastAttemptAt: z.date().optional(),
+  synopsisError: z.string().optional(),
+  synopsisJobLockedAt: z.date().optional(),
+  synopsisJobToken: z.string().optional(),
   wordCount: z.number().int().nonnegative().default(0),
   status: chapterStatusSchema.default("draft"),
   embedding: z.array(z.number()).optional(),
@@ -243,7 +251,7 @@ export const createChapterSchema = z.object({
   order: z.number().int().nonnegative().optional(),
   title: z.string().min(1).max(200),
   content: z.string().optional(),
-  synopsis: z.string().max(5000).optional(),
+  synopsis: z.string().optional(),
   status: chapterStatusSchema.optional(),
 });
 

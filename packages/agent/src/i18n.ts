@@ -120,7 +120,7 @@ const zh = {
     get_chapter: "根据ID获取章节完整内容。",
     get_chapter_id: "章节ID",
 
-    list_chapters: "列出项目的所有章节，按章节顺序排列。projectId 已自动注入。",
+    list_chapters: "列出当前项目的章节信息：最近5万字范围内的章节返回完整正文，更早的章节仅返回摘要。每项都包含章节ID，便于后续通过 get_chapter 获取全文。projectId 已自动注入。",
 
     continue_writing: "续写章节。获取当前章节内容和前文上下文，供续写使用。返回章节内容和上下文信息，由AI根据这些信息生成续写内容。",
     continue_writing_chapterId: "要续写的章节ID",
@@ -303,7 +303,7 @@ const en: typeof zh = {
     get_chapter: "Get the full content of a chapter by ID.",
     get_chapter_id: "Chapter ID",
 
-    list_chapters: "List all chapters in the project, sorted by chapter order. projectId is auto-injected.",
+    list_chapters: "List chapter information for the current project: chapters covering the most recent 50,000 words return full content, while older chapters return only synopses. Every item includes the chapter ID so the agent can call get_chapter later for full text. projectId is auto-injected.",
 
     continue_writing: "Continue writing a chapter. Retrieves current chapter content and preceding context for continuation. Returns chapter content and context info for the AI to generate continuation.",
     continue_writing_chapterId: "Chapter ID to continue writing",

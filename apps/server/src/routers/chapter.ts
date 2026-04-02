@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { ObjectId } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 import { createChapterSchema, updateChapterSchema, objectIdSchema } from "@ai-creator/types";
+import { computeChapterSynopsisSourceHash } from "@ai-creator/agent";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 
@@ -17,6 +18,52 @@ function countWords(text: string): number {
   const stripped = text.replace(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g, " ");
   const words = stripped.split(/\s+/).filter(Boolean);
   return cjkCount + words.length;
+}
+
+function buildSynopsisCreateState(title: string, content: string, synopsisProvided: boolean, now: Date) {
+  const sourceHash = computeChapterSynopsisSourceHash({ title, content });
+
+  if (synopsisProvided || !content.trim()) {
+    return {
+      synopsisSourceHash: sourceHash,
+      synopsisStatus: "ready" as const,
+      synopsisUpdatedAt: now,
+    };
+  }
+
+  return {
+    synopsisStatus: "pending" as const,
+  };
+}
+
+async function markDependentChapterSynopsesPending(
+  db: Db,
+  args: { projectId: string; userId: string; fromOrder?: number; excludeId?: string; all?: boolean },
+): Promise<void> {
+  const filter: Record<string, unknown> = {
+    projectId: { $in: [args.projectId, new ObjectId(args.projectId)] },
+    userId: userIdFilter(args.userId),
+  };
+
+  if (!args.all && args.fromOrder !== undefined) {
+    filter.order = { $gte: args.fromOrder };
+  }
+
+  if (args.excludeId) {
+    filter._id = { $ne: new ObjectId(args.excludeId) };
+  }
+
+  await db.collection("chapters").updateMany(
+    filter,
+    {
+      $set: { synopsisStatus: "pending" },
+      $unset: {
+        synopsisJobLockedAt: "",
+        synopsisJobToken: "",
+        synopsisError: "",
+      },
+    },
+  );
 }
 
 export const chapterRouter = router({
@@ -65,12 +112,21 @@ export const chapterRouter = router({
         title: input.title,
         content,
         synopsis: input.synopsis ?? "",
+        ...buildSynopsisCreateState(input.title, content, input.synopsis !== undefined, now),
         wordCount,
         status: input.status ?? "draft",
         createdAt: now,
         updatedAt: now,
       };
       const result = await ctx.db.collection("chapters").insertOne(doc);
+      if (input.order !== undefined) {
+        await markDependentChapterSynopsesPending(ctx.db, {
+          projectId: input.projectId,
+          userId: ctx.user.userId,
+          fromOrder: order,
+          excludeId: result.insertedId.toHexString(),
+        });
+      }
       getEmbeddingService()?.enqueue("chapters", result.insertedId.toHexString());
       return serializeDoc({ _id: result.insertedId, ...doc });
     }),
@@ -78,15 +134,56 @@ export const chapterRouter = router({
   update: protectedProcedure
     .input(z.object({ id: objectIdSchema, data: updateChapterSchema }))
     .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.db
+        .collection("chapters")
+        .findOne({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
+      if (!existing) return null;
+
+      const existingTitle = typeof existing.title === "string" ? existing.title : "";
+      const existingContent = typeof existing.content === "string" ? existing.content : "";
+      const existingSynopsis = typeof existing.synopsis === "string" ? existing.synopsis : "";
+      const existingOrder = typeof existing.order === "number" ? existing.order : 0;
+      const nextTitle = input.data.title ?? existingTitle;
+      const nextContent = input.data.content ?? existingContent;
+      const nextSourceHash = computeChapterSynopsisSourceHash({ title: nextTitle, content: nextContent });
+      const titleChanged = input.data.title !== undefined && input.data.title !== existingTitle;
+      const contentChanged = input.data.content !== undefined && input.data.content !== existingContent;
+      const synopsisChanged = input.data.synopsis !== undefined && input.data.synopsis !== existingSynopsis;
+      const orderChanged = input.data.order !== undefined && input.data.order !== existingOrder;
       const updateFields: Record<string, any> = {
         updatedAt: new Date(),
       };
+      const unsetFields: Record<string, ""> = {};
+
       if (input.data.title !== undefined) updateFields.title = input.data.title;
       if (input.data.content !== undefined) {
         updateFields.content = input.data.content;
         updateFields.wordCount = countWords(input.data.content);
       }
-      if (input.data.synopsis !== undefined) updateFields.synopsis = input.data.synopsis;
+
+      if (titleChanged || contentChanged || orderChanged || synopsisChanged) {
+        unsetFields.synopsisJobLockedAt = "";
+        unsetFields.synopsisJobToken = "";
+        unsetFields.synopsisError = "";
+      }
+
+      if (input.data.synopsis === undefined && (titleChanged || contentChanged || orderChanged)) {
+        if (!nextContent.trim()) {
+          updateFields.synopsis = "";
+          updateFields.synopsisSourceHash = nextSourceHash;
+          updateFields.synopsisStatus = "ready";
+          updateFields.synopsisUpdatedAt = updateFields.updatedAt;
+        } else {
+          updateFields.synopsisStatus = "pending";
+        }
+      }
+
+      if (input.data.synopsis !== undefined) {
+        updateFields.synopsis = input.data.synopsis;
+        updateFields.synopsisSourceHash = nextSourceHash;
+        updateFields.synopsisStatus = "ready";
+        updateFields.synopsisUpdatedAt = updateFields.updatedAt;
+      }
       if (input.data.status !== undefined) updateFields.status = input.data.status;
       if (input.data.order !== undefined) updateFields.order = input.data.order;
 
@@ -94,19 +191,47 @@ export const chapterRouter = router({
         .collection("chapters")
         .findOneAndUpdate(
           { _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) },
-          { $set: updateFields },
+          Object.keys(unsetFields).length > 0
+            ? { $set: updateFields, $unset: unsetFields }
+            : { $set: updateFields },
           { returnDocument: "after" }
         );
-      if (result) getEmbeddingService()?.enqueue("chapters", input.id);
+      if (result) {
+        const projectId = typeof existing.projectId === "string" ? existing.projectId : existing.projectId.toHexString();
+        if (orderChanged) {
+          await markDependentChapterSynopsesPending(ctx.db, {
+            projectId,
+            userId: ctx.user.userId,
+            all: true,
+            excludeId: input.id,
+          });
+        } else if (titleChanged || contentChanged || synopsisChanged) {
+          await markDependentChapterSynopsesPending(ctx.db, {
+            projectId,
+            userId: ctx.user.userId,
+            fromOrder: existingOrder,
+            excludeId: input.id,
+          });
+        }
+        getEmbeddingService()?.enqueue("chapters", input.id);
+      }
       return serializeDoc(result);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: objectIdSchema }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.db
+      const deleted = await ctx.db
         .collection("chapters")
-        .deleteOne({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
+        .findOneAndDelete({ _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) });
+      if (deleted) {
+        const projectId = typeof deleted.projectId === "string" ? deleted.projectId : deleted.projectId.toHexString();
+        await markDependentChapterSynopsesPending(ctx.db, {
+          projectId,
+          userId: ctx.user.userId,
+          fromOrder: typeof deleted.order === "number" ? deleted.order : 0,
+        });
+      }
       return { success: true };
     }),
 
@@ -133,6 +258,11 @@ export const chapterRouter = router({
 
       if (bulkOps.length > 0) {
         await ctx.db.collection("chapters").bulkWrite(bulkOps);
+        await markDependentChapterSynopsesPending(ctx.db, {
+          projectId: input.projectId,
+          userId: ctx.user.userId,
+          all: true,
+        });
       }
 
       const docs = await ctx.db

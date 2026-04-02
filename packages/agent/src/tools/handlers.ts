@@ -1,4 +1,5 @@
 import { Db, ObjectId } from "mongodb";
+import { computeChapterSynopsisSourceHash } from "../chapterSynopsis.js";
 
 // Helper to convert string ID to ObjectId safely
 function toObjectId(id: string): ObjectId {
@@ -299,6 +300,46 @@ export async function deleteWorldSetting(
 
 // ============ Chapter Handlers ============
 
+const RECENT_CHAPTER_WORD_BUDGET = 50_000;
+
+function countChapterWords(text: string): number {
+  if (!text) return 0;
+  const cjk = text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g);
+  const cjkCount = cjk ? cjk.length : 0;
+  const stripped = text.replace(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g, " ");
+  const words = stripped.split(/\s+/).filter(Boolean);
+  return cjkCount + words.length;
+}
+
+async function markDependentChapterSynopsesPending(
+  db: Db,
+  args: { projectId: ObjectId; fromOrder?: number; excludeId?: ObjectId; all?: boolean },
+): Promise<void> {
+  const filter: Record<string, unknown> = {
+    projectId: args.projectId,
+  };
+
+  if (!args.all && args.fromOrder !== undefined) {
+    filter.order = { $gte: args.fromOrder };
+  }
+
+  if (args.excludeId) {
+    filter._id = { $ne: args.excludeId };
+  }
+
+  await db.collection("chapters").updateMany(
+    filter,
+    {
+      $set: { synopsisStatus: "pending" },
+      $unset: {
+        synopsisJobLockedAt: "",
+        synopsisJobToken: "",
+        synopsisError: "",
+      },
+    },
+  );
+}
+
 export async function getChapter(
   args: { id: string },
   db: Db
@@ -319,7 +360,39 @@ export async function listChapters(
     .find({ projectId: new ObjectId(args.projectId) })
     .sort({ order: 1 })
     .toArray();
-  return serialize(chapters);
+
+  let recentWordCount = 0;
+  let recentStartIndex = chapters.length;
+
+  for (let i = chapters.length - 1; i >= 0; i -= 1) {
+    recentWordCount += countChapterWords(chapters[i].content ?? "");
+    recentStartIndex = i;
+    if (recentWordCount >= RECENT_CHAPTER_WORD_BUDGET) break;
+  }
+
+  const historicalChapters = chapters.slice(0, recentStartIndex).map((chapter) => ({
+    id: chapter._id.toHexString(),
+    order: chapter.order,
+    title: chapter.title,
+    wordCount: countChapterWords(chapter.content ?? ""),
+    synopsis: chapter.synopsis || (chapter.content ?? "").slice(0, 200),
+  }));
+
+  const recentChapters = chapters.slice(recentStartIndex).map((chapter) => ({
+    id: chapter._id.toHexString(),
+    order: chapter.order,
+    title: chapter.title,
+    wordCount: countChapterWords(chapter.content ?? ""),
+    synopsis: chapter.synopsis ?? "",
+    content: chapter.content ?? "",
+  }));
+
+  return {
+    recentWordBudget: RECENT_CHAPTER_WORD_BUDGET,
+    recentWordCount,
+    historicalChapters,
+    recentChapters,
+  };
 }
 
 export async function createChapter(
@@ -329,6 +402,7 @@ export async function createChapter(
 ): Promise<unknown> {
   const now = new Date();
   const content = args.content ?? "";
+  const sourceHash = computeChapterSynopsisSourceHash({ title: args.title, content });
 
   let order = args.order;
   if (order === undefined) {
@@ -347,13 +421,29 @@ export async function createChapter(
     title: args.title,
     content,
     synopsis: args.synopsis ?? "",
-    wordCount: content.length,
+    ...(args.synopsis !== undefined || !content.trim()
+      ? {
+          synopsisSourceHash: sourceHash,
+          synopsisStatus: "ready",
+          synopsisUpdatedAt: now,
+        }
+      : {
+          synopsisStatus: "pending",
+        }),
+    wordCount: countChapterWords(content),
     status: "draft",
     createdAt: now,
     updatedAt: now,
   };
   if (userId) doc.userId = userId;
   const result = await db.collection("chapters").insertOne(doc);
+  if (args.order !== undefined) {
+    await markDependentChapterSynopsesPending(db, {
+      projectId: new ObjectId(args.projectId),
+      fromOrder: order,
+      excludeId: result.insertedId,
+    });
+  }
   return serialize({ ...doc, _id: result.insertedId });
 }
 
@@ -391,6 +481,7 @@ export async function continueWriting(
       status: chapter.status,
     },
     previousChapters: prevChapters.reverse().map((ch) => ({
+      id: ch._id.toHexString(),
       title: ch.title,
       order: ch.order,
       synopsis: ch.synopsis || (ch.content ?? "").slice(-1000),
@@ -419,6 +510,8 @@ export async function updateChapter(
   if (!doc) return { error: `Chapter not found: ${id}` };
 
   const currentValue = typeof doc[field] === "string" ? doc[field] : "";
+  const currentTitle = typeof doc.title === "string" ? doc.title : "";
+  const currentContent = typeof doc.content === "string" ? doc.content : "";
 
   let newValue: string;
 
@@ -437,15 +530,57 @@ export async function updateChapter(
     newValue = currentValue.replace(old_string, new_string);
   }
 
+  const fieldChanged = newValue !== currentValue;
   const setFields: Record<string, unknown> = { [field]: newValue, updatedAt: new Date() };
+  const unsetFields: Record<string, ""> = {};
+  if (fieldChanged && (field === "title" || field === "content" || field === "synopsis")) {
+    unsetFields.synopsisJobLockedAt = "";
+    unsetFields.synopsisJobToken = "";
+    unsetFields.synopsisError = "";
+  }
+
   if (field === "content") {
-    setFields.wordCount = newValue.length;
+    const newSourceHash = computeChapterSynopsisSourceHash({ title: currentTitle, content: newValue });
+    setFields.wordCount = countChapterWords(newValue);
+    if (!newValue.trim()) {
+      setFields.synopsis = "";
+      setFields.synopsisStatus = "ready";
+      setFields.synopsisSourceHash = newSourceHash;
+      setFields.synopsisUpdatedAt = setFields.updatedAt;
+    } else {
+      setFields.synopsisStatus = "pending";
+    }
+  }
+  if (field === "title") {
+    const newSourceHash = computeChapterSynopsisSourceHash({ title: newValue, content: currentContent });
+    if (!currentContent.trim()) {
+      setFields.synopsis = "";
+      setFields.synopsisSourceHash = newSourceHash;
+      setFields.synopsisStatus = "ready";
+      setFields.synopsisUpdatedAt = setFields.updatedAt;
+    } else {
+      setFields.synopsisStatus = "pending";
+    }
+  }
+  if (field === "synopsis") {
+    setFields.synopsisSourceHash = computeChapterSynopsisSourceHash({ title: currentTitle, content: currentContent });
+    setFields.synopsisStatus = "ready";
+    setFields.synopsisUpdatedAt = setFields.updatedAt;
   }
   const result = await db.collection("chapters").findOneAndUpdate(
     { _id: toObjectId(id) },
-    { $set: setFields },
+    Object.keys(unsetFields).length > 0
+      ? { $set: setFields, $unset: unsetFields }
+      : { $set: setFields },
     { returnDocument: "after" }
   );
+  if (result && fieldChanged && (field === "title" || field === "content" || field === "synopsis")) {
+    await markDependentChapterSynopsesPending(db, {
+      projectId: doc.projectId as ObjectId,
+      fromOrder: typeof doc.order === "number" ? doc.order : 0,
+      excludeId: doc._id as ObjectId,
+    });
+  }
   return serialize(result);
 }
 
@@ -457,6 +592,10 @@ export async function deleteChapter(
     .collection("chapters")
     .findOneAndDelete({ _id: toObjectId(args.id) });
   if (!result) return { error: `Chapter not found: ${args.id}` };
+  await markDependentChapterSynopsesPending(db, {
+    projectId: result.projectId as ObjectId,
+    fromOrder: typeof result.order === "number" ? result.order : 0,
+  });
   await db.collection("embedding_chunks").deleteMany({
     sourceId: toObjectId(args.id),
     sourceCollection: "chapters",

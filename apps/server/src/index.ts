@@ -7,6 +7,7 @@ import { connectDb, disconnectDb } from "./db.js";
 import { createContext } from "./trpc.js";
 import { appRouter, AppRouter } from "./routers/index.js";
 import { initEmbeddingService } from "./services/embeddingService.js";
+import { ChapterSynopsisService } from "./services/chapterSynopsisService.js";
 import { registerAgentRoutes } from "./routes/agentStream.js";
 import { registerFileImportRoutes } from "./routes/fileImport.js";
 
@@ -31,6 +32,7 @@ async function main() {
 
   // Connect to MongoDB
   const db = await connectDb(MONGODB_URI);
+  const chapterSynopsisService = new ChapterSynopsisService(db);
 
   // Initialize embedding service (optional — requires EMBEDDING_API_KEY or OPENAI_API_KEY)
   const embeddingApiKey = process.env.EMBEDDING_API_KEY || process.env.OPENAI_API_KEY;
@@ -105,6 +107,9 @@ async function main() {
   // Register file import routes
   registerFileImportRoutes(fastify);
 
+  // Start background chapter synopsis generation
+  chapterSynopsisService.start();
+
   // Health check endpoint
   fastify.get("/health", async () => {
     return { status: "ok" };
@@ -113,6 +118,7 @@ async function main() {
   // Graceful shutdown
   const shutdown = async () => {
     fastify.log.info("Shutting down...");
+    chapterSynopsisService.stop();
     await fastify.close();
     await disconnectDb();
     process.exit(0);
