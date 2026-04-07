@@ -104,6 +104,8 @@ export function useAgentChat(worldId: string) {
   );
 
   const modelsQuery = trpc.agent.getModels.useQuery();
+  const activeSession = sessionsQuery.data?.find((session: any) => session.sessionId === sessionId) as any;
+  const currentModelSpec = selectedModel || activeSession?.model || modelsQuery.data?.default;
 
   const truncateMut = trpc.agent.truncateMessages.useMutation();
 
@@ -164,7 +166,7 @@ export function useAgentChat(worldId: string) {
       try {
         const token = getTokenSync();
         const baseUrl = getApiBaseUrlSync();
-        const modelToUse = model || selectedModel;
+        const modelToUse = model || currentModelSpec;
 
         await sseRequest(
           `${baseUrl}/api/agent/chat`,
@@ -262,7 +264,7 @@ export function useAgentChat(worldId: string) {
         abortRef.current = null;
       }
     },
-    [isLoading, sessionId, worldId, selectedModel, queryClient, sessionsQuery]
+    [currentModelSpec, isLoading, sessionId, worldId, queryClient, sessionsQuery]
   );
 
   const truncateAndResend = useCallback(

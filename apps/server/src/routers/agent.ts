@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
+import { getModelContextWindowFromSpec } from "@ai-creator/agent";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { objectIdSchema } from "@ai-creator/types";
 import { sessions } from "../routes/agentStream.js";
@@ -14,7 +15,16 @@ const AVAILABLE_MODELS = (process.env.AVAILABLE_MODELS || DEFAULT_MODEL)
 export const agentRouter = router({
   getModels: protectedProcedure.query(async ({ ctx }) => {
     const allowed = await getUserAllowedModels(ctx.db, ctx.user.userId, AVAILABLE_MODELS);
-    return { available: allowed, default: allowed[0] };
+    const contextWindows = Object.fromEntries(
+      allowed.map((modelSpec) => {
+        try {
+          return [modelSpec, getModelContextWindowFromSpec(modelSpec)];
+        } catch {
+          return [modelSpec, 0];
+        }
+      }),
+    );
+    return { available: allowed, default: allowed[0], contextWindows };
   }),
 
   listSessions: protectedProcedure
@@ -67,6 +77,17 @@ export const agentRouter = router({
         sessionId: input.sessionId,
         createdAt: { $gte: new Date(input.afterCreatedAt) },
       });
+
+      await ctx.db.collection("agent_sessions").updateOne(
+        {
+          sessionId: input.sessionId,
+          userId: userIdFilter(ctx.user.userId),
+        },
+        {
+          $unset: { compaction: "", usage: "" },
+          $set: { updatedAt: new Date() },
+        },
+      );
 
       // Clear cached agent session since history changed
       const cached = sessions.get(input.sessionId);

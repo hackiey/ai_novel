@@ -1,6 +1,7 @@
 import { getModel, type Model, type Api, type UserMessage, type Message, type SimpleStreamOptions, type ThinkingLevel } from "@mariozechner/pi-ai";
 import { runAgentLoop, type AgentContext, type AgentEvent as PiAgentEvent, type AgentLoopConfig, type AgentMessage } from "@mariozechner/pi-agent-core";
 import type { Db } from "mongodb";
+import { compactConversation, getContextCompactionThreshold } from "./compaction.js";
 import { buildSystemPromptWithContext } from "./systemPrompt.js";
 import { createNovelTools } from "./tools/index.js";
 import type { VectorSearchFn, OnDocumentChangedFn, OnWorldSummaryStaleFn } from "./tools/index.js";
@@ -81,8 +82,9 @@ export class CreatorAgentSession {
     locale?: Locale;
     projectMemory?: string;
     workingEnvironment?: string;
+    conversationSummary?: string;
   } = {}): AsyncGenerator<AgentEvent> {
-    const { historyMessages, memory, worldSummary, locale = "zh", projectMemory, workingEnvironment } = options;
+    const { historyMessages, memory, worldSummary, locale = "zh", projectMemory, workingEnvironment, conversationSummary } = options;
     const systemPrompt = buildSystemPromptWithContext(
       this.projectId,
       this.worldId,
@@ -91,6 +93,7 @@ export class CreatorAgentSession {
       locale,
       projectMemory,
       workingEnvironment,
+      conversationSummary,
     );
 
     const tools = createNovelTools(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale, locale, this.worldId, this.projectId);
@@ -281,5 +284,31 @@ export class CreatorAgentSession {
       this.abortController.abort();
       this.abortController = undefined;
     }
+  }
+
+  getContextWindow(): number {
+    return this.model.contextWindow || 0;
+  }
+
+  getContextCompactionThreshold(configuredThreshold?: number): number {
+    return getContextCompactionThreshold({
+      configuredThreshold,
+      contextWindow: this.model.contextWindow,
+    });
+  }
+
+  async compactHistory(options: {
+    transcript: string;
+    existingSummary?: string;
+    locale?: Locale;
+  }): Promise<string> {
+    return compactConversation({
+      apiKey: this.apiKey,
+      model: this.model,
+      reasoning: this.reasoning,
+      transcript: options.transcript,
+      existingSummary: options.existingSummary,
+      locale: options.locale,
+    });
   }
 }

@@ -1,9 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { ObjectId } from "mongodb";
-import { CreatorAgentSession, getOrRefreshWorldSummary, resolveLocale } from "@ai-creator/agent";
+import { CreatorAgentSession, getOrRefreshWorldSummary, parseModelSpec, resolveLocale } from "@ai-creator/agent";
 import type { VectorSearchFn, Locale, Message } from "@ai-creator/agent";
 import { getDb } from "../db.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
+import { getStoredCompactionState, getUsageStateFromEvents, maybeCompactHistory } from "../services/agentCompactionService.js";
 import { verifyToken, type JwtPayload } from "../auth/jwt.js";
 import { getUserAllowedModels } from "../auth/permissionGroups.js";
 
@@ -19,32 +20,6 @@ const AVAILABLE_MODELS = (process.env.AVAILABLE_MODELS || DEFAULT_MODEL)
 
 const VALID_REASONING = ["minimal", "low", "medium", "high", "xhigh"] as const;
 type ReasoningLevel = typeof VALID_REASONING[number];
-
-function parseModelSpec(spec: string): { provider: string; modelId: string; reasoning?: ReasoningLevel } {
-  // Format: provider:modelId/reasoning (reasoning is optional)
-  // e.g. "openai:gpt-5.4/medium", "anthropic:claude-opus-4-6/high", "openai:gpt-4o"
-  const idx = spec.indexOf(":");
-  let provider: string;
-  let rest: string;
-  if (idx === -1) {
-    // Legacy format: assume anthropic provider for bare model IDs
-    provider = "anthropic";
-    rest = spec;
-  } else {
-    provider = spec.slice(0, idx);
-    rest = spec.slice(idx + 1);
-  }
-
-  const slashIdx = rest.lastIndexOf("/");
-  if (slashIdx !== -1) {
-    const maybReasoning = rest.slice(slashIdx + 1);
-    if (VALID_REASONING.includes(maybReasoning as ReasoningLevel)) {
-      return { provider, modelId: rest.slice(0, slashIdx), reasoning: maybReasoning as ReasoningLevel };
-    }
-  }
-
-  return { provider, modelId: rest };
-}
 
 function extractUser(request: { headers: { authorization?: string } }): JwtPayload | null {
   const auth = request.headers.authorization;
@@ -167,6 +142,12 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     // Send sessionId as first event
     reply.raw.write(`data: ${JSON.stringify({ type: "session", sessionId })}\n\n`);
 
+    const sessionDoc = await db.collection("agent_sessions").findOne({
+      sessionId,
+      userId: user.userId,
+    });
+    const storedCompaction = getStoredCompactionState(sessionDoc as Record<string, any> | null | undefined);
+
     // Save user message to DB
     const now = new Date();
     await db.collection("agent_messages").insertOne({
@@ -178,27 +159,16 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     });
 
     // Load conversation history as structured Message[] from DB
+    const historyFilter: Record<string, unknown> = { sessionId };
+    historyFilter.createdAt = storedCompaction.cutoffCreatedAt
+      ? { $gte: storedCompaction.cutoffCreatedAt, $lt: now }
+      : { $lt: now };
+
     const historyDocs = await db
       .collection("agent_messages")
-      .find({ sessionId, createdAt: { $lt: now } })
+      .find(historyFilter)
       .sort({ createdAt: 1 })
       .toArray();
-
-    const historyMessages: Message[] = historyDocs.flatMap((doc) => {
-      // New format: assistant messages store full Message[] in `messages` field
-      if (doc.role === "assistant" && Array.isArray(doc.messages)) {
-        return doc.messages as Message[];
-      }
-      // User messages: reconstruct UserMessage
-      if (doc.role === "user") {
-        return [{
-          role: "user" as const,
-          content: (doc.content as string) || "",
-          timestamp: new Date(doc.createdAt).getTime(),
-        }];
-      }
-      return [];
-    });
 
     // Load agent memory for this world
     let memoryContent: string | undefined;
@@ -267,14 +237,34 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     let fullText = "";
     let turnMessages: Message[] = [];
 
+    const compactionState = await maybeCompactHistory({
+      db,
+      sessionId,
+      userId: user.userId,
+      selectedModel,
+      session,
+      sessionDoc: sessionDoc as Record<string, any> | null | undefined,
+      historyDocs,
+      currentTurnCreatedAt: now,
+      worldId,
+      message,
+      locale,
+    });
+
+    if (compactionState.compactionEvent) {
+      reply.raw.write(`data: ${JSON.stringify(compactionState.compactionEvent)}\n\n`);
+      allEvents.push(compactionState.compactionEvent);
+    }
+
     try {
       for await (const event of session.chat(message, {
-        historyMessages,
+        historyMessages: compactionState.historyMessages,
         memory: memoryContent,
         worldSummary,
         locale,
         projectMemory: projectMemoryContent,
         workingEnvironment,
+        conversationSummary: compactionState.conversationSummary,
       })) {
         if (event.type === "messages") {
           // Capture structured messages but don't send to client
@@ -305,16 +295,27 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       createdAt: new Date(),
     });
 
+    const usageState = getUsageStateFromEvents(allEvents);
+
     // Create or update session document
     const title = message.slice(0, 30) + (message.length > 30 ? "..." : "");
+    const sessionSetFields: Record<string, unknown> = {
+      worldId: worldId || "",
+      model: selectedModel,
+      updatedAt: new Date(),
+    };
+    if (usageState) {
+      sessionSetFields.usage = {
+        ...usageState,
+        modelContextWindow: session.getContextWindow(),
+        updatedAt: new Date(),
+      };
+    }
+
     await db.collection("agent_sessions").updateOne(
       { sessionId },
       {
-        $set: {
-          worldId: worldId || "",
-          model: selectedModel,
-          updatedAt: new Date(),
-        },
+        $set: sessionSetFields,
         $setOnInsert: {
           sessionId,
           userId: user.userId,

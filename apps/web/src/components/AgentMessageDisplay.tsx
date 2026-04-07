@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 
 export interface AgentEvent {
-  type: "text" | "tool_use" | "tool_result" | "done" | "error" | "session" | "usage";
+  type: "text" | "tool_use" | "tool_result" | "done" | "error" | "session" | "usage" | "compaction";
   text?: string;
   toolName?: string;
   toolInput?: any;
@@ -14,6 +14,9 @@ export interface AgentEvent {
   fullResponse?: string;
   error?: string;
   sessionId?: string;
+  message?: string;
+  threshold?: number;
+  contextTokens?: number;
   usage?: {
     model: string;
     input: number;
@@ -28,6 +31,7 @@ export interface AgentEvent {
 
 type Segment =
   | { type: "text"; content: string }
+  | { type: "status"; content: string }
   | { type: "tools"; calls: Array<{ toolName: string; toolInput?: any; result?: string; pending?: boolean }> };
 
 /** Split flat event list into ordered text/tool segments */
@@ -65,6 +69,18 @@ export function buildSegments(events: AgentEvent[] | undefined, content: string,
         toolUseList[resultIdx].result = ev.result;
         toolUseList[resultIdx].pending = false;
         resultIdx++;
+      }
+    } else if (ev.type === "compaction") {
+      if (currentToolGroup) {
+        segments.push(currentToolGroup);
+        currentToolGroup = null;
+      }
+      if (textAcc.trim()) {
+        segments.push({ type: "text", content: textAcc });
+        textAcc = "";
+      }
+      if (ev.message) {
+        segments.push({ type: "status", content: ev.message });
       }
     }
   }
@@ -230,6 +246,22 @@ export function AssistantMessageContent({ events, content, isStreaming, immersiv
             </div>
           );
         }
+
+        if (seg.type === "status") {
+          return (
+            <div
+              key={i}
+              className={`max-w-[90%] rounded-lg border px-3 py-2 text-xs ${
+                immersive
+                  ? "border-amber-300/20 bg-amber-300/10 text-amber-100/80"
+                  : "border-amber-200 bg-amber-50 text-amber-800"
+              }`}
+            >
+              {seg.content}
+            </div>
+          );
+        }
+
         return (
           <div key={i} className="space-y-1 max-w-[90%]">
             {seg.calls.map((call, j) => (

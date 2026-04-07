@@ -87,6 +87,7 @@ Useful optional variables:
 - `AVAILABLE_MODELS` — comma-separated list in `provider:modelId` format (e.g. `openai:gpt-4o,anthropic:claude-sonnet-4-6`)
 - `DEFAULT_MODEL` — default model in `provider:modelId` format
 - `DEFAULT_REASONING` — reasoning level: `minimal`, `low`, `medium`, `high`, `xhigh`
+- `CONTEXT_COMPACTION_THRESHOLD` — unified context compaction threshold in tokens. Defaults to `150000`; the server uses `min(CONTEXT_COMPACTION_THRESHOLD, modelContextWindow * 0.8)`
 - `EMBEDDING_API_KEY`, `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS`
 - `PORT`
 - `JWT_EXPIRES_IN`

@@ -86,6 +86,7 @@ pnpm dev:all
 - `AVAILABLE_MODELS` — 逗号分隔，格式为 `provider:modelId`（如 `openai:gpt-4o,anthropic:claude-sonnet-4-6`）
 - `DEFAULT_MODEL` — 默认模型，格式为 `provider:modelId`
 - `DEFAULT_REASONING` — 推理级别：`minimal`、`low`、`medium`、`high`、`xhigh`
+- `CONTEXT_COMPACTION_THRESHOLD` — 统一的上下文压缩阈值，单位 token，默认 `150000`；服务端实际使用 `min(CONTEXT_COMPACTION_THRESHOLD, modelContextWindow * 0.8)`
 - `EMBEDDING_API_KEY`、`EMBEDDING_BASE_URL`、`EMBEDDING_MODEL`、`EMBEDDING_DIMENSIONS`
 - `PORT`
 - `JWT_EXPIRES_IN`

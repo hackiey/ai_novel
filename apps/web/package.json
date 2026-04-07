@@ -27,6 +27,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@ai-creator/agent": "workspace:*",
     "@tailwindcss/vite": "^4.0.0",
     "@types/diff": "^8.0.0",
     "@types/react": "^19.0.0",

@@ -1,4 +1,14 @@
 export { buildSystemPrompt, buildSystemPromptWithContext } from "./systemPrompt.js";
+export {
+  compactConversation,
+  DEFAULT_COMPACTION_PROTECTED_USER_TURNS,
+  DEFAULT_CONTEXT_COMPACTION_THRESHOLD,
+  estimateContextTokens,
+  estimateMessageTokens,
+  estimateTokens,
+  getContextCompactionThreshold,
+} from "./compaction.js";
+export { getModelContextWindowFromSpec, parseModelSpec } from "./modelSpec.js";
 export { createNovelTools } from "./tools/index.js";
 export type { VectorSearchFn, OnDocumentChangedFn, OnWorldSummaryStaleFn } from "./tools/index.js";
 export { CreatorAgentSession } from "./session.js";

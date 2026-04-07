@@ -26,12 +26,17 @@ export function buildSystemPromptWithContext(
   locale: Locale = "zh",
   projectMemory?: string,
   workingEnvironment?: string,
+  conversationSummary?: string,
 ): string {
   const texts = t(locale);
   let prompt = buildSystemPrompt(projectId, worldId, locale);
 
   if (workingEnvironment) {
     prompt += `\n\n${texts.workingEnvironmentHeading}\n\n${workingEnvironment}`;
+  }
+
+  if (conversationSummary) {
+    prompt += `\n\n${texts.conversationSummaryHeading}\n\n${texts.conversationSummaryIntro}\n\n${conversationSummary}`;
   }
 
   if (worldSummary) {

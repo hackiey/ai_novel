@@ -43,6 +43,13 @@ interface Props {
   variant?: "default" | "immersive";
 }
 
+function formatTokenK(value: number | undefined): string {
+  if (!value || value <= 0) return "0k";
+  const scaled = value / 1000;
+  const formatted = scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1);
+  return `${formatted.replace(/\.0$/, "")}k`;
+}
+
 export default function AgentChatPanel({ projectId, worldId, currentChapterId, onAgentAppend, onChapterEdit, variant = "default" }: Props) {
   const imm = variant === "immersive";
   const { t, i18n } = useTranslation();
@@ -100,6 +107,13 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
     { worldId: worldId! },
     { enabled: !!worldId },
   );
+  const activeSession = sessionsQuery.data?.find((session: any) => session.sessionId === sessionId) as any;
+  const currentModelSpec = selectedModel || activeSession?.model || modelsQuery.data?.default;
+  const currentContextTokens = activeSession?.usage?.maxContextTokens ?? activeSession?.usage?.lastContextTokens ?? 0;
+  const currentModelContextWindow = activeSession?.usage?.modelContextWindow
+    ?? (currentModelSpec ? modelsQuery.data?.contextWindows?.[currentModelSpec] : undefined)
+    ?? 0;
+  const tokenLabel = i18n.language.startsWith("zh") ? "当前上下文" : "Context";
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -170,7 +184,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ projectId, worldId, message: text, sessionId, locale: i18n.language, model: selectedModel, currentChapterId }),
+          body: JSON.stringify({ projectId, worldId, message: text, sessionId, locale: i18n.language, model: currentModelSpec, currentChapterId }),
         signal: controller.signal,
       });
 
@@ -235,7 +249,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
               });
             }
 
-            if (event.type === "tool_use" || event.type === "tool_result") {
+            if (event.type === "tool_use" || event.type === "tool_result" || event.type === "compaction") {
               if (event.type === "tool_use" && event.toolName) mutatedTools.push(event.toolName);
               // Update events list in real-time
               setMessages((prev) => {
@@ -451,9 +465,9 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
         <div className="flex items-center gap-1.5">
           {!showMemory && modelsQuery.data && modelsQuery.data.available.length >= 1 && (
             <div className="relative">
-              <select
-                value={selectedModel || modelsQuery.data.default}
-                onChange={(e) => setSelectedModel(e.target.value)}
+                <select
+                  value={currentModelSpec || modelsQuery.data.default}
+                  onChange={(e) => setSelectedModel(e.target.value)}
                 className={`appearance-none text-xs rounded-md pl-2 pr-6 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer ${
                   imm
                     ? "bg-white/10 border border-white/15 text-white/80 hover:bg-white/15"
@@ -755,6 +769,9 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                   {t("chat.send")}
                 </button>
               )}
+            </div>
+            <div className={`mt-1 px-1 text-[11px] ${imm ? "text-white/35" : "text-gray-400"}`}>
+              {tokenLabel} {formatTokenK(currentContextTokens)} / {currentModelContextWindow > 0 ? formatTokenK(currentModelContextWindow) : "--"}
             </div>
           </div>
         </>

@@ -1,5 +1,5 @@
 export interface AgentEvent {
-  type: "text" | "tool_use" | "tool_result" | "done" | "error" | "session";
+  type: "text" | "tool_use" | "tool_result" | "done" | "error" | "session" | "compaction";
   text?: string;
   toolName?: string;
   toolInput?: any;
@@ -7,6 +7,9 @@ export interface AgentEvent {
   fullResponse?: string;
   error?: string;
   sessionId?: string;
+  message?: string;
+  threshold?: number;
+  contextTokens?: number;
 }
 
 export interface ChatMessage {
@@ -18,6 +21,7 @@ export interface ChatMessage {
 
 export type Segment =
   | { type: "text"; content: string }
+  | { type: "status"; content: string }
   | {
       type: "tools";
       calls: Array<{
@@ -76,6 +80,18 @@ export function buildSegments(
         toolUseList[resultIdx].result = ev.result;
         toolUseList[resultIdx].pending = false;
         resultIdx++;
+      }
+    } else if (ev.type === "compaction") {
+      if (currentToolGroup) {
+        segments.push(currentToolGroup);
+        currentToolGroup = null;
+      }
+      if (textAcc.trim()) {
+        segments.push({ type: "text", content: textAcc });
+        textAcc = "";
+      }
+      if (ev.message) {
+        segments.push({ type: "status", content: ev.message });
       }
     }
   }

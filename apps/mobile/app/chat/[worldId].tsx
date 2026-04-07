@@ -35,6 +35,13 @@ function formatModelName(model: string) {
     .replace(/-\d{8}$/, "");
 }
 
+function formatTokenK(value: number | undefined) {
+  if (!value || value <= 0) return "0k";
+  const scaled = value / 1000;
+  const formatted = scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1);
+  return `${formatted.replace(/\.0$/, "")}k`;
+}
+
 function AssistantMessageContent({
   events,
   content,
@@ -72,6 +79,15 @@ function AssistantMessageContent({
             </View>
           );
         }
+
+        if (seg.type === "status") {
+          return (
+            <View key={i} style={chatStyles.statusBubble}>
+              <Text style={chatStyles.statusText}>{seg.content}</Text>
+            </View>
+          );
+        }
+
         return (
           <View key={i} style={chatStyles.toolBlockWrap}>
             {seg.calls.map((call, j) => (
@@ -86,7 +102,7 @@ function AssistantMessageContent({
 
 export default function ChatScreen() {
   const { worldId } = useLocalSearchParams<{ worldId: string }>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { colors, baseStyles: base, fontFamily, themeVariant } = useTheme();
   const insets = useSafeAreaInsets();
   const [input, setInput] = useState("");
@@ -200,7 +216,13 @@ export default function ChatScreen() {
 
   const models = modelsQuery.data?.available ?? [];
   const defaultModel = modelsQuery.data?.default;
-  const currentModel = selectedModel || defaultModel || "";
+  const activeSession = sessionsQuery.data?.find((session: any) => session.sessionId === sessionId) as any;
+  const currentModel = selectedModel || activeSession?.model || defaultModel || "";
+  const currentContextTokens = activeSession?.usage?.maxContextTokens ?? activeSession?.usage?.lastContextTokens ?? 0;
+  const currentModelContextWindow = activeSession?.usage?.modelContextWindow
+    ?? (currentModel ? modelsQuery.data?.contextWindows?.[currentModel] : undefined)
+    ?? 0;
+  const tokenLabel = i18n.language.startsWith("zh") ? "当前上下文" : "Context";
 
   const s = useMemo(() => createStyles(colors), [colors]);
   const mdStyles = useMemo(() => getMarkdownStyles(colors, fontFamily), [colors, fontFamily]);
@@ -361,7 +383,7 @@ export default function ChatScreen() {
         />
 
         {/* Input */}
-        <View style={[s.inputBar, { paddingBottom: 12 + insets.bottom }]}>
+        <View style={[s.inputBar, { paddingBottom: 12 + insets.bottom }]}> 
           <View style={s.inputRow}>
             <TextInput
               value={input}
@@ -382,6 +404,9 @@ export default function ChatScreen() {
               <Text style={s.sendBtnText}>{t("chat.send")}</Text>
             </TouchableOpacity>
           </View>
+          <Text style={s.inputStatsText}>
+            {tokenLabel} {formatTokenK(currentContextTokens)} / {currentModelContextWindow > 0 ? formatTokenK(currentModelContextWindow) : "--"}
+          </Text>
         </View>
       </KeyboardAvoidingView>
 
@@ -594,9 +619,30 @@ function createStyles(colors: any) {
       marginBottom: 8,
       maxWidth: "90%",
     },
+    statusBubble: {
+      backgroundColor: "rgba(245, 158, 11, 0.12)",
+      borderWidth: 1,
+      borderColor: "rgba(245, 158, 11, 0.28)",
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginBottom: 8,
+      maxWidth: "90%",
+    },
+    statusText: {
+      color: colors.text,
+      fontSize: 12,
+      lineHeight: 18,
+    },
     toolBlockWrap: {
       maxWidth: "90%",
       marginBottom: 8,
+    },
+    inputStatsText: {
+      color: colors.slate400,
+      fontSize: 11,
+      marginTop: 6,
+      paddingHorizontal: 4,
     },
 
     // Message rows

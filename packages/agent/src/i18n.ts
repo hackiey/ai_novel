@@ -47,6 +47,35 @@ const zh = {
   // ── Working environment ──
   workingEnvironmentHeading: "## 当前工作环境",
 
+  // ── Conversation compaction ──
+  conversationSummaryHeading: "## 会话压缩摘要",
+  conversationSummaryIntro: "以下内容是更早历史对话的压缩摘要。把它作为延续当前工作的上下文；若需要精确细节，优先结合最近消息和工具查询。",
+  compactionSystemPrompt: "你是一个专门负责压缩会话上下文的 AI。你的任务是把历史对话整理成一份可供后续 AI 继续工作的摘要。不要回答原对话中的问题，不要调用任何工具，只输出摘要正文。",
+  compactionUserPrompt: (transcript: string, existingSummary?: string) =>
+    [
+      "请将下面的历史对话压缩成一份便于后续 AI 接手的工作摘要。",
+      "",
+      "要求：",
+      "- 不要回答历史对话中的问题，只做摘要",
+      "- 保留用户目标、明确约束、关键设定、重要决策、已完成工作、未完成工作、需要继续跟进的事项",
+      "- 提到相关文件、章节、角色、世界设定、草稿、工具调用结果时，只保留后续工作真正需要的内容",
+      "- 如果提供了已有摘要，请保留其中仍然有效的信息，并与新片段合并成一份更新后的完整摘要",
+      "- 使用与原对话一致的语言",
+      "- 摘要尽量紧凑，但不能丢失后续工作必须知道的信息",
+      "",
+      "请尽量使用以下结构：",
+      "## 目标",
+      "## 用户要求与约束",
+      "## 关键上下文",
+      "## 已完成",
+      "## 待继续",
+      "## 相关实体与文件",
+      "",
+      existingSummary ? `已有摘要：\n${existingSummary}` : "已有摘要：\n（无）",
+      "",
+      `新增历史片段：\n${transcript}`,
+    ].join("\n"),
+
   // ── World summary ──
   worldOverviewHeading: "## 世界观概览",
   worldOverviewIntro: "以下是当前世界观中所有角色和设定的概览。如需了解某个角色或设定的详细信息，请使用 semantic_search 工具搜索对应名称或关键词。",
@@ -229,6 +258,35 @@ const en: typeof zh = {
 
   // ── Working environment ──
   workingEnvironmentHeading: "## Current Working Environment",
+
+  // ── Conversation compaction ──
+  conversationSummaryHeading: "## Conversation Compaction Summary",
+  conversationSummaryIntro: "The content below is a compressed summary of earlier conversation history. Treat it as context for continuing the current work, but prefer recent messages and tool lookups when exact details matter.",
+  compactionSystemPrompt: "You are an AI specialized in compacting conversation context. Turn prior conversation history into a summary that another AI can use to continue the work. Do not answer the original conversation, do not call tools, and output only the summary text.",
+  compactionUserPrompt: (transcript: string, existingSummary?: string) =>
+    [
+      "Please compress the conversation history below into a working summary for another AI to continue from.",
+      "",
+      "Requirements:",
+      "- Do not answer questions from the original conversation; only summarize",
+      "- Preserve the user's goals, explicit constraints, key decisions, important project facts, completed work, unfinished work, and follow-up items",
+      "- Keep only the parts of files, chapters, characters, world settings, drafts, and tool results that matter for continuing the work",
+      "- If an existing summary is provided, retain the still-valid parts and merge in the new history into one updated summary",
+      "- Respond in the same language as the original conversation",
+      "- Keep the summary compact, but do not omit information required to continue the task",
+      "",
+      "Try to use this structure:",
+      "## Goal",
+      "## User Instructions And Constraints",
+      "## Key Context",
+      "## Completed",
+      "## Remaining Work",
+      "## Relevant Entities And Files",
+      "",
+      existingSummary ? `Existing summary:\n${existingSummary}` : "Existing summary:\n(none)",
+      "",
+      `New history to merge:\n${transcript}`,
+    ].join("\n"),
 
   // ── World summary ──
   worldOverviewHeading: "## World Overview",
