@@ -60,7 +60,13 @@ function AssistantMessageContent({
   const { t } = useTranslation();
   const segments = buildSegments(events, content, isStreaming);
 
-  if (segments.length === 0 && isStreaming) {
+  const lastSeg = segments[segments.length - 1];
+  const showThinking = isStreaming && (
+    segments.length === 0 ||
+    (lastSeg?.type === "tools" && lastSeg.calls.every((c: any) => !c.pending))
+  );
+
+  if (segments.length === 0 && showThinking) {
     return (
       <View style={chatStyles.thinkingRow}>
         <ActivityIndicator size="small" color={tealColor} />
@@ -96,6 +102,12 @@ function AssistantMessageContent({
           </View>
         );
       })}
+      {showThinking && segments.length > 0 && (
+        <View style={chatStyles.thinkingRow}>
+          <ActivityIndicator size="small" color={tealColor} />
+          <Text style={chatStyles.thinkingText}>{t("chat.thinking")}</Text>
+        </View>
+      )}
     </View>
   );
 }

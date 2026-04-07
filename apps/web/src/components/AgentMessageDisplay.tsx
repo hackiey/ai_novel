@@ -184,7 +184,7 @@ export function ToolCallBlock({ toolName, toolInput, result, pending, immersive 
         ) : (
           <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" strokeWidth={2} />
         )}
-        <span className={`font-medium ${immersive ? "text-white/70" : "text-gray-600"}`}>{label}</span>
+        <span className={`font-medium shrink-0 whitespace-nowrap ${immersive ? "text-white/70" : "text-gray-600"}`}>{label}</span>
         {hasDetails && !expanded && toolInput && (
           <span className={`font-mono text-[10px] truncate ${immersive ? "text-white/30" : "text-gray-400"}`}>
             {Object.entries(toolInput).map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`).join(", ")}
@@ -235,7 +235,13 @@ export function AssistantMessageContent({ events, content, isStreaming, immersiv
   const { t } = useTranslation();
   const segments = buildSegments(events, content, isStreaming);
 
-  if (segments.length === 0 && isStreaming) {
+  const showThinking = isStreaming && (
+    segments.length === 0 ||
+    (segments[segments.length - 1].type === "tools" &&
+      (segments[segments.length - 1] as Extract<Segment, { type: "tools" }>).calls.every(c => !c.pending))
+  );
+
+  if (segments.length === 0 && showThinking) {
     return (
       <div className={`flex items-center gap-2 text-xs ${immersive ? "text-teal-400" : "text-teal-600"}`}>
         <Loader2 className="w-4 h-4 animate-spin" />
@@ -282,6 +288,12 @@ export function AssistantMessageContent({ events, content, isStreaming, immersiv
           </div>
         );
       })}
+      {showThinking && segments.length > 0 && (
+        <div className={`flex items-center gap-2 text-xs mt-2 ${immersive ? "text-teal-400" : "text-teal-600"}`}>
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span>{t("chat.thinking")}</span>
+        </div>
+      )}
     </>
   );
 }

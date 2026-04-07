@@ -50,8 +50,8 @@ export default function ToolCallBlock({
         ) : (
           <Text style={s.checkmark}>✓</Text>
         )}
-        <Text style={[s.label, base.flex1]}>{label}</Text>
-        <Text style={s.toolName}>{toolName}</Text>
+        <Text style={s.label} numberOfLines={1}>{label}</Text>
+        <Text style={s.toolName} numberOfLines={1}>{toolName}</Text>
         <Text
           style={[
             s.arrow,
@@ -119,6 +119,7 @@ function createStyles(colors: any) {
       fontWeight: "500",
     },
     toolName: {
+      flex: 1,
       color: colors.slate600,
       fontSize: 11,
       fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }),
