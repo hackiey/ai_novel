@@ -261,6 +261,44 @@ export type Chapter = z.infer<typeof chapterSchema>;
 export type CreateChapter = z.infer<typeof createChapterSchema>;
 export type UpdateChapter = z.infer<typeof updateChapterSchema>;
 
+// ============ Share (分享) ============
+
+export const shareThemeSchema = z.enum(["rain", "starfield"]);
+export const shareFontSchema = z.enum([
+  "default", "longcang", "liujianmaocao", "zhimangxing", "mashanzheng",
+  "zcoolkuaile", "zcoolqingkehuangyou", "zcoolxiaowei", "xiaolai", "neoxihei", "markergothic",
+]);
+
+export const shareSchema = z.object({
+  _id: objectIdSchema,
+  userId: objectIdSchema,
+  projectId: objectIdSchema,
+  shareToken: z.string().min(8).max(32),
+  includedChapterIds: z.array(objectIdSchema).default([]),
+  theme: shareThemeSchema.default("starfield"),
+  font: shareFontSchema.default("default"),
+  isActive: z.boolean().default(true),
+  ...timestampsSchema.shape,
+});
+
+export const createShareSchema = z.object({
+  projectId: objectIdSchema,
+  includedChapterIds: z.array(objectIdSchema).optional(),
+  theme: shareThemeSchema.optional(),
+  font: shareFontSchema.optional(),
+});
+
+export const updateShareSchema = z.object({
+  includedChapterIds: z.array(objectIdSchema).optional(),
+  theme: shareThemeSchema.optional(),
+  font: shareFontSchema.optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type Share = z.infer<typeof shareSchema>;
+export type CreateShare = z.infer<typeof createShareSchema>;
+export type UpdateShare = z.infer<typeof updateShareSchema>;
+
 // ============ Embedding Chunks ============
 
 export const embeddingChunkSchema = z.object({

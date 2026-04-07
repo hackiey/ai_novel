@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { List, MessageSquare, Palette } from "lucide-react";
+import { List, MessageSquare, Palette, Share2 } from "lucide-react";
 import ThemePicker from "./ThemePicker.js";
 import ChapterDrawer from "./ChapterDrawer.js";
 import { type WriteTheme } from "../../contexts/WriteThemeContext.js";
@@ -19,6 +19,7 @@ interface FloatingControlsProps {
   onChapterDelete: (id: string) => void;
   chapterCreating: boolean;
   chatOpen?: boolean;
+  onShare?: () => void;
 }
 
 export default function FloatingControls({
@@ -35,6 +36,7 @@ export default function FloatingControls({
   onChapterDelete,
   chapterCreating,
   chatOpen = false,
+  onShare,
 }: FloatingControlsProps) {
   const { t } = useTranslation();
   const [themeOpen, setThemeOpen] = useState(false);
@@ -92,6 +94,16 @@ export default function FloatingControls({
             <Palette className="w-4 h-4" />
           </button>
         </div>
+
+        {onShare && (
+          <button
+            onClick={() => { onShare(); closeAll(); }}
+            className="p-2 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+            title={t("share.share")}
+          >
+            <Share2 className="w-4 h-4" />
+          </button>
+        )}
 
         <div className="w-px h-5 bg-white/20 mx-1" />
         <span className="text-xs text-white/50 px-2 tabular-nums">

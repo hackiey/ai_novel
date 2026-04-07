@@ -9,6 +9,7 @@ import { draftRouter } from "./draft.js";
 import { chapterRouter } from "./chapter.js";
 import { agentRouter } from "./agent.js";
 import { searchRouter } from "./search.js";
+import { shareRouter } from "./share.js";
 
 export const appRouter = router({
   auth: authRouter,
@@ -21,6 +22,7 @@ export const appRouter = router({
   chapter: chapterRouter,
   agent: agentRouter,
   search: searchRouter,
+  share: shareRouter,
 });
 
 export type AppRouter = typeof appRouter;

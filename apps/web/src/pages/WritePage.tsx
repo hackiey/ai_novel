@@ -10,6 +10,7 @@ import DiffViewer from "../components/DiffViewer.js";
 import { useBreadcrumb } from "../contexts/BreadcrumbContext.js";
 import { useWriteTheme } from "../contexts/WriteThemeContext.js";
 import FloatingControls from "../components/write/FloatingControls.js";
+import ShareDialog from "../components/write/ShareDialog.js";
 
 export default function WritePage() {
   const { projectId } = useParams({ strict: false }) as { projectId: string };
@@ -29,6 +30,7 @@ export default function WritePage() {
 
   // Chat drawer state — open by default
   const [chatDrawerOpen, setChatDrawerOpen] = useState(true);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   // Word/char stats for floating controls
   const [statCount, setStatCount] = useState(0);
@@ -350,6 +352,13 @@ export default function WritePage() {
         onChapterDelete={handleDeleteChapterById}
         chapterCreating={createChapter.isPending}
         chatOpen={chatDrawerOpen}
+        onShare={() => setShareDialogOpen(true)}
+      />
+
+      <ShareDialog
+        open={shareDialogOpen}
+        onClose={() => setShareDialogOpen(false)}
+        projectId={projectId}
       />
     </div>
   );

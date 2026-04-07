@@ -56,6 +56,9 @@ async function main() {
     await db.collection(col).createIndex({ userId: 1 });
   }
   await db.collection("file_imports").createIndex({ userId: 1, worldId: 1, fileHash: 1 });
+  await db.collection("shares").createIndex({ userId: 1 });
+  await db.collection("shares").createIndex({ shareToken: 1 }, { unique: true });
+  await db.collection("shares").createIndex({ projectId: 1, userId: 1 }, { unique: true });
 
   // Ensure vector search indexes (Atlas Search)
   if (embeddingApiKey) {

@@ -8,13 +8,15 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, Shield, Palette, Languages, LogOut } from "lucide-react";
+import { ChevronDown, Shield, Palette, Languages, LogOut, Share2 } from "lucide-react";
 import HomePage from "./pages/HomePage.js";
 import WritePage from "./pages/WritePage.js";
 import WorldPage from "./pages/WorldPage.js";
 import LoginPage from "./pages/LoginPage.js";
 import RegisterPage from "./pages/RegisterPage.js";
 import AdminPage from "./pages/AdminPage.js";
+import ReaderPage from "./pages/ReaderPage.js";
+import SharesPage from "./pages/SharesPage.js";
 import { getToken } from "./lib/auth.js";
 import { useAuth } from "./contexts/AuthContext.js";
 import { BreadcrumbProvider, useBreadcrumb } from "./contexts/BreadcrumbContext.js";
@@ -61,6 +63,14 @@ function UserMenu({ user, logout }: { user: { displayName: string; role: string 
               {t("header.admin")}
             </Link>
           )}
+          <Link
+            to="/shares"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-white/70 hover:text-teal-400 hover:bg-white/5 transition-colors"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            {t("header.shares")}
+          </Link>
           <button
             onClick={() => setTheme(theme === "rain" ? "starfield" : "rain")}
             className="w-full flex items-center gap-2 px-4 py-2 text-sm text-white/70 hover:text-teal-400 hover:bg-white/5 transition-colors"
@@ -191,6 +201,19 @@ const adminRoute = createRoute({
   component: AdminPage,
 });
 
+const readerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/s/$shareToken",
+  component: ReaderPage,
+});
+
+const sharesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/shares",
+  beforeLoad: requireAuth,
+  component: SharesPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   registerRoute,
@@ -198,6 +221,8 @@ const routeTree = rootRoute.addChildren([
   worldDetailRoute,
   writeRoute,
   adminRoute,
+  readerRoute,
+  sharesRoute,
 ]);
 
 export const router = createRouter({ routeTree });
