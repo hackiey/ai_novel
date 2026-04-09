@@ -9,7 +9,7 @@
 
 ## Core: Your AI Writing Partner
 
-At the heart of AI Creator is an AI Agent with **18 specialized tools**. It doesn't just generate text — it understands your world, remembers your preferences, and proactively consults existing lore to keep every piece of writing consistent.
+At the heart of AI Creator is an AI Agent with **a rich set of specialized tools**. It doesn't just generate text — it understands your world, remembers your preferences, and proactively consults existing lore to keep every piece of writing consistent.
 
 ### Character & World Management
 
@@ -137,6 +137,15 @@ Configure in `apps/server/.env`:
 | `AVAILABLE_MODELS` | Allowed models, format `provider:modelId`, comma-separated |
 | `DEFAULT_MODEL` | Default model, format `provider:modelId` |
 | `EMBEDDING_*` | Embedding service config (optional, enables semantic search) |
+
+---
+
+## Roadmap
+
+- [x] AI Agent-assisted writing (data management, continuation, search, memory, memory, continuation, semantic search, file import)
+- [x] Immersive multi-platform writing experience (Web / Desktop / Mobile)
+- [ ] **Automated Writing Pipeline** — AI generates chapter drafts from outlines → self-reviews for consistency, logic, and style → auto-revises → human final review. Hands-free novel production.
+- [ ] **Interactive Fiction Experience** — readers step into a fully realized world as a character, converse with inhabitants, make choices, and drive the plot forward for a personalized story experience.
 
 ---
 
