@@ -1,175 +1,99 @@
-# AI Creator — AI-Assisted Novel Studio
+# AI Creator — 你的 AI 小说创作工作台
 
-[中文文档](./README.zh-CN.md)
+[English](./README.en.md)
 
-AI Creator is a cross-platform writing studio for long-form fiction. It organizes work as `World -> Novel (Project) -> Chapter`, with a web editor/chat workspace, a mobile companion, and an Electron desktop shell. The built-in AI agent can manage story data, continue chapters, import reference files, and search across your world knowledge.
+> 构建世界观，管理角色设定，让 AI 陪你一起写长篇小说。
+> Web / 桌面 / 移动端三端可用，随时随地进入创作状态。
 
-## Highlights
+---
 
-- World-first workflow: create a world, attach one or more novels to it, then write chapter by chapter.
-- Structured story data: manage characters, world settings, and loose drafts with summaries and importance levels.
-- Immersive writing workspace: full-screen WebGL shader backgrounds (rain / starfield), glassmorphism panels, floating controls, and 11 Chinese font choices.
-- Agent automation: 18 built-in tools for CRUD, semantic search, memory, synopsis generation, and continuation.
-- Import pipeline: upload `.txt`, `.md`, `.docx`, or `.pdf` files and let the agent extract structured knowledge into a world.
-- Mobile chapter editor: Notion-style block editing with inline markdown, auto-save, and per-editor font selection.
-- Multi-platform access: web, Electron desktop, and Expo mobile clients share the same backend and types.
+## 为什么选择 AI Creator？
 
-## Tech Stack
+### 世界观驱动的写作方式
 
-| Layer | Technology |
-|-------|------------|
-| Monorepo | Turborepo + pnpm workspaces |
-| Web | React 19 + Vite + Tailwind CSS v4 + TanStack Router / Query |
-| Mobile | Expo Router + React Native + NativeWind + TanStack Query + Lucide icons |
-| Desktop | Electron |
-| Editor | TipTap rich text editor with auto-save, CJK-aware word/char counting |
-| Shader | WebGL2 full-screen fragment shaders (rain on glass, starfield) |
-| Fonts | LXGW WenKai, Long Cang, Ma Shan Zheng, ZCOOL XiaoWei, Xiaolai SC, and more (all SIL OFL) |
-| Backend | Fastify + tRPC v11 |
-| Database | MongoDB native driver |
-| AI Agent | Multi-provider LLM (OpenAI, Anthropic, Google, etc.) via pi-ai + pi-agent-core |
-| Embeddings | OpenAI-compatible embedding service (configurable model / dimensions) |
-| Shared Types | Zod schemas in `packages/types` |
+不再是一个空白文档面对灵感。AI Creator 按照 **世界观 → 小说 → 章节** 的层级组织你的创作——先搭建世界观、填充角色和设定，再在这个丰满的宇宙中展开故事。多部小说可以共享同一个世界观，人物和设定始终一脉相承。
 
-## Repository Layout
+### 懂你故事的 AI 助手
 
-```text
-ai_creator/
-├── apps/
-│   ├── server/     # Fastify + tRPC backend, SSE routes, auth, embeddings
-│   ├── web/        # React web app, main writing workspace
-│   ├── desktop/    # Electron shell for the web app
-│   └── mobile/     # Expo mobile app with chapter editor and AI chat
-└── packages/
-    ├── agent/      # CreatorAgentSession, i18n prompts, MCP tools
-    ├── core/       # Embedding service and chunking utilities
-    ├── editor/     # Reusable TipTap-based editor package
-    └── types/      # Shared Zod schemas and TypeScript types
-```
+内置 AI Agent 拥有 18 个专用工具，不只是"聊天"那么简单：
 
-## Quick Start
+- **续写章节**：基于已有剧情和角色性格，自动续写下一段。
+- **管理设定**：通过对话创建、修改、查询角色和世界观条目。
+- **语义搜索**：在你的整个创作知识库中做智能检索——"那个住在北城的铁匠叫什么？"
+- **记忆系统**：AI 记住你们的讨论要点，跨对话保持上下文连贯。
+- **章节摘要**：自动生成章节梗概，方便回顾和梳理剧情线。
+- **导入资料**：上传 `.txt`、`.md`、`.docx`、`.pdf` 文件，AI 自动提取人物、地点、势力等信息，整理为结构化设定。
 
-### Requirements
+### 沉浸式写作体验
 
-- Node.js >= 20
-- pnpm >= 9
-- MongoDB (local or Atlas)
+写小说需要氛围感。AI Creator 提供：
 
-### Install and Run
+- **动态背景**：全屏 WebGL 着色器渲染的雨夜玻璃和星空动效。
+- **毛玻璃界面**：半透明面板搭配动态背景，营造沉浸创作氛围。
+- **11 种精选字体**：霞鹜文楷、龙藏体、马善政楷书、站酷小薇等中文与艺术字体，一键切换。
+- **浮动控制栏**：章节导航、AI 聊天、主题切换，不打断你的写作心流。
+- **智能字数统计**：中文自动显示「字」数，英文显示词数。
+
+### 多端同步，随时创作
+
+- **Web 端**：完整的写作工作台，左侧编辑器 + 右侧 AI 对话，双栏并行。
+- **桌面端**：Electron 封装，独立窗口沉浸写作。
+- **移动端**：Expo 原生应用，支持章节编辑、AI 对话、设定管理。外出时在手机上记录灵感，回到电脑前无缝继续。
+
+### 结构化的故事资料库
+
+- 每个角色和世界观条目都有 **重要性分级**（核心 / 主要 / 次要）和 **摘要** 字段。
+- 草稿本可以存放零散的灵感、大纲片段和参考资料。
+- 所有数据按用户隔离，你的创作世界只属于你。
+
+### 灵活的模型选择
+
+支持接入 OpenAI、Anthropic、Google 等多家 AI 模型供应商。管理员可以配置可选模型列表和默认模型，不同用户组可以有不同的模型权限。
+
+---
+
+## 快速开始
+
+### 环境要求
+
+- Node.js >= 20、pnpm >= 9、MongoDB
+
+### 安装与运行
 
 ```bash
 pnpm install
 cp apps/server/.env.example apps/server/.env
+# 编辑 .env，填写 MONGODB_URI、JWT_SECRET 和至少一个 LLM API Key
 
-# Build all workspaces once before the first dev run
-pnpm build
-
-# Start backend (3001) and web app (5173)
-pnpm dev:all
+pnpm build        # 首次运行前构建
+pnpm dev:all      # 启动后端 (3001) + Web (5173)
 ```
 
-Open:
-
-- Web: `http://localhost:5173`
-- API: `http://localhost:3001`
-- Health check: `http://localhost:3001/health`
-
-### Required Environment Variables
-
-Set these in `apps/server/.env`:
-
-- `MONGODB_URI`
-- `JWT_SECRET`
-- At least one LLM API key: `LLM_API_KEY` (generic fallback), or provider-specific: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`
-
-Useful optional variables:
-
-- `AVAILABLE_MODELS` — comma-separated list in `provider:modelId` format (e.g. `openai:gpt-4o,anthropic:claude-sonnet-4-6`)
-- `DEFAULT_MODEL` — default model in `provider:modelId` format
-- `DEFAULT_REASONING` — reasoning level: `minimal`, `low`, `medium`, `high`, `xhigh`
-- `CONTEXT_COMPACTION_THRESHOLD` — unified context compaction threshold in tokens. Defaults to `150000`; the server uses `min(CONTEXT_COMPACTION_THRESHOLD, modelContextWindow * 0.8)`
-- `EMBEDDING_API_KEY`, `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS`
-- `PORT`
-- `JWT_EXPIRES_IN`
-
-### Desktop and Mobile
+移动端和桌面端：
 
 ```bash
-# Desktop: start the web dev server first, then Electron
-pnpm dev:web
-pnpm --filter @ai-creator/desktop dev
+# 桌面端
+pnpm dev:web && pnpm --filter @ai-creator/desktop dev
 
-# Mobile: start Expo
+# 移动端
 pnpm --filter @ai-creator/mobile dev
 ```
 
-## Core Flows
+### 环境变量
 
-### World Workspace
+在 `apps/server/.env` 中配置：
 
-- Create worlds, add descriptions, and keep each story universe isolated per user.
-- Inside a world, manage characters, world settings, and drafts.
-- Use semantic or regex search across the active tab from the world page.
+| 变量 | 说明 |
+|------|------|
+| `MONGODB_URI` | MongoDB 连接字符串（必填） |
+| `JWT_SECRET` | JWT 签名密钥（必填） |
+| `LLM_API_KEY` | 通用 LLM API Key，或使用 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY`（至少填一个） |
+| `AVAILABLE_MODELS` | 可选模型列表，格式 `provider:modelId`，逗号分隔 |
+| `DEFAULT_MODEL` | 默认模型，格式 `provider:modelId` |
+| `EMBEDDING_*` | Embedding 服务配置（可选，用于语义搜索） |
 
-### Writing Workspace
+---
 
-- Each world can contain multiple novels/projects.
-- Each novel contains ordered chapters edited in the main writing view.
-- The editor auto-saves with a debounce and preserves unsaved content while requests are in flight.
-- AI continuation can append generated text directly into the active chapter.
-- Immersive mode: full-screen WebGL2 shader backgrounds (rain on glass / starfield) with glassmorphism UI panels.
-- Floating control bar at the bottom for chapter list, AI chat toggle, and theme switching.
-- 11 built-in Chinese/artistic fonts selectable from the editor toolbar, all open-source (SIL OFL).
-- CJK-aware statistics: automatically shows character count (字) for Chinese text and word count for English.
-
-### Agent and Streaming
-
-- `POST /api/agent/chat` streams agent events over SSE.
-- Session history is stored in MongoDB and reused per `sessionId`.
-- Agent memory is stored per world, and world summaries are rebuilt per locale when stale.
-- Model access can be restricted by permission groups.
-
-### File Import
-
-- `POST /api/world/import-file` accepts `.txt`, `.md`, `.docx`, and `.pdf` uploads.
-- Large files are chunked, then each chunk is processed by the agent with streaming progress events.
-- Import is designed to turn reference material into structured world data instead of plain text dumps.
-
-### Authentication and Admin
-
-- JWT-based login and registration for web and mobile.
-- Admin page for user roles and permission-group management.
-- Permission groups can limit which LLM models a user may select.
-
-### Localization
-
-- Web supports Chinese and English via `i18next`.
-- Agent prompts, tool descriptions, and world summaries are locale-aware.
-- Mobile ships with Simplified Chinese strings and Lucide icon-based navigation.
-
-## Development
-
-```bash
-pnpm dev:all
-pnpm dev:server
-pnpm dev:web
-pnpm build
-```
-
-There is no dedicated automated test suite yet. Use `pnpm build` to verify TypeScript and package builds.
-
-## Atlas Vector Search
-
-If you enable embedding-based search, create a `vector_index` on the `embedding` field for these collections:
-
-- `characters`
-- `world_settings`
-- `drafts`
-- `chapters`
-- `embedding_chunks`
-
-Set the index dimensions to match `EMBEDDING_DIMENSIONS` (or your embedding provider's default). If you rely on metadata filters, include the ownership field used by that collection, typically `worldId` or `projectId`.
-
-## License
+## 开源协议
 
 MIT
