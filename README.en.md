@@ -2,53 +2,99 @@
 
 [中文文档](./README.md)
 
-> Build worlds, manage characters, and write long-form fiction with an AI that understands your story.
-> Available on Web, Desktop, and Mobile — write anywhere, anytime.
+> Not just another "AI chat + editor."
+> AI Creator ships with a purpose-built AI writing partner that manages your characters and settings, continues chapters, imports reference material, and searches your creative knowledge base — like an experienced co-editor, not a generic chatbot.
 
 ---
 
-## Why AI Creator?
+## Core: Your AI Writing Partner
 
-### World-Driven Writing
+At the heart of AI Creator is an AI Agent with **18 specialized tools**. It doesn't just generate text — it understands your world, remembers your preferences, and proactively consults existing lore to keep every piece of writing consistent.
 
-Stop staring at a blank document. AI Creator organizes your work as **World → Novel → Chapter** — build your world, populate it with characters and settings, then tell your stories within a fully fleshed-out universe. Multiple novels can share the same world, keeping your characters and lore consistent across stories.
+### Character & World Management
 
-### An AI That Knows Your Story
+Operate your creative database through conversation:
 
-The built-in AI Agent comes with 18 specialized tools — it's far more than a chatbot:
+- **Create / edit / delete characters** — multi-dimensional profiles covering appearance, personality, background, goals, and relationships, organized by importance (core / major / minor).
+- **Create / edit / delete world settings** — geography, history, magic systems, politics, technology, culture, factions — clearly categorized and easily searchable.
+- **Create / edit / delete drafts** — idea fragments, outline notes, reference material, with links to specific characters or settings.
 
-- **Continue chapters**: Generate the next passage based on existing plot and character traits.
-- **Manage story data**: Create, edit, and query characters and world settings through conversation.
-- **Semantic search**: Intelligently search across your entire knowledge base — "What's the name of that blacksmith in the northern city?"
-- **Memory system**: The AI remembers key discussion points and maintains context across conversations.
-- **Chapter synopsis**: Auto-generate chapter summaries to help you track plot threads.
-- **Import files**: Upload `.txt`, `.md`, `.docx`, or `.pdf` reference material and let the AI extract characters, locations, and factions into structured data.
+> Say "create a hot-tempered but kind-hearted blacksmith living in the northern city" and the AI writes it to your database — automatically referenced the next time it continues a chapter.
 
-### Immersive Writing Experience
+### Intelligent Continuation
 
-Novel writing demands atmosphere. AI Creator delivers:
+Far more than "keep writing":
 
-- **Dynamic backgrounds**: Full-screen WebGL shader effects — rain on glass and starfield animations.
-- **Glassmorphism UI**: Translucent panels layered over animated backgrounds for a distraction-free creative space.
-- **11 curated fonts**: LXGW WenKai, Long Cang, Ma Shan Zheng, and more Chinese/artistic typefaces, all open-source.
-- **Floating controls**: Chapter navigation, AI chat toggle, and theme switching — never break your writing flow.
-- **Smart word count**: Automatically shows character count for Chinese text and word count for English.
+- **Context-aware** — automatically retrieves the current chapter plus the two preceding chapters before continuing.
+- **Stylistically consistent** — analyzes existing narrative voice, word choice, and pacing to match your style.
+- **Steerable** — specify word count targets, plot direction, and special instructions.
+- **Seamless insertion** — generated text appends directly into the editor, WYSIWYG.
 
-### Write Anywhere
+### Semantic Search
 
-- **Web**: Full writing workspace with side-by-side editor and AI chat.
-- **Desktop**: Standalone Electron app for focused, immersive sessions.
-- **Mobile**: Native Expo app with chapter editing, AI chat, and story data management. Capture ideas on your phone, continue seamlessly on your computer.
+Intelligent retrieval across your entire creative knowledge base:
 
-### Structured Story Knowledge Base
+- Searches across characters, world settings, drafts, and chapters.
+- Vector-based semantic matching (with optional Embedding service) with regex fallback.
+- "What was the general's name who clashed with the protagonist in chapter three?" — the AI searches and tells you.
 
-- Every character and world-setting entry has an **importance level** (core / major / minor) and a **summary** field.
-- A drafts notebook for loose ideas, outlines, and reference notes.
-- All data is isolated per user — your creative universe belongs to you alone.
+### Dual-Layer Memory
 
-### Flexible Model Support
+The AI doesn't forget between conversations:
 
-Connect to OpenAI, Anthropic, Google, and other LLM providers. Admins can configure available model lists and defaults, with per-group model permissions for team setups.
+- **World-level memory** — preferences and rules shared across all novels (e.g., "no firearms exist in this world").
+- **Project-level memory** — instructions specific to a single novel (e.g., "the protagonist's narration is always first-person").
+- Memory is automatically injected into every conversation context, and can be manually edited in the UI.
+
+### Auto-Generated Chapter Synopses
+
+- Chapter content changes automatically trigger synopsis regeneration in the background.
+- Synopsis generation references preceding chapters (up to 50K words of full text + historical summaries) for plot continuity.
+- Generated summaries preserve character names, goals, conflicts, turning points, and key reveals — essential for tracking long-form plot threads.
+
+### File Import & Knowledge Extraction
+
+Turn existing reference material into structured creative data:
+
+- Supports `.txt`, `.md`, `.docx`, and `.pdf` formats.
+- Large files are automatically chunked; the AI extracts characters, locations, and factions chunk by chunk.
+- Automatic deduplication via semantic search against existing entries.
+- Real-time streaming progress with resumable uploads.
+
+### Conversation Compaction
+
+Long creative sessions without context overflow:
+
+- Automatically compresses conversation history when approaching the model's context window limit.
+- Preserves the last 2 complete turns; earlier history is replaced with AI-generated summaries.
+- Summaries retain: working goals, key constraints, completed work, pending issues, referenced characters and settings — no important context is lost.
+
+### Usage Transparency
+
+- Real-time token usage and cost display per turn.
+- Breakdown of input / output / cache read / cache write for clear cost tracking.
+
+---
+
+## Immersive Writing Experience
+
+Novel writing demands atmosphere:
+
+- **Dynamic backgrounds** — full-screen WebGL shader effects: rain on glass and starfield animations.
+- **Glassmorphism UI** — translucent panels over animated backgrounds for a distraction-free creative space.
+- **11 curated fonts** — LXGW WenKai, Long Cang, Ma Shan Zheng, and more, all open-source.
+- **Floating controls** — chapter navigation, AI chat toggle, and theme switching without breaking your flow.
+- **Smart word count** — automatically shows character count for Chinese and word count for English.
+
+## Write Anywhere
+
+- **Web** — side-by-side editor and AI chat, the full writing workspace.
+- **Desktop** — standalone Electron app for focused, immersive sessions.
+- **Mobile** — native Expo app with chapter editing, AI chat, and story data management. Capture ideas on the go, continue seamlessly at your desk.
+
+## Flexible Model Support
+
+Connect to OpenAI, Anthropic, Google, and other providers. Configure available models, defaults, and reasoning intensity levels, with per-group model permissions for team setups.
 
 ---
 
