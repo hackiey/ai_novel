@@ -377,8 +377,8 @@
   "dataImport.invalidFormat": "文件格式无效",
   "dataImport.unsupportedVersion": "不支持的格式版本",
   "dataImport.close": "关闭",
-  "dataImport.skipped": "已存在",
-  "dataImport.skippedHint": "该世界已导入过，已跳过。",
+  "dataImport.mergedHint": "已合并到已有世界，重复数据已跳过。",
+  "dataImport.worldMismatchWarning": "该文件来自另一个世界，导入后将新建一个世界，而非合并到当前世界。",
   "dataImport.selectWorld": "选择目标世界",
   "dataImport.noWorld": "不关联世界"
 }

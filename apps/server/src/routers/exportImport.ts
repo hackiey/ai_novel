@@ -159,7 +159,8 @@ export const exportImportRouter = router({
       const worldDoc = parseDateFields(data.world);
       delete worldDoc._id;
 
-      // Try insert world — skip if already exists
+      // Try insert world — if already exists, merge new data into it
+      let worldExists = false;
       try {
         await db.collection("worlds").insertOne({
           _id: new ObjectId(worldId),
@@ -171,10 +172,10 @@ export const exportImportRouter = router({
         });
       } catch (err: any) {
         if (err.code === 11000) {
-          // World already imported — skip entirely
-          return { worldId, skipped: true };
+          worldExists = true;
+        } else {
+          throw err;
         }
-        throw err;
       }
 
       // Insert characters (skip duplicates)
@@ -309,6 +310,14 @@ export const exportImportRouter = router({
         for (const id of insertedChapterIds) embeddingService.enqueue("chapters", id);
       }
 
-      return { worldId, skipped: false };
+      // Mark world summary as stale after merge
+      if (worldExists) {
+        await db.collection("worlds").updateOne(
+          { _id: new ObjectId(worldId) },
+          { $set: { summaryStale: true, updatedAt: now } },
+        );
+      }
+
+      return { worldId, merged: worldExists };
     }),
 });

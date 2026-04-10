@@ -8,6 +8,7 @@ type Stage = "select" | "preview" | "importing" | "done";
 interface PreviewInfo {
   version: number;
   exportedAt: string;
+  worldId?: string;
   worldName?: string;
   characters: number;
   worldSettings: number;
@@ -28,6 +29,7 @@ function extractPreview(data: any): PreviewInfo | null {
   return {
     version: data.version,
     exportedAt: data.exportedAt,
+    worldId: d.world._id,
     worldName: d.world.name,
     characters: (d.characters ?? []).length,
     worldSettings: (d.worldSettings ?? []).length,
@@ -41,9 +43,11 @@ function extractPreview(data: any): PreviewInfo | null {
 export default function DataImportDialog({
   onClose,
   onSuccess,
+  currentWorldId,
 }: {
   onClose: () => void;
   onSuccess?: () => void;
+  currentWorldId?: string;
 }) {
   const { t } = useTranslation();
   const [stage, setStage] = useState<Stage>("select");
@@ -52,16 +56,16 @@ export default function DataImportDialog({
   const [parsedData, setParsedData] = useState<any>(null);
   const [preview, setPreview] = useState<PreviewInfo | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const [skipped, setSkipped] = useState(false);
+  const [merged, setMerged] = useState(false);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const importWorldMut = trpc.exportImport.importWorld.useMutation({
     onSuccess: (result) => {
-      setSkipped(result.skipped);
+      setMerged(result.merged);
       setStage("done");
-      if (!result.skipped) onSuccess?.();
+      onSuccess?.();
     },
     onError: (err) => {
       setErrorMsg(err.message);
@@ -264,6 +268,16 @@ export default function DataImportDialog({
                   </div>
                 )}
               </div>
+
+              {/* Warning: world ID mismatch */}
+              {currentWorldId && preview.worldId && preview.worldId !== currentWorldId && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="text-xs text-amber-300/90">
+                    {t("dataImport.worldMismatchWarning")}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -284,17 +298,13 @@ export default function DataImportDialog({
                   <div className="text-sm text-red-400">{t("dataImport.error")}</div>
                   <div className="text-xs text-white/40 text-center max-w-xs">{errorMsg}</div>
                 </>
-              ) : skipped ? (
-                <>
-                  <Check className="w-8 h-8 text-amber-400" />
-                  <div className="text-sm text-white/80">{t("dataImport.skipped")}</div>
-                  <div className="text-xs text-white/40">{t("dataImport.skippedHint")}</div>
-                </>
               ) : (
                 <>
                   <Check className="w-8 h-8 text-teal-400" />
                   <div className="text-sm text-white/80">{t("dataImport.done")}</div>
-                  <div className="text-xs text-white/40">{t("dataImport.doneHint")}</div>
+                  <div className="text-xs text-white/40">
+                    {merged ? t("dataImport.mergedHint") : t("dataImport.doneHint")}
+                  </div>
                 </>
               )}
             </div>

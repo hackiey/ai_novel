@@ -8,6 +8,7 @@ import WorldSettingsTab from "../components/WorldSettingsTab.js";
 import DraftsTab from "../components/DraftsTab.js";
 import AgentChatPanel from "../components/AgentChatPanel.js";
 import FileImportDialog from "../components/FileImportDialog.js";
+import DataImportDialog from "../components/DataImportDialog.js";
 import { useBreadcrumb } from "../contexts/BreadcrumbContext.js";
 
 type Tab = "characters" | "worldSettings" | "drafts";
@@ -24,6 +25,7 @@ export default function WorldPage() {
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showDataImport, setShowDataImport] = useState(false);
 
   // Project editing
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -178,6 +180,13 @@ export default function WorldPage() {
                     )}
                   </div>
                   <div className="shrink-0 flex items-center gap-2">
+                    <button
+                      onClick={() => setShowDataImport(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/50 hover:text-teal-400 border border-white/20 hover:border-teal-400/30 rounded-lg transition-colors"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">{t("dataImport.button")}</span>
+                    </button>
                     <button
                       onClick={() => exportWorldMut.mutate({ worldId })}
                       disabled={exportWorldMut.isPending}
@@ -443,6 +452,21 @@ export default function WorldPage() {
             setShowImportDialog(false);
             charactersQuery.refetch();
             worldSettingsQuery.refetch();
+          }}
+        />
+      )}
+
+      {/* Data Import Dialog */}
+      {showDataImport && (
+        <DataImportDialog
+          currentWorldId={worldId}
+          onClose={() => setShowDataImport(false)}
+          onSuccess={() => {
+            worldQuery.refetch();
+            charactersQuery.refetch();
+            worldSettingsQuery.refetch();
+            draftsQuery.refetch();
+            projectsQuery.refetch();
           }}
         />
       )}
