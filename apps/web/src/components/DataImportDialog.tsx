@@ -50,7 +50,7 @@ export default function DataImportDialog({
   currentWorldId,
 }: {
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (importedWorldId?: string) => void;
   currentWorldId?: string;
 }) {
   const { t } = useTranslation();
@@ -70,7 +70,7 @@ export default function DataImportDialog({
     onSuccess: (result) => {
       setMerged(result.merged);
       setStage("done");
-      onSuccess?.();
+      onSuccess?.(result.worldId);
     },
     onError: (err) => {
       setErrorMsg(err.message);

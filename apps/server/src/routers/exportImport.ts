@@ -166,6 +166,8 @@ export const exportImportRouter = router({
         }
       }
 
+      const worldOid = new ObjectId(worldId);
+
       // Insert characters (skip duplicates)
       const characters = data.characters ?? [];
       const insertedCharIds = await insertManySkipDuplicates(db, "characters",
@@ -173,7 +175,7 @@ export const exportImportRouter = router({
           const doc = parseDateFields(char);
           const id = doc._id;
           delete doc._id;
-          return { _id: new ObjectId(id), ...doc, userId, worldId };
+          return { _id: new ObjectId(id), ...doc, userId, worldId: worldOid };
         }),
       );
 
@@ -184,7 +186,7 @@ export const exportImportRouter = router({
           const doc = parseDateFields(ws);
           const id = doc._id;
           delete doc._id;
-          return { _id: new ObjectId(id), ...doc, userId, worldId };
+          return { _id: new ObjectId(id), ...doc, userId, worldId: worldOid };
         }),
       );
 
@@ -195,7 +197,7 @@ export const exportImportRouter = router({
           const doc = parseDateFields(draft);
           const id = doc._id;
           delete doc._id;
-          return { _id: new ObjectId(id), ...doc, userId, worldId };
+          return { _id: new ObjectId(id), ...doc, userId, worldId: worldOid };
         }),
       );
 

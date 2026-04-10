@@ -313,7 +313,6 @@ export default function ChatScreen() {
 
   const suggestions = [
     t("chat.suggestion.listCharacters"),
-    t("chat.suggestion.continueWriting"),
     t("chat.suggestion.plotTwist"),
   ];
 

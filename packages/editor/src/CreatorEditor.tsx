@@ -135,7 +135,6 @@ export interface CreatorEditorProps {
   editable?: boolean;
   autoSaveMs?: number;
   className?: string;
-  appendText?: string;
   onDelete?: () => void;
   deleteTitle?: string;
   variant?: EditorVariant;
@@ -152,7 +151,6 @@ export function CreatorEditor({
   editable = true,
   autoSaveMs = 2000,
   className,
-  appendText,
   onDelete,
   deleteTitle,
   variant = "default",
@@ -280,21 +278,6 @@ export function CreatorEditor({
     }
   }, [content, editor]);
 
-  // Append text from agent
-  const prevAppendText = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (!editor || !appendText) return;
-    if (appendText === prevAppendText.current) return;
-    prevAppendText.current = appendText;
-
-    // Convert appended text through normalizeContent too
-    const html = normalizeContent(appendText);
-    editor.chain().focus("end").insertContent(html).run();
-
-    const editorHtml = editor.getHTML();
-    contentRef.current = editorHtml;
-    onUpdateRef.current(editorHtml);
-  }, [appendText, editor]);
 
   // Ctrl/Cmd+S: prevent browser save and flush immediately
   useEffect(() => {

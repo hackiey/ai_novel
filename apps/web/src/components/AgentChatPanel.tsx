@@ -41,7 +41,6 @@ interface Props {
   projectId?: string;
   worldId?: string;
   currentChapterId?: string;
-  onAgentAppend?: (text: string) => void;
   onChapterEdit?: (chapterId: string) => void;
   variant?: "default" | "immersive";
 }
@@ -53,7 +52,7 @@ function formatTokenK(value: number | undefined): string {
   return `${formatted.replace(/\.0$/, "")}k`;
 }
 
-export default function AgentChatPanel({ projectId, worldId, currentChapterId, onAgentAppend, onChapterEdit, variant = "default" }: Props) {
+export default function AgentChatPanel({ projectId, worldId, currentChapterId, onChapterEdit, variant = "default" }: Props) {
   const imm = variant === "immersive";
   const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -319,15 +318,6 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
         return updated;
       });
 
-      // Handle onAgentAppend for continue_writing
-      if (onAgentAppend) {
-        for (const e of allEvents) {
-          if (e.type === "tool_use" && e.toolName === "continue_writing" && fullText) {
-            onAgentAppend(fullText);
-          }
-        }
-      }
-
       // Check if any chapter-edit tools were used; if so, trigger review flow
       let chapterEditHandled = false;
       if (onChapterEdit) {
@@ -431,7 +421,6 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
 
   const suggestions = [
     t("chat.suggestion.listCharacters"),
-    t("chat.suggestion.continueWriting"),
     t("chat.suggestion.plotTwist"),
   ];
 

@@ -226,21 +226,6 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
     },
 
     {
-      name: "continue_writing",
-      label: "Continue Writing",
-      description: d.continue_writing,
-      parameters: Type.Object({
-        chapterId: Type.String({ description: d.continue_writing_chapterId }),
-        instructions: Type.Optional(Type.String({ description: d.continue_writing_instructions })),
-        wordCount: Type.Optional(Type.Number({ description: d.continue_writing_wordCount })),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await handlers.continueWriting(args, db);
-        return textResult(result);
-      },
-    },
-
-    {
       name: "update_chapter",
       label: "Update Chapter",
       description: d.update_chapter,

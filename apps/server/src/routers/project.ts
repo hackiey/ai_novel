@@ -74,7 +74,7 @@ export const projectRouter = router({
     .query(async ({ ctx, input }) => {
       const docs = await ctx.db
         .collection("projects")
-        .find({ worldId: input.worldId, userId: userIdFilter(ctx.user.userId) })
+        .find({ worldId: { $in: [input.worldId, new ObjectId(input.worldId)] }, userId: userIdFilter(ctx.user.userId) })
         .sort({ updatedAt: -1 })
         .toArray();
       return docs.map(serializeDoc);

@@ -78,6 +78,8 @@ export class CreatorAgentSession {
         baseUrl: options.baseURL || "https://api.openai.com/v1",
         contextWindow: options.contextWindow || 128000,
         maxTokens: 32000,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       } as Model<any>;
     } else if (options.baseURL) {
       model.baseUrl = options.baseURL;
@@ -211,6 +213,17 @@ export class CreatorAgentSession {
         // Process all queued events
         while (eventQueue.length > 0) {
           const event = eventQueue.shift()!;
+
+          if (event.type !== "message_update") {
+            console.log("[AgentSession] event: %s %s", event.type, JSON.stringify(
+              event.type === "tool_execution_start" ? { tool: event.toolName, args: event.args } :
+              event.type === "tool_execution_end" ? { tool: event.toolName, result: event.result } :
+              event.type === "turn_end" ? { role: (event.message as any)?.role, content: (event.message as any)?.content } :
+              event.type === "agent_end" ? { messageCount: event.messages?.length } :
+              event,
+              null, 2,
+            ));
+          }
 
           if (event.type === "message_update") {
             const ame = event.assistantMessageEvent;

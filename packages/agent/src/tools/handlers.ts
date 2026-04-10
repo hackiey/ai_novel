@@ -447,51 +447,6 @@ export async function createChapter(
   return serialize({ ...doc, _id: result.insertedId });
 }
 
-export async function continueWriting(
-  args: { chapterId: string; instructions?: string; wordCount?: number },
-  db: Db
-): Promise<unknown> {
-  const { chapterId, instructions, wordCount = 500 } = args;
-
-  // Get the target chapter
-  const chapter = await db
-    .collection("chapters")
-    .findOne({ _id: toObjectId(chapterId) });
-  if (!chapter) return { error: `Chapter not found: ${chapterId}` };
-
-  // Get previous 2 chapters for context
-  const prevChapters = await db
-    .collection("chapters")
-    .find({
-      projectId: chapter.projectId,
-      order: { $lt: chapter.order },
-    })
-    .sort({ order: -1 })
-    .limit(2)
-    .toArray();
-
-  // Build context
-  const context: Record<string, unknown> = {
-    currentChapter: {
-      id: chapter._id.toHexString(),
-      title: chapter.title,
-      order: chapter.order,
-      content: chapter.content,
-      wordCount: chapter.wordCount,
-      status: chapter.status,
-    },
-    previousChapters: prevChapters.reverse().map((ch) => ({
-      id: ch._id.toHexString(),
-      title: ch.title,
-      order: ch.order,
-      synopsis: ch.synopsis || (ch.content ?? "").slice(-1000),
-    })),
-    instructions: instructions ?? "请自然地续写下去",
-    targetWordCount: wordCount,
-  };
-
-  return context;
-}
 
 const CHAPTER_EDITABLE_FIELDS = ["title", "content", "synopsis"];
 

@@ -161,10 +161,6 @@ const zh = {
 
     list_chapters: "列出当前项目的章节信息：最近5万字范围内的章节返回完整正文，更早的章节仅返回摘要。每项都包含章节ID，便于后续通过 get_chapter 获取全文。projectId 已自动注入。",
 
-    continue_writing: "续写章节。获取当前章节内容和前文上下文，供续写使用。返回章节内容和上下文信息，由AI根据这些信息生成续写内容。",
-    continue_writing_chapterId: "要续写的章节ID",
-    continue_writing_instructions: "续写指导说明，如情节方向、场景描写要求等",
-    continue_writing_wordCount: "目标续写字数，默认500",
 
     update_chapter: "编辑章节内容。三种模式：1) 查找替换：传 old_string + new_string；2) 追加到末尾：传 append: true + new_string；3) 插入到开头：传 prepend: true + new_string。field 默认为 content。",
     update_chapter_id: "章节ID",
@@ -383,10 +379,6 @@ const en: typeof zh = {
 
     list_chapters: "List chapter information for the current project: chapters covering the most recent 50,000 words return full content, while older chapters return only synopses. Every item includes the chapter ID so the agent can call get_chapter later for full text. projectId is auto-injected.",
 
-    continue_writing: "Continue writing a chapter. Retrieves current chapter content and preceding context for continuation. Returns chapter content and context info for the AI to generate continuation.",
-    continue_writing_chapterId: "Chapter ID to continue writing",
-    continue_writing_instructions: "Writing guidance, e.g. plot direction, scene description requirements",
-    continue_writing_wordCount: "Target word count for continuation, default 500",
 
     update_chapter: "Edit chapter content. Three modes: 1) Find-replace: pass old_string + new_string; 2) Append to end: pass append: true + new_string; 3) Prepend to start: pass prepend: true + new_string. Field defaults to content.",
     update_chapter_id: "Chapter ID",

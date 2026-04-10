@@ -18,7 +18,6 @@ export default function WritePage() {
   const { t } = useTranslation();
   const { chapterId } = useSearch({ from: "/project/$projectId/write" });
   const [selectedChapterId, setSelectedChapterId] = useState<string>(chapterId ?? "");
-  const [appendText, setAppendText] = useState<string>("");
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "idle">("idle");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [pendingEdit, setPendingEdit] = useState<{ oldContent: string; newContent: string } | null>(null);
@@ -132,9 +131,6 @@ export default function WritePage() {
     [selectedChapterId, updateChapter],
   );
 
-  const handleAgentAppend = useCallback((text: string) => {
-    setAppendText(text);
-  }, []);
 
   const handleChapterEdit = useCallback(async (chapterId: string) => {
     if (chapterId !== selectedChapterId) {
@@ -289,7 +285,6 @@ export default function WritePage() {
                   content={editorContent}
                   onUpdate={handleContentUpdate}
                   placeholder={t("write.editorPlaceholder")}
-                  appendText={appendText}
                   className="flex-1"
                   onDelete={handleDeleteChapter}
                   deleteTitle={t("write.deleteChapter")}
@@ -329,7 +324,6 @@ export default function WritePage() {
                 projectId={projectId}
                 worldId={(project as any)?.worldId}
                 currentChapterId={selectedChapterId || undefined}
-                onAgentAppend={handleAgentAppend}
                 onChapterEdit={handleChapterEdit}
                 variant="immersive"
               />

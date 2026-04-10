@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { Download, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
@@ -15,6 +15,7 @@ type Tab = "characters" | "worldSettings" | "drafts";
 
 export default function WorldPage() {
   const { worldId } = useParams({ strict: false }) as { worldId: string };
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<Tab>("characters");
   const [createRequestKey, setCreateRequestKey] = useState(0);
@@ -461,12 +462,16 @@ export default function WorldPage() {
         <DataImportDialog
           currentWorldId={worldId}
           onClose={() => setShowDataImport(false)}
-          onSuccess={() => {
-            worldQuery.refetch();
-            charactersQuery.refetch();
-            worldSettingsQuery.refetch();
-            draftsQuery.refetch();
-            projectsQuery.refetch();
+          onSuccess={(importedWorldId) => {
+            if (importedWorldId && importedWorldId !== worldId) {
+              navigate({ to: "/world/$worldId", params: { worldId: importedWorldId } });
+            } else {
+              worldQuery.refetch();
+              charactersQuery.refetch();
+              worldSettingsQuery.refetch();
+              draftsQuery.refetch();
+              projectsQuery.refetch();
+            }
           }}
         />
       )}

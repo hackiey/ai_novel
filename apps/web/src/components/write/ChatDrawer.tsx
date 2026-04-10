@@ -8,7 +8,6 @@ interface ChatDrawerProps {
   projectId: string;
   worldId?: string;
   currentChapterId?: string;
-  onAgentAppend: (text: string) => void;
   onChapterEdit: (chapterId: string) => Promise<void>;
 }
 
@@ -18,7 +17,6 @@ export default function ChatDrawer({
   projectId,
   worldId,
   currentChapterId,
-  onAgentAppend,
   onChapterEdit,
 }: ChatDrawerProps) {
   const { t } = useTranslation();
@@ -50,7 +48,6 @@ export default function ChatDrawer({
             projectId={projectId}
             worldId={worldId}
             currentChapterId={currentChapterId}
-            onAgentAppend={onAgentAppend}
             onChapterEdit={onChapterEdit}
           />
         </div>
