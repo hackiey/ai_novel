@@ -2,11 +2,13 @@ import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext.js";
+import { trpc } from "../lib/trpc.js";
 
 export default function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const settingsQuery = trpc.settings.get.useQuery();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -25,6 +27,20 @@ export default function RegisterPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (settingsQuery.data?.registrationEnabled === false) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="w-full max-w-sm mx-auto p-6 glass-panel rounded-2xl text-center">
+          <h1 className="text-2xl font-bold mb-4 text-white/90">{t("register.title")}</h1>
+          <p className="text-sm text-white/50 mb-4">{t("register.disabled")}</p>
+          <Link to="/login" className="text-teal-400 hover:underline text-sm">
+            {t("register.login")}
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (

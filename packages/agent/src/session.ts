@@ -60,8 +60,25 @@ export class CreatorAgentSession {
     onWorldSummaryStale?: OnWorldSummaryStaleFn;
   }) {
     this.apiKey = options.apiKey;
-    const model = getModel(options.provider as any, options.modelId as any);
-    if (options.baseURL) {
+    let model: Model<any> | undefined;
+    try {
+      model = getModel(options.provider as any, options.modelId as any);
+    } catch {
+      // getModel threw — fall through to fallback
+    }
+    if (!model) {
+      // Unknown model — create a generic OpenAI Chat Completions compatible fallback
+      // Use "openai-completions" (not "openai-responses") for maximum proxy compatibility
+      model = {
+        id: options.modelId,
+        name: options.modelId,
+        api: "openai-completions",
+        provider: options.provider,
+        baseUrl: options.baseURL || "https://api.openai.com/v1",
+        contextWindow: 128000,
+        maxTokens: 32000,
+      } as Model<any>;
+    } else if (options.baseURL) {
       model.baseUrl = options.baseURL;
     }
     this.model = model;

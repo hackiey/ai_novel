@@ -87,6 +87,20 @@ World → Novel → Chapter
 
 ---
 
+## Try It Online
+
+Don't want to self-host? Try the public instance I maintain:
+
+**👉 [https://words.toagi.life](https://words.toagi.life)**
+
+- You need to configure your own API Key (supports OpenAI / Anthropic / OpenRouter / any OpenAI-compatible service)
+- Your API Key is only used to proxy requests and is **never stored on the server**
+- Novel content, character settings, and other data are stored on the server
+- This instance is maintained as a personal side project — service may be unstable, and data persistence is not guaranteed
+- For production use, self-hosting is recommended
+
+---
+
 ## Quick Start
 
 ### Requirements

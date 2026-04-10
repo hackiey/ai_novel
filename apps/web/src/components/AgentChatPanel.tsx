@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { BotMessageSquare, BookOpen, ChevronDown, History, Loader2, Pencil, Plus, RotateCcw, X } from "lucide-react";
+import { BotMessageSquare, BookOpen, ChevronDown, History, KeyRound, Loader2, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import { getToken } from "../lib/auth.js";
+import { getBYOKForModel, getBYOKModelSpecs, hasBYOKKeys } from "../lib/byokStorage.js";
 import { AgentEvent, AssistantMessageContent } from "./AgentMessageDisplay.js";
 
 const API_BASE = "";
@@ -178,13 +179,20 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
       const token = getToken();
       const controller = new AbortController();
       abortRef.current = controller;
+      const modelToUse = currentModelSpec;
+      const byok = modelToUse ? getBYOKForModel(modelToUse) : null;
       const response = await fetch(`${API_BASE}/api/agent/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-          body: JSON.stringify({ projectId, worldId, message: text, sessionId, locale: i18n.language, model: currentModelSpec, currentChapterId }),
+        body: JSON.stringify({
+          projectId, worldId, message: text, sessionId,
+          locale: i18n.language, model: modelToUse, currentChapterId,
+          ...(byok?.apiKey ? { apiKey: byok.apiKey } : {}),
+          ...(byok?.baseURL ? { baseURL: byok.baseURL } : {}),
+        }),
         signal: controller.signal,
       });
 
@@ -463,36 +471,52 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
           </button>
         </div>
         <div className="flex items-center gap-1.5">
-          {!showMemory && modelsQuery.data && modelsQuery.data.available.length >= 1 && (
-            <div className="relative">
-                <select
-                  value={currentModelSpec || modelsQuery.data.default}
-                  onChange={(e) => setSelectedModel(e.target.value)}
-                className={`appearance-none text-xs rounded-md pl-2 pr-6 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer ${
-                  imm
-                    ? "bg-white/10 border border-white/15 text-white/80 hover:bg-white/15"
-                    : "bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200"
-                }`}
-                title={t("chat.selectModel")}
-              >
-                {modelsQuery.data.available.map((m: string) => {
-                  const afterColon = m.includes(":") ? m.split(":")[1] : m;
-                  const slashIdx = afterColon.lastIndexOf("/");
-                  const reasoningLevels = ["minimal", "low", "medium", "high", "xhigh"];
-                  let display = afterColon;
-                  if (slashIdx !== -1 && reasoningLevels.includes(afterColon.slice(slashIdx + 1))) {
-                    display = `${afterColon.slice(0, slashIdx)} (${afterColon.slice(slashIdx + 1)})`;
-                  }
-                  return (
-                    <option key={m} value={m}>
-                      {display}
-                    </option>
-                  );
-                })}
-              </select>
-              <ChevronDown className={`w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none ${imm ? "text-white/40" : "text-gray-400"}`} />
-            </div>
-          )}
+          {!showMemory && (() => {
+            const byokModels = getBYOKModelSpecs();
+            const serverModels = modelsQuery.data?.available ?? [];
+            const allModels = [...serverModels, ...byokModels.filter((m) => !serverModels.includes(m))];
+            const showByokBadge = currentModelSpec && getBYOKForModel(currentModelSpec);
+
+            if (allModels.length === 0) return null;
+
+            return (
+              <div className="flex items-center gap-1">
+                {showByokBadge && (
+                  <span className="flex items-center gap-0.5 text-[10px] text-amber-400/70" title={t("byok.usingOwnKey")}>
+                    <KeyRound className="w-3 h-3" />
+                  </span>
+                )}
+                <div className="relative">
+                  <select
+                    value={currentModelSpec || modelsQuery.data?.default || allModels[0]}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className={`appearance-none text-xs rounded-md pl-2 pr-6 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer ${
+                      imm
+                        ? "bg-white/10 border border-white/15 text-white/80 hover:bg-white/15"
+                        : "bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200"
+                    }`}
+                    title={t("chat.selectModel")}
+                  >
+                    {allModels.map((m: string) => {
+                      const afterColon = m.includes(":") ? m.split(":")[1] : m;
+                      const slashIdx = afterColon.lastIndexOf("/");
+                      const reasoningLevels = ["minimal", "low", "medium", "high", "xhigh"];
+                      let display = afterColon;
+                      if (slashIdx !== -1 && reasoningLevels.includes(afterColon.slice(slashIdx + 1))) {
+                        display = `${afterColon.slice(0, slashIdx)} (${afterColon.slice(slashIdx + 1)})`;
+                      }
+                      return (
+                        <option key={m} value={m}>
+                          {display}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <ChevronDown className={`w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none ${imm ? "text-white/40" : "text-gray-400"}`} />
+                </div>
+              </div>
+            );
+          })()}
           {!showMemory && (
             <button
               onClick={handleNewSession}
@@ -622,28 +646,39 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
           <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto scrollbar-none p-4 space-y-4">
             {messages.length === 0 && (
               <div className="text-center py-8">
-                <p className={`text-sm mb-1 ${imm ? "text-white/70" : "text-gray-600"}`}>{t("chat.emptyTitle")}</p>
-                <p className={`text-xs max-w-xs mx-auto ${imm ? "text-white/40" : "text-gray-400"}`}>
-                  {t("chat.emptySubtitle")}
-                </p>
-                <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-                  {suggestions.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => { setInput(s); }}
-                      className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
-                        imm
-                          ? "border-white/15 text-white/50 hover:text-white/80 hover:border-white/30"
-                          : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-                <p className={`mt-3 text-xs max-w-xs mx-auto ${imm ? "text-white/30" : "text-gray-400"}`}>
-                  {t("chat.memoryHint")}
-                </p>
+                {(modelsQuery.data?.available?.length === 0 && !hasBYOKKeys()) ? (
+                  <>
+                    <KeyRound className={`w-8 h-8 mx-auto mb-3 ${imm ? "text-white/20" : "text-gray-300"}`} />
+                    <p className={`text-xs max-w-xs mx-auto ${imm ? "text-white/40" : "text-gray-400"}`}>
+                      {t("byok.noServerModels")}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className={`text-sm mb-1 ${imm ? "text-white/70" : "text-gray-600"}`}>{t("chat.emptyTitle")}</p>
+                    <p className={`text-xs max-w-xs mx-auto ${imm ? "text-white/40" : "text-gray-400"}`}>
+                      {t("chat.emptySubtitle")}
+                    </p>
+                    <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+                      {suggestions.map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => { setInput(s); }}
+                          className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
+                            imm
+                              ? "border-white/15 text-white/50 hover:text-white/80 hover:border-white/30"
+                              : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                    <p className={`mt-3 text-xs max-w-xs mx-auto ${imm ? "text-white/30" : "text-gray-400"}`}>
+                      {t("chat.memoryHint")}
+                    </p>
+                  </>
+                )}
               </div>
             )}
 

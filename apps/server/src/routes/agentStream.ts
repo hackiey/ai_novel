@@ -10,6 +10,8 @@ import { getUserAllowedModels } from "../auth/permissionGroups.js";
 
 // Store active sessions in memory (shared with router)
 export const sessions = new Map<string, CreatorAgentSession>();
+// Track key mode per session to detect BYOK↔server switches
+export const sessionKeyMode = new Map<string, string>();
 
 // Model format: "provider:modelId" (e.g. "openai:gpt-4o", "anthropic:claude-sonnet-4-6-20250514")
 const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "openai:gpt-4o";
@@ -39,7 +41,9 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       return reply.status(401).send({ error: "Unauthorized" });
     }
 
-    const { projectId, worldId, message, sessionId: inputSessionId, model, locale: rawLocale, currentChapterId } =
+    // SECURITY: userApiKey is never logged, persisted, or included in DB records
+    const { projectId, worldId, message, sessionId: inputSessionId, model, locale: rawLocale, currentChapterId,
+            apiKey: userApiKey, baseURL: userBaseURL } =
       request.body as {
         projectId: string;
         worldId?: string;
@@ -48,7 +52,10 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
         model?: string;
         locale?: string;
         currentChapterId?: string;
+        apiKey?: string;
+        baseURL?: string;
       };
+    const isBYOK = !!userApiKey;
     const locale: Locale = resolveLocale(rawLocale);
 
     if (!message) {
@@ -60,27 +67,41 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
 
     const db = getDb();
     const sessionId = inputSessionId || crypto.randomUUID();
-    const allowedModels = await getUserAllowedModels(db, user.userId, AVAILABLE_MODELS);
 
-    if (allowedModels.length === 0) {
-      return reply.status(403).send({ error: "AI access is disabled for your permission group" });
+    let selectedModel: string;
+    if (isBYOK) {
+      // BYOK: user provides their own key, skip permission group check
+      selectedModel = model || AVAILABLE_MODELS[0] || "openai:gpt-4o";
+    } else {
+      const allowedModels = await getUserAllowedModels(db, user.userId, AVAILABLE_MODELS);
+      if (allowedModels.length === 0) {
+        return reply.status(403).send({ error: "AI access is disabled for your permission group" });
+      }
+      selectedModel = model || allowedModels[0];
+      if (!allowedModels.includes(selectedModel)) {
+        return reply.status(403).send({ error: "Model not allowed for your permission group" });
+      }
     }
 
-    const selectedModel = model || allowedModels[0];
+    const parsed = parseModelSpec(selectedModel);
+    const modelReasoning = parsed.reasoning;
+    const modelId = parsed.modelId;
+    // "custom" provider maps to "openai" (OpenAI-compatible API with custom baseURL)
+    const provider = parsed.provider === "custom" ? "openai" : parsed.provider;
 
-    // Validate model against user's permission group
-    if (!allowedModels.includes(selectedModel)) {
-      return reply.status(403).send({ error: "Model not allowed for your permission group" });
+    // Resolve API key and base URL: BYOK uses user-provided key, otherwise env vars
+    let apiKey: string;
+    let baseURL: string | undefined;
+    if (isBYOK) {
+      apiKey = userApiKey;
+      baseURL = userBaseURL || undefined;
+    } else {
+      const providerEnvPrefix = provider.toUpperCase().replace(/-/g, "_");
+      apiKey = process.env[`${providerEnvPrefix}_API_KEY`]
+        || process.env.LLM_API_KEY
+        || "";
+      baseURL = process.env[`${providerEnvPrefix}_BASE_URL`] || undefined;
     }
-
-    const { provider, modelId, reasoning: modelReasoning } = parseModelSpec(selectedModel);
-
-    // Resolve API key and base URL per provider
-    const providerEnvPrefix = provider.toUpperCase().replace(/-/g, "_");
-    const apiKey = process.env[`${providerEnvPrefix}_API_KEY`]
-      || process.env.LLM_API_KEY
-      || "";
-    const baseURL = process.env[`${providerEnvPrefix}_BASE_URL`] || undefined;
 
     // Resolve reasoning level: model spec > env var > undefined (let pi-ai decide)
     const defaultReasoningRaw = process.env.DEFAULT_REASONING;
@@ -104,31 +125,45 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     }
 
     // Get or create agent session
+    // BYOK: always recreate to pick up config changes (key, baseURL, model)
+    const keyMode = isBYOK ? "byok" : "server";
     let session = sessions.get(sessionId);
+    if (session && (isBYOK || sessionKeyMode.get(sessionId) !== keyMode)) {
+      session.close();
+      sessions.delete(sessionId);
+      sessionKeyMode.delete(sessionId);
+      session = undefined;
+    }
     if (!session) {
       const embeddingSvc = getEmbeddingService();
-      session = new CreatorAgentSession({
-        apiKey,
-        provider,
-        modelId,
-        baseURL,
-        reasoning,
-        db,
-        projectId,
-        worldId,
-        userId: user.userId,
-        vectorSearchFn,
-        onDocumentChanged: embeddingSvc
-          ? (collection, id) => embeddingSvc.enqueue(collection, id)
-          : undefined,
-        onWorldSummaryStale: (wId) => {
-          db.collection("worlds").updateOne(
-            { _id: new ObjectId(wId) },
-            { $set: { summaryStale: true } }
-          ).catch((err) => console.error("[WorldSummary] Failed to mark stale:", err));
-        },
-      });
+      try {
+        session = new CreatorAgentSession({
+          apiKey,
+          provider,
+          modelId,
+          baseURL,
+          reasoning,
+          db,
+          projectId,
+          worldId,
+          userId: user.userId,
+          vectorSearchFn,
+          onDocumentChanged: embeddingSvc
+            ? (collection, id) => embeddingSvc.enqueue(collection, id)
+            : undefined,
+          onWorldSummaryStale: (wId) => {
+            db.collection("worlds").updateOne(
+              { _id: new ObjectId(wId) },
+              { $set: { summaryStale: true } }
+            ).catch((err) => console.error("[WorldSummary] Failed to mark stale:", err));
+          },
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return reply.status(400).send({ error: msg });
+      }
       sessions.set(sessionId, session);
+      sessionKeyMode.set(sessionId, keyMode);
     }
 
     // Set SSE headers

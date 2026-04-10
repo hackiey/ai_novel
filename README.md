@@ -87,6 +87,20 @@ AI Creator 的核心是一个拥有丰富专用工具的 AI Agent。它不只是
 
 ---
 
+## 在线体验
+
+不想自己部署？可以直接访问我搭建好的公共实例：
+
+**👉 [https://words.toagi.life](https://words.toagi.life)**
+
+- 需要自行配置 API Key（支持 OpenAI / Anthropic / OpenRouter / 任意 OpenAI 兼容服务）
+- 你的 API Key 仅用于代理请求，**不会被服务端保存**
+- 小说内容、角色设定等数据存储在服务器上
+- 本实例为个人业余维护，服务可能不稳定，不保证数据持久性
+- 如需稳定使用，建议自行部署
+
+---
+
 ## 快速开始
 
 ### 环境要求

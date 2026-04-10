@@ -15,9 +15,44 @@ export default function AdminPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-8">
       <h1 className="text-2xl font-bold text-white/90">{t("admin.title")}</h1>
+      <SiteSettingsSection />
       <PermissionGroupSection />
       <UserSection />
     </div>
+  );
+}
+
+function SiteSettingsSection() {
+  const { t } = useTranslation();
+  const utils = trpc.useUtils();
+  const settingsQuery = trpc.settings.get.useQuery();
+  const updateMutation = trpc.settings.update.useMutation({
+    onSuccess: () => utils.settings.get.invalidate(),
+  });
+
+  const registrationEnabled = settingsQuery.data?.registrationEnabled ?? true;
+
+  return (
+    <section>
+      <h2 className="text-lg font-semibold text-white/80 mb-4">{t("admin.siteSettings")}</h2>
+      <div className="p-4 glass-panel rounded-lg">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-sm text-white/80">{t("admin.allowRegistration")}</span>
+            <p className="text-xs text-white/40 mt-0.5">
+              {registrationEnabled ? t("admin.registrationEnabled") : t("admin.registrationDisabled")}
+            </p>
+          </div>
+          <button
+            onClick={() => updateMutation.mutate({ registrationEnabled: !registrationEnabled })}
+            disabled={settingsQuery.isLoading || updateMutation.isPending}
+            className={`relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 ${registrationEnabled ? "bg-teal-500" : "bg-white/20"}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${registrationEnabled ? "translate-x-5" : ""}`} />
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 

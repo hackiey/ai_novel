@@ -10,6 +10,7 @@ import { chapterRouter } from "./chapter.js";
 import { agentRouter } from "./agent.js";
 import { searchRouter } from "./search.js";
 import { shareRouter } from "./share.js";
+import { settingsRouter } from "./settings.js";
 
 export const appRouter = router({
   auth: authRouter,
@@ -23,6 +24,7 @@ export const appRouter = router({
   agent: agentRouter,
   search: searchRouter,
   share: shareRouter,
+  settings: settingsRouter,
 });
 
 export type AppRouter = typeof appRouter;

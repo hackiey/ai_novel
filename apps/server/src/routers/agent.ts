@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import { getModelContextWindowFromSpec } from "@ai-creator/agent";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { objectIdSchema } from "@ai-creator/types";
-import { sessions } from "../routes/agentStream.js";
+import { sessions, sessionKeyMode } from "../routes/agentStream.js";
 import { getUserAllowedModels } from "../auth/permissionGroups.js";
 
 const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "claude-sonnet-4-6-20250514";
@@ -24,7 +24,7 @@ export const agentRouter = router({
         }
       }),
     );
-    return { available: allowed, default: allowed[0], contextWindows };
+    return { available: allowed, default: allowed[0], contextWindows, serverHasModels: AVAILABLE_MODELS.length > 0 };
   }),
 
   listSessions: protectedProcedure
@@ -94,6 +94,7 @@ export const agentRouter = router({
       if (cached) {
         cached.close();
         sessions.delete(input.sessionId);
+        sessionKeyMode.delete(input.sessionId);
       }
 
       return { success: true };
@@ -151,6 +152,7 @@ export const agentRouter = router({
       if (session) {
         session.close();
         sessions.delete(input.sessionId);
+        sessionKeyMode.delete(input.sessionId);
       }
       await ctx.db.collection("agent_sessions").deleteOne({ sessionId: input.sessionId, userId: userIdFilter(ctx.user.userId) });
       await ctx.db.collection("agent_messages").deleteMany({ sessionId: input.sessionId });

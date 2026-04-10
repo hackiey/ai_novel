@@ -8,7 +8,8 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, Shield, Palette, Languages, LogOut, Share2 } from "lucide-react";
+import { ChevronDown, Shield, Palette, Languages, LogOut, Share2, KeyRound } from "lucide-react";
+import BYOKSettingsDialog from "./components/BYOKSettingsDialog.js";
 import HomePage from "./pages/HomePage.js";
 import WritePage from "./pages/WritePage.js";
 import WorldPage from "./pages/WorldPage.js";
@@ -28,6 +29,7 @@ function UserMenu({ user, logout }: { user: { displayName: string; role: string 
   const { t, i18n } = useTranslation();
   const { theme, setTheme } = useWriteTheme();
   const [open, setOpen] = useState(false);
+  const [byokOpen, setBYOKOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const isZh = i18n.language?.startsWith("zh");
 
@@ -43,6 +45,7 @@ function UserMenu({ user, logout }: { user: { displayName: string; role: string 
   }, [open]);
 
   return (
+    <>
     <div ref={menuRef} className="relative">
       <button
         onClick={() => setOpen(!open)}
@@ -72,6 +75,13 @@ function UserMenu({ user, logout }: { user: { displayName: string; role: string 
             {t("header.shares")}
           </Link>
           <button
+            onClick={() => { setOpen(false); setBYOKOpen(true); }}
+            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-white/70 hover:text-teal-400 hover:bg-white/5 transition-colors"
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            {t("header.apiKeys")}
+          </button>
+          <button
             onClick={() => setTheme(theme === "rain" ? "starfield" : "rain")}
             className="w-full flex items-center gap-2 px-4 py-2 text-sm text-white/70 hover:text-teal-400 hover:bg-white/5 transition-colors"
           >
@@ -96,6 +106,8 @@ function UserMenu({ user, logout }: { user: { displayName: string; role: string 
         </div>
       )}
     </div>
+    <BYOKSettingsDialog open={byokOpen} onClose={() => setBYOKOpen(false)} />
+    </>
   );
 }
 

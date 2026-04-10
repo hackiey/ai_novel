@@ -17,13 +17,21 @@ export const authRouter = router({
   register: publicProcedure
     .input(registerSchema)
     .mutation(async ({ ctx, input }) => {
+      // Check if registration is enabled (first user can always register)
+      const userCount = await ctx.db.collection("users").countDocuments();
+      if (userCount > 0) {
+        const settings = await ctx.db.collection("system_settings").findOne({ key: "global" });
+        if (settings?.registrationEnabled === false) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Registration is currently disabled" });
+        }
+      }
+
       const existing = await ctx.db.collection("users").findOne({ email: input.email });
       if (existing) {
         throw new TRPCError({ code: "CONFLICT", message: "Email already registered" });
       }
 
       // First user becomes admin
-      const userCount = await ctx.db.collection("users").countDocuments();
       const role = userCount === 0 ? "admin" : "user";
       const defaultPermissionGroup = await ensureDefaultPermissionGroup(ctx.db);
       if (!defaultPermissionGroup) {

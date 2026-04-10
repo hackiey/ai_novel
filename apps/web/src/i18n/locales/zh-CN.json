@@ -21,6 +21,7 @@
   "register.submit": "注册",
   "register.hasAccount": "已有账号？",
   "register.login": "登录",
+  "register.disabled": "注册功能已关闭。",
 
   "admin.noAccess": "无权访问",
   "admin.title": "管理面板",
@@ -38,6 +39,10 @@
   "admin.role": "角色",
   "admin.permissionGroup": "权限组",
   "admin.none": "无",
+  "admin.siteSettings": "站点设置",
+  "admin.allowRegistration": "允许注册",
+  "admin.registrationEnabled": "新用户可以注册",
+  "admin.registrationDisabled": "注册已关闭",
 
   "home.title": "你的世界",
   "home.subtitle": "每个世界包含角色、设定和小说",
@@ -284,6 +289,7 @@
   "search.semanticBadge": "语义搜索",
   "search.keywordBadge": "关键词回退",
 
+  "header.apiKeys": "API 密钥",
   "header.shares": "我的分享",
 
   "share.title": "分享设置",
@@ -320,5 +326,23 @@
   "reader.wordCount": "{{count}} 字",
 
   "language.zh-CN": "中文",
-  "language.en": "English"
+  "language.en": "English",
+
+  "byok.title": "API 密钥设置",
+  "byok.description": "配置你自己的 API 密钥来使用 AI 功能。",
+  "byok.securityNotice": "你的 API 密钥仅存储在浏览器本地（localStorage），服务器不会保存、记录或以任何方式持久化你的密钥。密钥仅在请求时通过 HTTPS 加密传输用于代理调用 AI 服务。",
+  "byok.provider": "提供商",
+  "byok.apiKey": "API 密钥",
+  "byok.apiKeyPlaceholder": "sk-...",
+  "byok.baseURL": "Base URL",
+  "byok.baseURLPlaceholder": "https://api.example.com/v1",
+  "byok.models": "模型",
+  "byok.modelsPlaceholder": "模型 ID，多个用英文逗号分隔",
+  "byok.modelsHint": "多个模型用英文逗号分隔，如 gpt-4o, gpt-4o-mini",
+  "byok.save": "保存",
+  "byok.clear": "清除所有密钥",
+  "byok.cleared": "所有密钥已清除",
+  "byok.saved": "设置已保存",
+  "byok.noServerModels": "服务器未配置 AI 模型。请在右上角菜单的「API 密钥」中配置你自己的 API 密钥来使用 AI 助手。",
+  "byok.usingOwnKey": "使用自有密钥"
 }

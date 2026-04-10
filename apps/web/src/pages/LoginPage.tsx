@@ -2,11 +2,13 @@ import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext.js";
+import { trpc } from "../lib/trpc.js";
 
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const settingsQuery = trpc.settings.get.useQuery();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -62,12 +64,14 @@ export default function LoginPage() {
             {loading ? t("login.loading") : t("login.submit")}
           </button>
         </form>
-        <p className="text-center text-sm text-white/50 mt-4">
-          {t("login.noAccount")}{" "}
-          <Link to="/register" className="text-teal-400 hover:underline">
-            {t("login.register")}
-          </Link>
-        </p>
+        {settingsQuery.data?.registrationEnabled !== false && (
+          <p className="text-center text-sm text-white/50 mt-4">
+            {t("login.noAccount")}{" "}
+            <Link to="/register" className="text-teal-400 hover:underline">
+              {t("login.register")}
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );

@@ -21,6 +21,7 @@
   "register.submit": "Register",
   "register.hasAccount": "Already have an account?",
   "register.login": "Login",
+  "register.disabled": "Registration is currently closed.",
 
   "admin.noAccess": "No access",
   "admin.title": "Admin Panel",
@@ -38,6 +39,10 @@
   "admin.role": "Role",
   "admin.permissionGroup": "Permission Group",
   "admin.none": "None",
+  "admin.siteSettings": "Site Settings",
+  "admin.allowRegistration": "Allow Registration",
+  "admin.registrationEnabled": "New users can register",
+  "admin.registrationDisabled": "Registration is closed",
 
   "home.title": "Your Worlds",
   "home.subtitle": "Each world contains characters, settings, and novels",
@@ -278,6 +283,7 @@
   "search.semanticBadge": "Semantic search",
   "search.keywordBadge": "Keyword fallback",
 
+  "header.apiKeys": "API Keys",
   "header.shares": "My Shares",
 
   "share.title": "Share Settings",
@@ -314,5 +320,23 @@
   "reader.wordCount": "{{count}} words",
 
   "language.zh-CN": "中文",
-  "language.en": "English"
+  "language.en": "English",
+
+  "byok.title": "API Key Settings",
+  "byok.description": "Configure your own API key to use AI features.",
+  "byok.securityNotice": "Your API key is stored only in your browser (localStorage). The server will never save, log, or persist your key in any way. It is only transmitted via HTTPS at request time to proxy AI service calls.",
+  "byok.provider": "Provider",
+  "byok.apiKey": "API Key",
+  "byok.apiKeyPlaceholder": "sk-...",
+  "byok.baseURL": "Base URL",
+  "byok.baseURLPlaceholder": "https://api.example.com/v1",
+  "byok.models": "Models",
+  "byok.modelsPlaceholder": "Model IDs, separated by commas",
+  "byok.modelsHint": "Separate multiple models with commas, e.g. gpt-4o, gpt-4o-mini",
+  "byok.save": "Save",
+  "byok.clear": "Clear All Keys",
+  "byok.cleared": "All keys cleared",
+  "byok.saved": "Settings saved",
+  "byok.noServerModels": "No AI models available from the server. Configure your own API key in the \"API Keys\" menu to use the AI assistant.",
+  "byok.usingOwnKey": "Using your own key"
 }
