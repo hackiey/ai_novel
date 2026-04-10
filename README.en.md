@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" />
   <img src="https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg" alt="Node.js" />
   <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6.svg?logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/platform-Web%20%7C%20Desktop%20%7C%20Mobile-blueviolet" alt="Platform" />
+  <img src="https://img.shields.io/badge/platform-Web%20%7C%20Mobile-blueviolet" alt="Platform" />
 </p>
 
 ---
@@ -56,7 +56,6 @@ At the heart of AI Creator is an AI Agent with a rich set of specialized tools. 
 ### 📱 Multi-Platform Sync
 
 - **Web** — Side-by-side editor + AI chat, the full writing workspace
-- **Desktop** — Standalone Electron app for focused, immersive sessions
 - **Mobile** — Native Expo app with chapter editing, AI chat, and data management. Capture ideas on the go, continue seamlessly at your desk
 
 ### 🤖 Flexible Model Support
@@ -119,9 +118,6 @@ pnpm dev:all      # Start backend (3001) + web app (5173)
 ```
 
 ```bash
-# Desktop
-pnpm dev:web && pnpm --filter @ai-creator/desktop dev
-
 # Mobile
 pnpm --filter @ai-creator/mobile dev
 ```
@@ -144,7 +140,7 @@ Configure in `apps/server/.env`:
 ## Roadmap
 
 - [x] AI Agent-assisted writing (data management, smart continuation, semantic search, memory, file import)
-- [x] Immersive multi-platform writing experience (Web / Desktop / Mobile)
+- [x] Immersive multi-platform writing experience (Web / Mobile)
 - [ ] **Automated Writing Pipeline** — AI generates chapter drafts from outlines → self-reviews for consistency, logic, and style → auto-revises → human final review. Hands-free novel production.
 - [ ] **Interactive Fiction Experience** — Readers step into a fully realized world as a character, converse with inhabitants, make choices, and drive the plot forward for a personalized story experience.
 

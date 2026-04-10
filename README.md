@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" />
   <img src="https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg" alt="Node.js" />
   <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6.svg?logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/platform-Web%20%7C%20Desktop%20%7C%20Mobile-blueviolet" alt="Platform" />
+  <img src="https://img.shields.io/badge/platform-Web%20%7C%20Mobile-blueviolet" alt="Platform" />
 </p>
 
 ---
@@ -56,7 +56,6 @@ AI Creator 的核心是一个拥有丰富专用工具的 AI Agent。它不只是
 ### 📱 多端同步
 
 - **Web 端** —— 左侧编辑器 + 右侧 AI 对话，双栏并行的完整工作台
-- **桌面端** —— Electron 封装，独立窗口沉浸写作
 - **移动端** —— Expo 原生应用，章节编辑 + AI 对话 + 设定管理。外出记录灵感，回来无缝继续
 
 ### 🤖 灵活的模型接入
@@ -119,9 +118,6 @@ pnpm dev:all      # 启动后端 (3001) + Web (5173)
 ```
 
 ```bash
-# 桌面端
-pnpm dev:web && pnpm --filter @ai-creator/desktop dev
-
 # 移动端
 pnpm --filter @ai-creator/mobile dev
 ```
@@ -144,7 +140,7 @@ pnpm --filter @ai-creator/mobile dev
 ## Roadmap
 
 - [x] AI Agent 辅助创作（设定管理、智能续写、语义搜索、记忆系统、文件导入）
-- [x] 沉浸式多端写作体验（Web / Desktop / Mobile）
+- [x] 沉浸式多端写作体验（Web / Mobile）
 - [ ] **自动化写作流水线** —— AI 按大纲自动生成章节初稿 → 自我审核（一致性、逻辑、风格）→ 自动修改 → 人工终审，实现"挂机写小说"
 - [ ] **交互式小说体验** —— 读者进入一个完整的世界观，以角色身份沉浸其中，与世界中的人物对话、做出选择、推动剧情发展，获得个人化的故事体验
 

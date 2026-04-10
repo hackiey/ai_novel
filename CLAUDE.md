@@ -16,12 +16,11 @@ No test suite is configured. Verify changes by running `pnpm build` and checking
 
 ## Architecture
 
-Turborepo + pnpm workspaces monorepo. Four apps, four shared packages.
+Turborepo + pnpm workspaces monorepo. Three apps, four shared packages.
 
 **Apps:**
 - `apps/server` — Fastify + tRPC v11 backend (port 3001). MongoDB native driver. REST endpoint `POST /api/agent/chat` streams agent responses via SSE. JWT auth with permission groups.
 - `apps/web` — React 19 + Vite + TailwindCSS v4 SPA. TanStack Router (file-based) + TanStack Query. Main page is WritePage: two-panel layout with editor (left) and AI chat (right).
-- `apps/desktop` — Electron wrapper loading the web app.
 - `apps/mobile` — Expo 52 + React Native + NativeWind. Expo Router (file-based). tRPC client + TanStack Query. i18next for i18n (zh-CN). Auth via AsyncStorage JWT tokens.
 
 **Packages:**

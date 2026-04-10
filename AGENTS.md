@@ -11,15 +11,14 @@ pnpm dev:all                          # Start server (3001) + web (5173)
 pnpm dev:server                       # Backend only
 pnpm dev:web                          # Web only
 pnpm --filter @ai-creator/mobile dev  # Expo mobile app
-pnpm --filter @ai-creator/desktop dev # Electron shell (start web first)
 ```
 
 No dedicated automated test suite is configured. Validate changes with `pnpm build`.
-`apps/mobile` and `apps/desktop` currently have placeholder `build` scripts, so `pnpm build` is mainly useful as a TypeScript/package build check for the server, web app, and shared packages.
+`apps/mobile` currently has a placeholder `build` script, so `pnpm build` is mainly useful as a TypeScript/package build check for the server, web app, and shared packages.
 
 ## Architecture
 
-Turborepo + pnpm workspaces monorepo. Four apps and four shared packages.
+Turborepo + pnpm workspaces monorepo. Three apps and four shared packages.
 
 Core content hierarchy: `World -> Project (Novel) -> Chapter`.
 Characters and world settings live at the world level. Drafts can belong to either a world or a project.
@@ -27,7 +26,7 @@ Characters and world settings live at the world level. Drafts can belong to eith
 **Apps:**
 - `apps/server` — Fastify + tRPC v11 backend with MongoDB native driver. Registers `/trpc`, `POST /api/agent/chat` for SSE streaming, `POST /api/world/import-file` plus `DELETE /api/world/import-file/:fileHash` for resumable file import, and `/health`. JWT auth and permission groups control access.
 - `apps/web` — React 19 + Vite + TailwindCSS v4 SPA. Uses TanStack Router with an explicit route tree in `src/router.tsx`, TanStack Query, and `i18next` (`zh-CN` + `en`). Main routes cover auth, home, world workspace, immersive writing, and admin.
-- `apps/desktop` — Electron shell that loads the web app.
+
 - `apps/mobile` — Expo 54 + React Native 0.81 + Expo Router. Uses tRPC + TanStack Query, AsyncStorage-backed auth/config/theme state, StyleSheet-based UI, markdown rendering for assistant output, and themed rain/starfield backgrounds.
 
 **Packages:**
