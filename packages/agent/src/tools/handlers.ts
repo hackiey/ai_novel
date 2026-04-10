@@ -60,9 +60,9 @@ export async function semanticSearch(
   const pattern = escaped.trim().split(/\s+/).join("|");
   const regex = { $regex: pattern, $options: "i" };
   const worldFilter: Record<string, any> = {};
-  if (args.worldId) worldFilter.worldId = new ObjectId(args.worldId);
+  if (args.worldId) worldFilter.worldId = { $in: [args.worldId, new ObjectId(args.worldId)] };
   const projectFilter: Record<string, any> = {};
-  if (args.projectId) projectFilter.projectId = new ObjectId(args.projectId);
+  if (args.projectId) projectFilter.projectId = { $in: [args.projectId, new ObjectId(args.projectId)] };
   const results: Array<{ collection: string; title: string; excerpt: string; id: string }> = [];
 
   if (scope.includes("character")) {
@@ -113,13 +113,13 @@ export async function semanticSearch(
     const draftFilter: Record<string, any> = {};
     if (args.projectId && args.worldId) {
       draftFilter.$or = [
-        { projectId: new ObjectId(args.projectId) },
-        { worldId: new ObjectId(args.worldId) },
+        { projectId: { $in: [args.projectId, new ObjectId(args.projectId)] } },
+        { worldId: { $in: [args.worldId, new ObjectId(args.worldId)] } },
       ];
     } else if (args.projectId) {
-      draftFilter.projectId = new ObjectId(args.projectId);
+      draftFilter.projectId = { $in: [args.projectId, new ObjectId(args.projectId)] };
     } else if (args.worldId) {
-      draftFilter.worldId = new ObjectId(args.worldId);
+      draftFilter.worldId = { $in: [args.worldId, new ObjectId(args.worldId)] };
     }
     const textMatch = { $or: [{ title: regex }, { content: regex }, { tags: regex }] };
     const draftQuery = draftFilter.$or
@@ -379,7 +379,7 @@ export async function listChapters(
 ): Promise<unknown> {
   const chapters = await db
     .collection("chapters")
-    .find({ projectId: new ObjectId(args.projectId) })
+    .find({ projectId: { $in: [args.projectId, new ObjectId(args.projectId)] } })
     .sort({ order: 1 })
     .toArray();
 
@@ -430,7 +430,7 @@ export async function createChapter(
   if (order === undefined) {
     const lastChapter = await db
       .collection("chapters")
-      .find({ projectId: new ObjectId(args.projectId) })
+      .find({ projectId: { $in: [args.projectId, new ObjectId(args.projectId)] } })
       .sort({ order: -1 })
       .limit(1)
       .toArray();

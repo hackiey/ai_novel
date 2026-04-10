@@ -105,10 +105,10 @@ const zh = {
 
   // ── Tool descriptions ──
   tools: {
-    semantic_search: "搜索角色、世界观设定、草稿、章节中的相关内容。支持语义搜索（向量匹配）和关键词搜索。projectId 和 worldId 已自动注入。",
-    semantic_search_query: "搜索内容（支持语义理解，不必完全匹配关键词）",
+    semantic_search: "搜索角色、世界观设定、草稿、章节中的相关内容。支持同时传入多个查询（最多5个），结果自动去重和融合排序。单次调用传入多个查询比多次调用更高效。projectId 和 worldId 已自动注入。",
+    semantic_search_query: "搜索内容，可以是单个字符串或最多5个查询的数组（支持语义理解，不必完全匹配关键词）。多个查询的结果会自动去重和融合排序。",
     semantic_search_scope: "搜索范围，可选。默认搜索所有类型。可指定一个或多个: character, world, draft, chapter",
-    semantic_search_limit: "返回结果数量上限，默认5",
+    semantic_search_limit: "返回结果数量上限，默认15",
 
     update_character: "更新角色信息。可以更新名称、重要性、别名、描述内容等。",
     update_character_id: "角色ID",
@@ -316,10 +316,10 @@ const en: typeof zh = {
 
   // ── Tool descriptions ──
   tools: {
-    semantic_search: "Search for relevant content across characters, world settings, drafts, and chapters. Supports semantic search (vector matching) and keyword search. projectId and worldId are auto-injected.",
-    semantic_search_query: "Search query (supports semantic understanding, exact keyword match not required)",
+    semantic_search: "Search for relevant content across characters, world settings, drafts, and chapters. Supports multiple queries at once (up to 5) with automatic deduplication and fusion ranking. Passing multiple queries in a single call is more efficient than making separate calls. projectId and worldId are auto-injected.",
+    semantic_search_query: "Search queries — a single string or an array of up to 5 queries (supports semantic understanding, exact keyword match not required). Results from multiple queries are automatically deduplicated and fusion-ranked.",
     semantic_search_scope: "Search scope, optional. Defaults to all types. Specify one or more: character, world, draft, chapter",
-    semantic_search_limit: "Maximum number of results, default 5",
+    semantic_search_limit: "Maximum number of results, default 15",
 
     update_character: "Update character information. Can update name, importance, aliases, description content, etc.",
     update_character_id: "Character ID",

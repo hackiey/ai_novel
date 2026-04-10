@@ -23,6 +23,28 @@ function textResult(data: unknown): AgentToolResult<undefined> {
   };
 }
 
+type SearchResult = { collection: string; id: string; title: string; excerpt: string; score: number };
+
+function rrfMerge(rankedLists: SearchResult[][], k = 60): SearchResult[] {
+  const merged = new Map<string, { result: SearchResult; rrfScore: number }>();
+  for (const list of rankedLists) {
+    for (let rank = 0; rank < list.length; rank++) {
+      const item = list[rank];
+      const contribution = 1 / (k + rank + 1);
+      const existing = merged.get(item.id);
+      if (existing) {
+        existing.rrfScore += contribution;
+        if (item.score > existing.result.score) existing.result = item;
+      } else {
+        merged.set(item.id, { result: item, rrfScore: contribution });
+      }
+    }
+  }
+  return Array.from(merged.values())
+    .sort((a, b) => b.rrfScore - a.rrfScore)
+    .map(({ result, rrfScore }) => ({ ...result, score: rrfScore }));
+}
+
 export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocumentChanged?: OnDocumentChangedFn, userId?: string, onWorldSummaryStale?: OnWorldSummaryStaleFn, locale: Locale = "zh", worldId?: string, projectId?: string): AgentTool<any>[] {
   const d = t(locale).tools;
 
@@ -32,7 +54,10 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       label: "Semantic Search",
       description: d.semantic_search,
       parameters: Type.Object({
-        query: Type.String({ description: d.semantic_search_query }),
+        query: Type.Union([
+          Type.String({ description: d.semantic_search_query }),
+          Type.Array(Type.String(), { maxItems: 5, description: d.semantic_search_query }),
+        ], { description: d.semantic_search_query }),
         scope: Type.Optional(Type.Array(
           StringEnum(["character", "world", "draft", "chapter"] as const),
           { description: d.semantic_search_scope },
@@ -40,21 +65,36 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         limit: Type.Optional(Type.Number({ description: d.semantic_search_limit })),
       }),
       async execute(_toolCallId, args) {
-        const fullArgs = { ...args, projectId, worldId };
-        console.log("[semantic_search] called with:", JSON.stringify(fullArgs));
-        console.log("[semantic_search] vectorSearchFn available:", !!vectorSearchFn);
-        if (vectorSearchFn) {
-          try {
-            const result = await vectorSearchFn(fullArgs);
-            console.log("[semantic_search] vector result count:", result.results?.length);
-            return textResult(result);
-          } catch (err) {
-            console.error("[semantic_search] Vector search failed, falling back to regex:", err);
-          }
+        const queries: string[] = (typeof args.query === "string" ? [args.query] : args.query).slice(0, 5);
+        const limit = args.limit ?? 15;
+        const baseArgs = { scope: args.scope, limit, projectId, worldId };
+
+        console.log("[semantic_search] called with", queries.length, "queries:", JSON.stringify(queries));
+
+        const resultLists = await Promise.all(
+          queries.map(async (q): Promise<SearchResult[]> => {
+            const fullArgs = { ...baseArgs, query: q };
+            if (vectorSearchFn) {
+              try {
+                const result = await vectorSearchFn(fullArgs);
+                return result.results;
+              } catch (err) {
+                console.error("[semantic_search] Vector search failed for query, falling back to regex:", q, err);
+              }
+            }
+            const result = await handlers.semanticSearch(fullArgs, db) as { results: SearchResult[]; total: number };
+            return result.results.map((r, i) => ({ ...r, score: r.score ?? (1 - i * 0.01) }));
+          })
+        );
+
+        if (queries.length === 1) {
+          const results = resultLists[0];
+          return textResult({ results, total: results.length });
         }
-        const result = await handlers.semanticSearch(fullArgs, db);
-        console.log("[semantic_search] regex result count:", (result as any).results?.length);
-        return textResult(result);
+
+        const merged = rrfMerge(resultLists).slice(0, limit);
+        console.log("[semantic_search] merged:", merged.length, "results from", queries.length, "queries");
+        return textResult({ results: merged, total: merged.length });
       },
     },
 
