@@ -112,7 +112,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
     { enabled: !!worldId },
   );
   const activeSession = sessionsQuery.data?.find((session: any) => session.sessionId === sessionId) as any;
-  const currentModelSpec = selectedModel || activeSession?.model || modelsQuery.data?.default;
+  const currentModelSpec = selectedModel || activeSession?.model || modelsQuery.data?.default || getBYOKModelSpecs()[0];
   const currentContextTokens = activeSession?.usage?.maxContextTokens ?? activeSession?.usage?.lastContextTokens ?? 0;
   const currentModelContextWindow = activeSession?.usage?.modelContextWindow
     ?? (currentModelSpec ? modelsQuery.data?.contextWindows?.[currentModelSpec] : undefined)
