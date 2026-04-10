@@ -16,15 +16,13 @@ const API_BASE = "";
 const MUTATION_TOOL_INVALIDATIONS: Record<string, string[][]> = {
   create_character: [["character"]],
   update_character: [["character"]],
-  delete_character: [["character"]],
   create_world_setting: [["worldSetting"]],
   update_world_setting: [["worldSetting"]],
-  delete_world_setting: [["worldSetting"]],
   create_chapter: [["chapter"]],
   update_chapter: [["chapter"]],
-  delete_chapter: [["chapter"]],
   create_draft: [["draft"]],
-  delete_draft: [["draft"]],
+  update_draft: [["draft"]],
+  delete_entity: [["character"], ["worldSetting"], ["chapter"], ["draft"]],
 };
 
 interface ChatMessage {

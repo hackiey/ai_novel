@@ -166,6 +166,17 @@ export async function semanticSearch(
 
 // ============ Character Handlers ============
 
+export async function getCharacter(
+  args: { id: string },
+  db: Db
+): Promise<unknown> {
+  const character = await db
+    .collection("characters")
+    .findOne({ _id: toObjectId(args.id) });
+  if (!character) return { error: `Character not found: ${args.id}` };
+  return serialize(character);
+}
+
 export async function createCharacter(
   args: { worldId?: string; projectId?: string; name: string; aliases?: string[]; tags?: string[]; content?: string; importance?: string; summary?: string },
   db: Db,
@@ -233,6 +244,17 @@ export async function deleteCharacter(
 }
 
 // ============ World Setting Handlers ============
+
+export async function getWorldSetting(
+  args: { id: string },
+  db: Db
+): Promise<unknown> {
+  const ws = await db
+    .collection("world_settings")
+    .findOne({ _id: toObjectId(args.id) });
+  if (!ws) return { error: `World setting not found: ${args.id}` };
+  return serialize(ws);
+}
 
 export async function createWorldSetting(
   args: { worldId?: string; projectId?: string; category: string; title: string; content?: string; tags?: string[]; importance?: string; summary?: string },

@@ -107,17 +107,50 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
     },
 
     {
-      name: "delete_character",
-      label: "Delete Character",
-      description: d.delete_character,
+      name: "get_entity",
+      label: "Get Entity",
+      description: d.get_entity,
       parameters: Type.Object({
-        id: Type.String({ description: d.delete_character_id }),
+        type: StringEnum(["character", "world_setting", "draft", "chapter"] as const, { description: d.get_entity_type }),
+        id: Type.String({ description: d.get_entity_id }),
       }),
       async execute(_toolCallId, args) {
-        const charDoc = await db.collection("characters").findOne({ _id: new ObjectId(args.id) });
-        const result = await handlers.deleteCharacter(args, db);
-        if (charDoc?.worldId) onWorldSummaryStale?.(charDoc.worldId.toHexString());
-        return textResult(result);
+        switch (args.type) {
+          case "character": return textResult(await handlers.getCharacter(args, db));
+          case "world_setting": return textResult(await handlers.getWorldSetting(args, db));
+          case "draft": return textResult(await handlers.getDraft(args, db));
+          default: return textResult(await handlers.getChapter(args, db));
+        }
+      },
+    },
+
+    {
+      name: "delete_entity",
+      label: "Delete Entity",
+      description: d.delete_entity,
+      parameters: Type.Object({
+        type: StringEnum(["character", "world_setting", "draft", "chapter"] as const, { description: d.delete_entity_type }),
+        id: Type.String({ description: d.delete_entity_id }),
+      }),
+      async execute(_toolCallId, args) {
+        switch (args.type) {
+          case "character": {
+            const charDoc = await db.collection("characters").findOne({ _id: new ObjectId(args.id) });
+            const result = await handlers.deleteCharacter(args, db);
+            if (charDoc?.worldId) onWorldSummaryStale?.(charDoc.worldId.toHexString());
+            return textResult(result);
+          }
+          case "world_setting": {
+            const wsDoc = await db.collection("world_settings").findOne({ _id: new ObjectId(args.id) });
+            const result = await handlers.deleteWorldSetting(args, db);
+            if (wsDoc?.worldId) onWorldSummaryStale?.(wsDoc.worldId.toHexString());
+            return textResult(result);
+          }
+          case "draft":
+            return textResult(await handlers.deleteDraft(args, db));
+          default:
+            return textResult(await handlers.deleteChapter(args, db));
+        }
       },
     },
 
@@ -169,20 +202,6 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       },
     },
 
-    {
-      name: "delete_world_setting",
-      label: "Delete World Setting",
-      description: d.delete_world_setting,
-      parameters: Type.Object({
-        id: Type.String({ description: d.delete_world_setting_id }),
-      }),
-      async execute(_toolCallId, args) {
-        const wsDoc = await db.collection("world_settings").findOne({ _id: new ObjectId(args.id) });
-        const result = await handlers.deleteWorldSetting(args, db);
-        if (wsDoc?.worldId) onWorldSummaryStale?.(wsDoc.worldId.toHexString());
-        return textResult(result);
-      },
-    },
 
     {
       name: "create_chapter",
@@ -197,19 +216,6 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       async execute(_toolCallId, args) {
         const result = await handlers.createChapter({ ...args, projectId: projectId! }, db, userId);
         if ((result as any)?._id) onDocumentChanged?.("chapters", String((result as any)._id));
-        return textResult(result);
-      },
-    },
-
-    {
-      name: "get_chapter",
-      label: "Get Chapter",
-      description: d.get_chapter,
-      parameters: Type.Object({
-        id: Type.String({ description: d.get_chapter_id }),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await handlers.getChapter(args, db);
         return textResult(result);
       },
     },
@@ -244,31 +250,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       },
     },
 
-    {
-      name: "delete_chapter",
-      label: "Delete Chapter",
-      description: d.delete_chapter,
-      parameters: Type.Object({
-        id: Type.String({ description: d.delete_chapter_id }),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await handlers.deleteChapter(args, db);
-        return textResult(result);
-      },
-    },
 
-    {
-      name: "get_draft",
-      label: "Get Draft",
-      description: d.get_draft,
-      parameters: Type.Object({
-        id: Type.String({ description: d.get_draft_id }),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await handlers.getDraft(args, db);
-        return textResult(result);
-      },
-    },
 
     {
       name: "create_draft",
@@ -307,18 +289,6 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       },
     },
 
-    {
-      name: "delete_draft",
-      label: "Delete Draft",
-      description: d.delete_draft,
-      parameters: Type.Object({
-        id: Type.String({ description: d.delete_draft_id }),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await handlers.deleteDraft(args, db);
-        return textResult(result);
-      },
-    },
 
     {
       name: "update_memory",

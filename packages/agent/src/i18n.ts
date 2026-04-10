@@ -127,8 +127,13 @@ const zh = {
     create_character_tags: "角色标签，如：反派、魔法师、皇族等",
     create_character_content: "角色的详细描述（自然语言）。建议涵盖以下维度：外貌特征、性格特点、背景故事、目标动机、与其他角色的关系等。",
 
-    delete_character: "删除指定角色。此操作不可撤销，会同时删除相关的嵌入数据。",
-    delete_character_id: "要删除的角色ID",
+    get_entity: "根据类型和ID获取实体的完整详情。可获取角色、世界观设定、草稿或章节。",
+    get_entity_type: "实体类型：character（角色）、world_setting（世界观设定）、draft（草稿）、chapter（章节）",
+    get_entity_id: "实体ID",
+
+    delete_entity: "删除指定实体。此操作不可撤销，会同时删除相关的嵌入数据。",
+    delete_entity_type: "实体类型：character（角色）、world_setting（世界观设定）、draft（草稿）、chapter（章节）",
+    delete_entity_id: "要删除的实体ID",
 
     update_world_setting: "更新世界观设定。",
     update_world_setting_id: "世界观设定ID",
@@ -147,8 +152,6 @@ const zh = {
     create_world_setting_importance: "重要性级别，默认 minor",
     create_world_setting_summary: "一句话简介，不超过50字",
 
-    delete_world_setting: "删除指定世界观设定。此操作不可撤销。",
-    delete_world_setting_id: "要删除的世界观设定ID",
 
     create_chapter: "创建新章节。如果不指定 order，会自动排在最后。projectId 已自动注入。",
     create_chapter_title: "章节标题",
@@ -156,10 +159,7 @@ const zh = {
     create_chapter_synopsis: "章节梗概",
     create_chapter_order: "章节排序，不指定则自动排在最后",
 
-    get_chapter: "根据ID获取章节完整内容。",
-    get_chapter_id: "章节ID",
-
-    list_chapters: "列出当前项目的章节信息：最近5万字范围内的章节返回完整正文，更早的章节仅返回摘要。每项都包含章节ID，便于后续通过 get_chapter 获取全文。projectId 已自动注入。",
+    list_chapters: "列出当前项目的章节信息：最近5万字范围内的章节返回完整正文，更早的章节仅返回摘要。每项都包含章节ID，便于后续通过 get_entity 获取全文。projectId 已自动注入。",
 
 
     update_chapter: "编辑章节内容。三种模式：1) 查找替换：传 old_string + new_string；2) 追加到末尾：传 append: true + new_string；3) 插入到开头：传 prepend: true + new_string。field 默认为 content。",
@@ -170,11 +170,6 @@ const zh = {
     update_chapter_append: "设为 true 时，将 new_string 追加到字段末尾，无需 old_string",
     update_chapter_prepend: "设为 true 时，将 new_string 插入到字段开头，无需 old_string",
 
-    delete_chapter: "删除指定章节。此操作不可撤销，会同时删除相关的嵌入数据。",
-    delete_chapter_id: "要删除的章节ID",
-
-    get_draft: "根据ID获取草稿详情。",
-    get_draft_id: "草稿ID",
 
     create_draft: "创建草稿，用于保存创作过程中的想法、灵感、决策等。projectId 和 worldId 已自动注入。",
     create_draft_title: "草稿标题",
@@ -191,8 +186,6 @@ const zh = {
     update_draft_linkedCharacters: "关联角色ID列表",
     update_draft_linkedWorldSettings: "关联世界观设定ID列表",
 
-    delete_draft: "删除指定草稿。此操作不可撤销。",
-    delete_draft_id: "要删除的草稿ID",
 
     update_memory: "更新用户偏好记忆。整体覆盖 content 字段。当用户要求你记住某些做事方式、行为偏好时调用此工具保存。worldId 和 projectId 已自动注入。可通过 scope 参数选择保存到世界观级别(world)还是小说项目级别(project)。在编辑页面默认保存到 project 级别，在世界页面默认保存到 world 级别。",
     update_memory_content: "完整的记忆内容（会整体覆盖旧内容，请先读取再追加）",
@@ -345,8 +338,13 @@ const en: typeof zh = {
     create_character_tags: "Character tags, e.g.: villain, mage, royalty",
     create_character_content: "Detailed character description in natural language. Recommended dimensions: appearance, personality, background story, goals/motivations, relationships with other characters.",
 
-    delete_character: "Delete a character. This action is irreversible and will also delete related embedding data.",
-    delete_character_id: "Character ID to delete",
+    get_entity: "Get full details of an entity by type and ID. Supports character, world_setting, draft, and chapter.",
+    get_entity_type: "Entity type: character, world_setting, draft, or chapter",
+    get_entity_id: "Entity ID",
+
+    delete_entity: "Delete an entity. This action is irreversible and will also delete related embedding data.",
+    delete_entity_type: "Entity type: character, world_setting, draft, or chapter",
+    delete_entity_id: "Entity ID to delete",
 
     update_world_setting: "Update a world setting.",
     update_world_setting_id: "World setting ID",
@@ -365,8 +363,6 @@ const en: typeof zh = {
     create_world_setting_importance: "Importance level, default: minor",
     create_world_setting_summary: "One-line summary, max 50 characters",
 
-    delete_world_setting: "Delete a world setting. This action is irreversible.",
-    delete_world_setting_id: "World setting ID to delete",
 
     create_chapter: "Create a new chapter. If order is not specified, it will be placed at the end. projectId is auto-injected.",
     create_chapter_title: "Chapter title",
@@ -374,10 +370,7 @@ const en: typeof zh = {
     create_chapter_synopsis: "Chapter synopsis",
     create_chapter_order: "Chapter order; auto-placed at end if not specified",
 
-    get_chapter: "Get the full content of a chapter by ID.",
-    get_chapter_id: "Chapter ID",
-
-    list_chapters: "List chapter information for the current project: chapters covering the most recent 50,000 words return full content, while older chapters return only synopses. Every item includes the chapter ID so the agent can call get_chapter later for full text. projectId is auto-injected.",
+    list_chapters: "List chapter information for the current project: chapters covering the most recent 50,000 words return full content, while older chapters return only synopses. Every item includes the chapter ID so the agent can call get_entity later for full text. projectId is auto-injected.",
 
 
     update_chapter: "Edit chapter content. Three modes: 1) Find-replace: pass old_string + new_string; 2) Append to end: pass append: true + new_string; 3) Prepend to start: pass prepend: true + new_string. Field defaults to content.",
@@ -388,11 +381,6 @@ const en: typeof zh = {
     update_chapter_append: "Set to true to append new_string to the end of the field. No old_string needed.",
     update_chapter_prepend: "Set to true to prepend new_string to the start of the field. No old_string needed.",
 
-    delete_chapter: "Delete a chapter. This action is irreversible and will also delete related embedding data.",
-    delete_chapter_id: "Chapter ID to delete",
-
-    get_draft: "Get draft details by ID.",
-    get_draft_id: "Draft ID",
 
     create_draft: "Create a draft to save ideas, inspirations, and decisions during the creative process. projectId and worldId are auto-injected.",
     create_draft_title: "Draft title",
@@ -409,8 +397,6 @@ const en: typeof zh = {
     update_draft_linkedCharacters: "Linked character ID list",
     update_draft_linkedWorldSettings: "Linked world setting ID list",
 
-    delete_draft: "Delete a draft. This action is irreversible.",
-    delete_draft_id: "Draft ID to delete",
 
     update_memory: "Update user preference memory. Overwrites the entire content field. Call this when the user asks you to remember certain work styles or behavior preferences. worldId and projectId are auto-injected. Use the scope parameter to choose between world-level (shared across projects) or project-level (this novel only). Defaults to project when in editor, world when in world page.",
     update_memory_content: "Complete memory content (will overwrite old content entirely; read first, then append)",
