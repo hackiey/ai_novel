@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { X, Eye, EyeOff } from "lucide-react";
 import { getBYOKConfig, setBYOKConfig, clearBYOKConfig, type BYOKConfig, type BYOKProvider } from "../lib/byokStorage.js";
+import { trpc } from "../lib/trpc.js";
 
 const PROVIDERS: { key: BYOKProvider; label: string; showBaseURL: boolean; defaultModels: string }[] = [
   { key: "openai", label: "OpenAI", showBaseURL: false, defaultModels: "gpt-4o" },
@@ -10,6 +11,13 @@ const PROVIDERS: { key: BYOKProvider; label: string; showBaseURL: boolean; defau
   { key: "openrouter", label: "OpenRouter", showBaseURL: false, defaultModels: "anthropic/claude-sonnet-4.6" },
   { key: "custom", label: "OpenAI Compatible", showBaseURL: true, defaultModels: "" },
 ];
+
+interface ModelCtxEntry {
+  modelId: string;
+  contextWindow: string;
+  autoFilled: boolean;
+  unknown: boolean;
+}
 
 interface Props {
   open: boolean;
@@ -24,8 +32,10 @@ export default function BYOKSettingsDialog({ open, onClose }: Props) {
   const [apiKey, setApiKey] = useState("");
   const [baseURL, setBaseURL] = useState("");
   const [modelsText, setModelsText] = useState("");
+  const [modelCtxEntries, setModelCtxEntries] = useState<ModelCtxEntry[]>([]);
   const [showKey, setShowKey] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
+  const utils = trpc.useUtils();
 
   // Load config on open
   useEffect(() => {
@@ -36,15 +46,62 @@ export default function BYOKSettingsDialog({ open, onClose }: Props) {
       setApiKey(config.apiKey);
       setBaseURL(config.baseURL ?? "");
       setModelsText(config.models.join(", "));
+      // Initialize entries from stored contextWindows
+      setModelCtxEntries(config.models.map((m) => ({
+        modelId: m,
+        contextWindow: config.contextWindows?.[m] ? String(config.contextWindows[m]) : "",
+        autoFilled: false,
+        unknown: false,
+      })));
     } else {
       setProvider("openai");
       setApiKey("");
       setBaseURL("");
       setModelsText("");
+      setModelCtxEntries([]);
     }
     setShowKey(false);
     setSaveStatus("");
   }, [open]);
+
+  // Auto-lookup context windows when models text or provider changes
+  const lookupTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => {
+    if (!open) return;
+    clearTimeout(lookupTimer.current);
+    lookupTimer.current = setTimeout(async () => {
+      const models = modelsText.split(",").map((m) => m.trim()).filter(Boolean);
+      if (models.length === 0) {
+        setModelCtxEntries([]);
+        return;
+      }
+
+      // Preserve manually edited values
+      const prevMap = new Map(modelCtxEntries.filter((e) => !e.autoFilled).map((e) => [e.modelId, e.contextWindow]));
+
+      const entries: ModelCtxEntry[] = await Promise.all(
+        models.map(async (modelId) => {
+          // If user manually set a value, keep it
+          const manual = prevMap.get(modelId);
+          if (manual) {
+            return { modelId, contextWindow: manual, autoFilled: false, unknown: false };
+          }
+
+          const spec = `${provider}:${modelId}`;
+          try {
+            const info = await utils.agent.getModelInfo.fetch({ modelSpec: spec });
+            if (info) {
+              return { modelId, contextWindow: String(info.contextWindow), autoFilled: true, unknown: false };
+            }
+          } catch { /* ignore */ }
+          return { modelId, contextWindow: "", autoFilled: false, unknown: true };
+        }),
+      );
+      setModelCtxEntries(entries);
+    }, 500);
+    return () => clearTimeout(lookupTimer.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, provider, modelsText]);
 
   // Close on outside click
   useEffect(() => {
@@ -75,7 +132,6 @@ export default function BYOKSettingsDialog({ open, onClose }: Props) {
   function handleProviderChange(key: BYOKProvider) {
     setProvider(key);
     const info = PROVIDERS.find((p) => p.key === key)!;
-    // Pre-fill default models when switching provider (only if models field is empty or has defaults from another provider)
     const currentModels = modelsText.trim();
     const isDefaultFromOther = PROVIDERS.some((p) => p.key !== key && p.defaultModels && currentModels === p.defaultModels);
     if (!currentModels || isDefaultFromOther) {
@@ -86,14 +142,29 @@ export default function BYOKSettingsDialog({ open, onClose }: Props) {
     }
   }
 
+  function handleCtxWindowChange(modelId: string, value: string) {
+    setModelCtxEntries((prev) =>
+      prev.map((e) => e.modelId === modelId ? { ...e, contextWindow: value, autoFilled: false, unknown: false } : e),
+    );
+  }
+
   function handleSave() {
     const models = modelsText.split(",").map((m) => m.trim()).filter(Boolean);
     if (!apiKey.trim() || models.length === 0) return;
+
+    const contextWindows: Record<string, number> = {};
+    for (const entry of modelCtxEntries) {
+      const val = Number(entry.contextWindow);
+      if (Number.isFinite(val) && val > 0) {
+        contextWindows[entry.modelId] = Math.floor(val);
+      }
+    }
 
     const config: BYOKConfig = {
       provider,
       apiKey: apiKey.trim(),
       models,
+      ...(Object.keys(contextWindows).length > 0 ? { contextWindows } : {}),
     };
     if (provider === "custom" && baseURL.trim()) {
       config.baseURL = baseURL.trim();
@@ -108,6 +179,7 @@ export default function BYOKSettingsDialog({ open, onClose }: Props) {
     setApiKey("");
     setBaseURL("");
     setModelsText("");
+    setModelCtxEntries([]);
     setSaveStatus(t("byok.cleared"));
     setTimeout(() => setSaveStatus(""), 2000);
   }
@@ -197,6 +269,40 @@ export default function BYOKSettingsDialog({ open, onClose }: Props) {
               />
               <p className="text-[10px] text-white/25">{t("byok.modelsHint")}</p>
             </div>
+
+            {/* Per-model context windows */}
+            {modelCtxEntries.length > 0 && (
+              <div className="space-y-1.5">
+                <label className="text-xs text-white/60 font-medium">{t("byok.contextWindow")}</label>
+                <div className="space-y-1.5">
+                  {modelCtxEntries.map((entry) => (
+                    <div key={entry.modelId} className="flex items-center gap-2">
+                      <span className="text-[11px] text-white/50 truncate min-w-0 flex-1" title={entry.modelId}>
+                        {entry.modelId}
+                      </span>
+                      <input
+                        type="number"
+                        value={entry.contextWindow}
+                        onChange={(e) => handleCtxWindowChange(entry.modelId, e.target.value)}
+                        placeholder="128000"
+                        min={1000}
+                        step={1000}
+                        className={`w-28 bg-white/5 border rounded-md px-2 py-1 text-xs text-white/80 placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-teal-500 ${
+                          entry.autoFilled ? "border-teal-500/30" : entry.unknown ? "border-amber-500/30" : "border-white/10"
+                        }`}
+                      />
+                    </div>
+                  ))}
+                </div>
+                {modelCtxEntries.some((e) => e.unknown) && (
+                  <p className="text-[10px] text-amber-400/70">{t("byok.contextWindowUnknown")}</p>
+                )}
+                {modelCtxEntries.some((e) => e.autoFilled) && !modelCtxEntries.some((e) => e.unknown) && (
+                  <p className="text-[10px] text-white/25">{t("byok.contextWindowAutoFilled")}</p>
+                )}
+                <p className="text-[10px] text-white/25">{t("byok.contextWindowHint")}</p>
+              </div>
+            )}
           </div>
 
           {/* Footer */}

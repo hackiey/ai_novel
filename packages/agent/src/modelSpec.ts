@@ -1,4 +1,4 @@
-import { getModel } from "@mariozechner/pi-ai";
+import { getModel, getProviders, getModels } from "@mariozechner/pi-ai";
 import type { ThinkingLevel } from "@mariozechner/pi-ai";
 
 const VALID_REASONING = ["minimal", "low", "medium", "high", "xhigh"] as const;
@@ -40,4 +40,25 @@ export function parseModelSpec(spec: string): ParsedModelSpec {
 export function getModelContextWindowFromSpec(spec: string): number {
   const { provider, modelId } = parseModelSpec(spec);
   return getModel(provider as any, modelId as any).contextWindow || 0;
+}
+
+export function getModelInfoFromSpec(spec: string): { contextWindow: number; maxTokens: number } | null {
+  const { provider, modelId } = parseModelSpec(spec);
+
+  // 1. Try exact provider:modelId match
+  try {
+    const model = getModel(provider as any, modelId as any);
+    if (model) return { contextWindow: model.contextWindow || 0, maxTokens: model.maxTokens || 0 };
+  } catch {
+    // not found, fall through
+  }
+
+  // 2. Search by modelId across all providers
+  for (const p of getProviders()) {
+    const models = getModels(p);
+    const found = models.find((m) => m.id === modelId);
+    if (found) return { contextWindow: found.contextWindow || 0, maxTokens: found.maxTokens || 0 };
+  }
+
+  return null;
 }

@@ -7,6 +7,7 @@ export interface BYOKConfig {
   apiKey: string;
   baseURL?: string;       // only for "custom" provider
   models: string[];       // model IDs without provider prefix, e.g. ["gpt-4o", "gpt-4o-mini"]
+  contextWindows?: Record<string, number>; // modelId -> context window size in tokens
 }
 
 export function getBYOKConfig(): BYOKConfig | null {
@@ -15,6 +16,14 @@ export function getBYOKConfig(): BYOKConfig | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.apiKey || !parsed?.provider) return null;
+    // Migrate old single contextWindow to contextWindows map
+    if (typeof parsed.contextWindow === "number" && !parsed.contextWindows) {
+      const models = Array.isArray(parsed.models) ? parsed.models as string[] : [];
+      if (models.length > 0) {
+        parsed.contextWindows = Object.fromEntries(models.map((m: string) => [m, parsed.contextWindow]));
+      }
+      delete parsed.contextWindow;
+    }
     return parsed as BYOKConfig;
   } catch {
     return null;
@@ -37,18 +46,22 @@ export function getBYOKModelSpecs(): string[] {
 }
 
 /** Return BYOK credentials if the model matches the configured provider */
-export function getBYOKForModel(modelSpec: string): { apiKey: string; baseURL?: string } | null {
+export function getBYOKForModel(modelSpec: string): { apiKey: string; baseURL?: string; contextWindow?: number } | null {
   const config = getBYOKConfig();
   if (!config?.apiKey) return null;
 
   const colonIdx = modelSpec.indexOf(":");
   const provider = colonIdx !== -1 ? modelSpec.slice(0, colonIdx) : "";
+  const modelId = colonIdx !== -1 ? modelSpec.slice(colonIdx + 1) : modelSpec;
 
   if (provider !== config.provider) return null;
+
+  const contextWindow = config.contextWindows?.[modelId];
 
   return {
     apiKey: config.apiKey,
     ...(config.baseURL ? { baseURL: config.baseURL } : {}),
+    ...(contextWindow ? { contextWindow } : {}),
   };
 }
 

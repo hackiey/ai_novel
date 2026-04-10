@@ -1,7 +1,7 @@
 import { getModel, type Model, type Api, type UserMessage, type Message, type SimpleStreamOptions, type ThinkingLevel } from "@mariozechner/pi-ai";
 import { runAgentLoop, type AgentContext, type AgentEvent as PiAgentEvent, type AgentLoopConfig, type AgentMessage } from "@mariozechner/pi-agent-core";
 import type { Db } from "mongodb";
-import { compactConversation, getContextCompactionThreshold } from "./compaction.js";
+import { compactConversation, type ModelInfo } from "./compaction.js";
 import { buildSystemPromptWithContext } from "./systemPrompt.js";
 import { createNovelTools } from "./tools/index.js";
 import type { VectorSearchFn, OnDocumentChangedFn, OnWorldSummaryStaleFn } from "./tools/index.js";
@@ -51,6 +51,7 @@ export class CreatorAgentSession {
     modelId: string;
     baseURL?: string;
     reasoning?: "minimal" | "low" | "medium" | "high" | "xhigh";
+    contextWindow?: number;
     db: Db;
     projectId: string;
     worldId?: string;
@@ -75,7 +76,7 @@ export class CreatorAgentSession {
         api: "openai-completions",
         provider: options.provider,
         baseUrl: options.baseURL || "https://api.openai.com/v1",
-        contextWindow: 128000,
+        contextWindow: options.contextWindow || 128000,
         maxTokens: 32000,
       } as Model<any>;
     } else if (options.baseURL) {
@@ -307,11 +308,12 @@ export class CreatorAgentSession {
     return this.model.contextWindow || 0;
   }
 
-  getContextCompactionThreshold(configuredThreshold?: number): number {
-    return getContextCompactionThreshold({
-      configuredThreshold,
-      contextWindow: this.model.contextWindow,
-    });
+  getModelInfo(): ModelInfo {
+    return {
+      contextWindow: this.model.contextWindow || 0,
+      maxTokens: this.model.maxTokens || 32000,
+      inputLimit: (this.model as any).inputLimit,
+    };
   }
 
   async compactHistory(options: {

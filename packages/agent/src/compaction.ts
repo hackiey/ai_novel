@@ -2,12 +2,94 @@ import type { Api, Message, Model, ThinkingLevel, UserMessage } from "@mariozech
 import { runAgentLoop, type AgentContext, type AgentEvent as PiAgentEvent, type AgentLoopConfig, type AgentMessage } from "@mariozechner/pi-agent-core";
 import { t, type Locale } from "./i18n.js";
 
-export const DEFAULT_CONTEXT_COMPACTION_THRESHOLD = 150_000;
 export const DEFAULT_COMPACTION_PROTECTED_USER_TURNS = 2;
+export const COMPACTION_BUFFER = 20_000;
+export const PRUNE_MINIMUM = 20_000;
+export const PRUNE_PROTECT = 40_000;
 
 const DEFAULT_COMPACTION_MAX_TOKENS = 4_000;
 const MESSAGE_OVERHEAD_TOKENS = 12;
 const CJK_REGEX = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u3000-\u303f\uff00-\uffef]/g;
+
+export interface ModelInfo {
+  contextWindow: number;
+  maxTokens: number;
+  inputLimit?: number;
+}
+
+export interface TokenUsageInfo {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  total?: number;
+}
+
+/**
+ * Check if token usage indicates context overflow.
+ * Based on OpenCode's approach: compare actual token count against usable context.
+ */
+export function isOverflow(tokens: TokenUsageInfo, model: ModelInfo): boolean {
+  if (model.contextWindow === 0) return false;
+
+  const count = tokens.total
+    || (tokens.input + tokens.output + tokens.cacheRead + tokens.cacheWrite);
+
+  const reserved = Math.min(COMPACTION_BUFFER, model.maxTokens);
+  const usable = model.inputLimit
+    ? model.inputLimit - reserved
+    : model.contextWindow - model.maxTokens;
+
+  return count >= usable;
+}
+
+/**
+ * Prune old tool result content from message history to reduce context size.
+ * Walks backwards through messages, skips last N user turns, then replaces
+ * old tool result content with a placeholder once the protection threshold is exceeded.
+ */
+export function pruneToolResults(
+  messages: Message[],
+  protectedUserTurns: number = DEFAULT_COMPACTION_PROTECTED_USER_TURNS,
+): { messages: Message[]; prunedTokens: number } {
+  const result = messages.map((m) => ({ ...m }));
+  let userTurns = 0;
+  let totalToolTokens = 0;
+  let prunedTokens = 0;
+  const toPrune: number[] = [];
+
+  // Walk backwards to find tool results beyond protection threshold
+  for (let i = result.length - 1; i >= 0; i--) {
+    const msg = result[i];
+    if (msg.role === "user") userTurns++;
+    if (userTurns < protectedUserTurns) continue;
+
+    if (msg.role === "toolResult") {
+      const estimate = estimateContentTokens(msg.content);
+      totalToolTokens += estimate;
+      if (totalToolTokens > PRUNE_PROTECT) {
+        prunedTokens += estimate;
+        toPrune.push(i);
+      }
+    }
+  }
+
+  if (prunedTokens < PRUNE_MINIMUM) {
+    return { messages, prunedTokens: 0 };
+  }
+
+  for (const idx of toPrune) {
+    const msg = result[idx];
+    if (msg.role === "toolResult") {
+      result[idx] = {
+        ...msg,
+        content: [{ type: "text", text: "[Old tool result content cleared]" }],
+      };
+    }
+  }
+
+  return { messages: result, prunedTokens };
+}
 
 function estimateContentTokens(content: unknown): number {
   if (typeof content === "string") return estimateTokens(content);
@@ -90,20 +172,6 @@ export function estimateContextTokens(input: {
     + estimateTokens(input.userMessage ?? "")
     + estimateMessageTokens(input.messages ?? [])
     + (input.extras ?? []).reduce((total, item) => total + estimateTokens(item), 0);
-}
-
-export function getContextCompactionThreshold(input: {
-  configuredThreshold?: number;
-  contextWindow?: number;
-}): number {
-  const configuredThreshold = Number.isFinite(input.configuredThreshold) && (input.configuredThreshold ?? 0) > 0
-    ? Math.floor(input.configuredThreshold!)
-    : DEFAULT_CONTEXT_COMPACTION_THRESHOLD;
-  const contextWindowThreshold = input.contextWindow && input.contextWindow > 0
-    ? Math.floor(input.contextWindow * 0.8)
-    : Number.POSITIVE_INFINITY;
-
-  return Math.max(1, Math.min(configuredThreshold, contextWindowThreshold));
 }
 
 function assistantTextFromMessages(messages: Message[]): string {

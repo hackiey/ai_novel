@@ -1,17 +1,19 @@
 import {
   DEFAULT_COMPACTION_PROTECTED_USER_TURNS,
-  DEFAULT_CONTEXT_COMPACTION_THRESHOLD,
   estimateTokens,
+  isOverflow,
+  pruneToolResults,
   type CreatorAgentSession,
   type Locale,
   type Message,
+  type ModelInfo,
+  type TokenUsageInfo,
 } from "@ai-creator/agent";
 import type { Db } from "mongodb";
 
 const USER_ENTRY_CHAR_LIMIT = 4_000;
 const ASSISTANT_ENTRY_CHAR_LIMIT = 6_000;
 const TOOL_ENTRY_CHAR_LIMIT = 3_000;
-const MAX_COMPACTION_ATTEMPTS = 3;
 
 type HistoryDoc = Record<string, any>;
 
@@ -26,6 +28,9 @@ interface StoredUsageState {
   lastTotalTokens?: number;
   maxTotalTokens?: number;
   model?: string;
+  contextWindow?: number;
+  maxTokens?: number;
+  inputLimit?: number;
   updatedAt?: Date;
 }
 
@@ -46,11 +51,6 @@ function emptyUsage() {
   };
 }
 
-function parsePositiveInteger(value: string | undefined, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
-}
-
 function parseOptionalNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
@@ -64,10 +64,10 @@ function toDate(value: unknown): Date | undefined {
   return undefined;
 }
 
-function buildCompactionMessage(locale: Locale, contextTokens: number, threshold: number): string {
+function buildCompactionMessage(locale: Locale, contextTokens: number, modelInfo: ModelInfo): string {
   return locale === "zh"
-    ? `已自动压缩较早对话上下文（上一轮最大上下文 ${contextTokens} tokens，阈值 ${threshold}）。`
-    : `Earlier conversation context was compacted automatically (previous max context ${contextTokens} tokens, threshold ${threshold}).`;
+    ? `已自动压缩较早对话上下文（上一轮 token 用量 ${contextTokens}，模型上下文窗口 ${modelInfo.contextWindow}）。`
+    : `Earlier conversation context was compacted automatically (previous turn token usage ${contextTokens}, model context window ${modelInfo.contextWindow}).`;
 }
 
 function isMessage(value: unknown): value is Message {
@@ -156,31 +156,6 @@ function buildTranscriptEntries(historyDocs: HistoryDoc[]): string[] {
   return entries;
 }
 
-function chunkTranscriptEntries(entries: string[], chunkBudgetTokens: number): string[][] {
-  const chunks: string[][] = [];
-  let currentChunk: string[] = [];
-  let currentTokens = 0;
-
-  for (const entry of entries) {
-    const entryTokens = Math.max(1, estimateTokens(entry));
-
-    if (currentChunk.length > 0 && currentTokens + entryTokens > chunkBudgetTokens) {
-      chunks.push(currentChunk);
-      currentChunk = [];
-      currentTokens = 0;
-    }
-
-    currentChunk.push(entry);
-    currentTokens += entryTokens;
-  }
-
-  if (currentChunk.length > 0) {
-    chunks.push(currentChunk);
-  }
-
-  return chunks;
-}
-
 export function getUsageStateFromEvents(events: Array<Record<string, any>>): StoredUsageState | undefined {
   const usageEvents = events
     .filter((event) => event?.type === "usage" && event.usage && !event.usage.isSummary)
@@ -251,33 +226,21 @@ async function compactHistoryDocs(options: {
   historyDocs: HistoryDoc[];
   existingSummary?: string;
   locale: Locale;
-  threshold: number;
 }): Promise<string> {
   const entries = buildTranscriptEntries(options.historyDocs);
   if (entries.length === 0) {
     return options.existingSummary?.trim() ?? "";
   }
 
-  const chunkBudgetTokens = Math.max(8_000, Math.min(32_000, Math.floor(options.threshold * 0.25)));
-  const chunks = chunkTranscriptEntries(entries, chunkBudgetTokens);
-  let summary = options.existingSummary?.trim();
-
-  for (const chunk of chunks) {
-    summary = await options.session.compactHistory({
-      transcript: chunk.join("\n\n"),
-      existingSummary: summary,
-      locale: options.locale,
-    });
-  }
+  // Single-shot summarization (no chunking)
+  const transcript = entries.join("\n\n");
+  const summary = await options.session.compactHistory({
+    transcript,
+    existingSummary: options.existingSummary,
+    locale: options.locale,
+  });
 
   return summary?.trim() ?? "";
-}
-
-export function getConfiguredCompactionThreshold(): number {
-  return parsePositiveInteger(
-    process.env.CONTEXT_COMPACTION_THRESHOLD,
-    DEFAULT_CONTEXT_COMPACTION_THRESHOLD,
-  );
 }
 
 export function getStoredCompactionState(sessionDoc: Record<string, any> | null | undefined): StoredCompactionState {
@@ -302,6 +265,9 @@ export function getStoredUsageState(sessionDoc: Record<string, any> | null | und
     lastTotalTokens: parseOptionalNumber(usage.lastTotalTokens),
     maxTotalTokens: parseOptionalNumber(usage.maxTotalTokens),
     model: typeof usage.model === "string" ? usage.model : undefined,
+    contextWindow: parseOptionalNumber(usage.contextWindow),
+    maxTokens: parseOptionalNumber(usage.maxTokens),
+    inputLimit: parseOptionalNumber(usage.inputLimit),
     updatedAt: toDate(usage.updatedAt),
   };
 }
@@ -359,17 +325,15 @@ export async function maybeCompactHistory(options: {
   worldId?: string;
   message: string;
   locale: Locale;
+  compactionThreshold?: number;
 }): Promise<{
   historyDocs: HistoryDoc[];
   historyMessages: Message[];
   conversationSummary?: string;
-  threshold: number;
-  contextTokens?: number;
   compacted: boolean;
   compactionEvent?: {
     type: "compaction";
     message: string;
-    threshold: number;
     contextTokens: number;
   };
 }> {
@@ -379,107 +343,138 @@ export async function maybeCompactHistory(options: {
   let historyMessages = buildHistoryMessages(historyDocs);
   let conversationSummary = stored.summary;
 
-  const configuredThreshold = getConfiguredCompactionThreshold();
-  const threshold = options.session.getContextCompactionThreshold(configuredThreshold);
-  const contextTokens = storedUsage.maxContextTokens ?? storedUsage.lastContextTokens;
+  // Get model info for overflow detection
+  const modelInfo = options.session.getModelInfo();
 
-  if (!contextTokens || contextTokens < threshold || historyDocs.length === 0) {
+  // Build token usage from stored stats (use last turn's total tokens)
+  const lastTotalTokens = storedUsage.maxTotalTokens ?? storedUsage.lastTotalTokens;
+  if (!lastTotalTokens || historyDocs.length === 0) {
     return {
       historyDocs,
       historyMessages,
       conversationSummary,
-      threshold,
-      contextTokens,
       compacted: false,
     };
   }
 
-  let compacted = false;
-  let lastCutoffCreatedAt = stored.cutoffCreatedAt ?? options.currentTurnCreatedAt;
-  let compactionEvent:
-    | {
-        type: "compaction";
-        message: string;
-        threshold: number;
-        contextTokens: number;
-      }
-    | undefined;
-
-  for (let attempt = 0; attempt < MAX_COMPACTION_ATTEMPTS && historyDocs.length > 0; attempt += 1) {
-    const slice = selectCompactionSlice(
-      historyDocs,
-      DEFAULT_COMPACTION_PROTECTED_USER_TURNS,
-      options.currentTurnCreatedAt,
-    );
-    if (!slice || slice.docsToCompact.length === 0) break;
-
-    const nextSummary = await compactHistoryDocs({
-      session: options.session,
-      historyDocs: slice.docsToCompact,
-      existingSummary: conversationSummary,
-      locale: options.locale,
-      threshold,
-    });
-    if (!nextSummary) break;
-
-    compacted = true;
-    conversationSummary = nextSummary;
-    historyDocs = slice.docsToKeep;
-    historyMessages = buildHistoryMessages(historyDocs);
-    lastCutoffCreatedAt = slice.cutoffCreatedAt;
-
-    compactionEvent = {
-      type: "compaction",
-      message: buildCompactionMessage(options.locale, contextTokens, threshold),
-      threshold,
-      contextTokens,
+  // Check overflow: user-configured threshold takes priority, otherwise use model-based detection
+  let needsCompaction = false;
+  if (options.compactionThreshold && options.compactionThreshold > 0) {
+    needsCompaction = lastTotalTokens >= options.compactionThreshold;
+  } else {
+    const tokenUsage: TokenUsageInfo = {
+      input: storedUsage.lastContextTokens ?? 0,
+      output: (storedUsage.lastTotalTokens ?? 0) - (storedUsage.lastContextTokens ?? 0),
+      cacheRead: 0,
+      cacheWrite: 0,
+      total: lastTotalTokens,
     };
-
-    break;
+    needsCompaction = isOverflow(tokenUsage, modelInfo);
   }
 
-  if (compacted && conversationSummary) {
-    console.log("[AgentCompaction] Compacted session history", {
-      sessionId: options.sessionId,
-      threshold,
-      contextTokens,
-      remainingHistoryDocs: historyDocs.length,
-    });
+  if (!needsCompaction) {
+    return {
+      historyDocs,
+      historyMessages,
+      conversationSummary,
+      compacted: false,
+    };
+  }
 
-    await options.db.collection("agent_sessions").updateOne(
-      { sessionId: options.sessionId, userId: options.userId },
-      {
-        $set: {
-          compaction: {
-            summary: conversationSummary,
-            cutoffCreatedAt: lastCutoffCreatedAt,
-            threshold,
-            contextTokens,
-            modelContextWindow: options.session.getContextWindow(),
-            updatedAt: new Date(),
-          },
+  // Stage 1: Prune old tool results in-memory
+  const pruneResult = pruneToolResults(historyMessages);
+  if (pruneResult.prunedTokens > 0) {
+    historyMessages = pruneResult.messages;
+    console.log("[AgentCompaction] Pruned tool results", {
+      sessionId: options.sessionId,
+      prunedTokens: pruneResult.prunedTokens,
+    });
+  }
+
+  // Stage 2: Full compaction — summarize older messages
+  const slice = selectCompactionSlice(
+    historyDocs,
+    DEFAULT_COMPACTION_PROTECTED_USER_TURNS,
+    options.currentTurnCreatedAt,
+  );
+  if (!slice || slice.docsToCompact.length === 0) {
+    return {
+      historyDocs,
+      historyMessages,
+      conversationSummary,
+      compacted: false,
+    };
+  }
+
+  const nextSummary = await compactHistoryDocs({
+    session: options.session,
+    historyDocs: slice.docsToCompact,
+    existingSummary: conversationSummary,
+    locale: options.locale,
+  });
+  if (!nextSummary) {
+    return {
+      historyDocs,
+      historyMessages,
+      conversationSummary,
+      compacted: false,
+    };
+  }
+
+  conversationSummary = nextSummary;
+  historyDocs = slice.docsToKeep;
+  // Rebuild messages from remaining docs, then prune again
+  historyMessages = buildHistoryMessages(historyDocs);
+  const rePrune = pruneToolResults(historyMessages);
+  if (rePrune.prunedTokens > 0) {
+    historyMessages = rePrune.messages;
+  }
+
+  const lastCutoffCreatedAt = slice.cutoffCreatedAt;
+
+  console.log("[AgentCompaction] Compacted session history", {
+    sessionId: options.sessionId,
+    tokenUsage: lastTotalTokens,
+    modelContextWindow: modelInfo.contextWindow,
+    remainingHistoryDocs: historyDocs.length,
+  });
+
+  await options.db.collection("agent_sessions").updateOne(
+    { sessionId: options.sessionId, userId: options.userId },
+    {
+      $set: {
+        compaction: {
+          summary: conversationSummary,
+          cutoffCreatedAt: lastCutoffCreatedAt,
+          tokenUsage: lastTotalTokens,
+          modelContextWindow: modelInfo.contextWindow,
           updatedAt: new Date(),
         },
-        $setOnInsert: {
-          sessionId: options.sessionId,
-          userId: options.userId,
-          title: options.message.slice(0, 30) + (options.message.length > 30 ? "..." : ""),
-          worldId: options.worldId || "",
-          model: options.selectedModel,
-          createdAt: new Date(),
-        },
+        updatedAt: new Date(),
       },
-      { upsert: true },
-    );
-  }
+      $setOnInsert: {
+        sessionId: options.sessionId,
+        userId: options.userId,
+        title: options.message.slice(0, 30) + (options.message.length > 30 ? "..." : ""),
+        worldId: options.worldId || "",
+        model: options.selectedModel,
+        createdAt: new Date(),
+      },
+    },
+    { upsert: true },
+  );
+
+  const compactionEvent = {
+    type: "compaction" as const,
+    message: buildCompactionMessage(options.locale, lastTotalTokens, modelInfo),
+    contextTokens: lastTotalTokens,
+  };
 
   return {
     historyDocs,
     historyMessages,
     conversationSummary,
-    threshold,
-    contextTokens,
-    compacted,
+    compacted: true,
     compactionEvent,
   };
 }

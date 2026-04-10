@@ -43,7 +43,8 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
 
     // SECURITY: userApiKey is never logged, persisted, or included in DB records
     const { projectId, worldId, message, sessionId: inputSessionId, model, locale: rawLocale, currentChapterId,
-            apiKey: userApiKey, baseURL: userBaseURL } =
+            apiKey: userApiKey, baseURL: userBaseURL, compactionThreshold: rawCompactionThreshold,
+            contextWindow: rawContextWindow } =
       request.body as {
         projectId: string;
         worldId?: string;
@@ -54,7 +55,12 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
         currentChapterId?: string;
         apiKey?: string;
         baseURL?: string;
+        compactionThreshold?: number;
+        contextWindow?: number;
       };
+    const compactionThreshold = typeof rawCompactionThreshold === "number" && rawCompactionThreshold > 0
+      ? Math.floor(rawCompactionThreshold)
+      : undefined;
     const isBYOK = !!userApiKey;
     const locale: Locale = resolveLocale(rawLocale);
 
@@ -137,12 +143,16 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     if (!session) {
       const embeddingSvc = getEmbeddingService();
       try {
+        const userContextWindow = typeof rawContextWindow === "number" && rawContextWindow > 0
+          ? Math.floor(rawContextWindow)
+          : undefined;
         session = new CreatorAgentSession({
           apiKey,
           provider,
           modelId,
           baseURL,
           reasoning,
+          contextWindow: userContextWindow,
           db,
           projectId,
           worldId,
@@ -284,6 +294,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       worldId,
       message,
       locale,
+      compactionThreshold,
     });
 
     if (compactionState.compactionEvent) {
@@ -340,9 +351,13 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       updatedAt: new Date(),
     };
     if (usageState) {
+      const modelInfo = session.getModelInfo();
       sessionSetFields.usage = {
         ...usageState,
-        modelContextWindow: session.getContextWindow(),
+        contextWindow: modelInfo.contextWindow,
+        maxTokens: modelInfo.maxTokens,
+        inputLimit: modelInfo.inputLimit,
+        modelContextWindow: modelInfo.contextWindow,
         updatedAt: new Date(),
       };
     }

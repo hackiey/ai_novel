@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { BotMessageSquare, BookOpen, ChevronDown, History, KeyRound, Loader2, Pencil, Plus, RotateCcw, X } from "lucide-react";
+import { BotMessageSquare, BookOpen, ChevronDown, History, KeyRound, Loader2, Pencil, Plus, RotateCcw, Settings, X } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import { getToken } from "../lib/auth.js";
 import { getBYOKForModel, getBYOKModelSpecs, hasBYOKKeys } from "../lib/byokStorage.js";
+import { getCompactionSettings } from "../lib/compactionSettings.js";
 import { AgentEvent, AssistantMessageContent } from "./AgentMessageDisplay.js";
+import CompactionSettingsDialog from "./CompactionSettingsDialog.js";
 
 const API_BASE = "";
 
@@ -82,6 +84,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
   const [worldMemoryDraft, setWorldMemoryDraft] = useState<string | null>(null);
   const [projectMemoryDraft, setProjectMemoryDraft] = useState<string | null>(null);
   const [memorySaveStatus, setMemorySaveStatus] = useState<Record<string, string>>({});
+  const [showCompactionSettings, setShowCompactionSettings] = useState(false);
 
   // Auto-resize textarea: grow with content, cap at 120px
   useEffect(() => {
@@ -192,6 +195,8 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
           locale: i18n.language, model: modelToUse, currentChapterId,
           ...(byok?.apiKey ? { apiKey: byok.apiKey } : {}),
           ...(byok?.baseURL ? { baseURL: byok.baseURL } : {}),
+          ...(byok?.contextWindow ? { contextWindow: byok.contextWindow } : {}),
+          ...(getCompactionSettings()?.threshold ? { compactionThreshold: getCompactionSettings()!.threshold } : {}),
         }),
         signal: controller.signal,
       });
@@ -436,7 +441,14 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
       {/* Header */}
       <div className={`flex items-center justify-between px-4 py-1.5 border-b shrink-0 ${imm ? "border-white/10" : "border-gray-200"}`}>
         <div className="flex items-center gap-2">
-          <span className={`text-sm font-semibold ${imm ? "text-white/80" : "text-gray-700"}`}>{t("chat.aiAssistant")}</span>
+          <button
+            onClick={() => setShowCompactionSettings(true)}
+            className={`flex items-center gap-1 text-sm font-semibold transition-colors ${imm ? "text-white/80 hover:text-white" : "text-gray-700 hover:text-gray-900"}`}
+            title={t("chat.compactionSettings")}
+          >
+            {t("chat.aiAssistant")}
+            <Settings className="w-3.5 h-3.5 opacity-40" />
+          </button>
           <button
             onClick={() => { setShowHistory((v) => !v); setShowMemory(false); }}
             className={`p-1.5 rounded-md transition-colors ${
@@ -811,6 +823,10 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
           </div>
         </>
       )}
+      <CompactionSettingsDialog
+        open={showCompactionSettings}
+        onClose={() => setShowCompactionSettings(false)}
+      />
     </div>
   );
 }

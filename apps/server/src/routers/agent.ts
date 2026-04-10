@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
-import { getModelContextWindowFromSpec } from "@ai-creator/agent";
+import { getModelContextWindowFromSpec, getModelInfoFromSpec } from "@ai-creator/agent";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { objectIdSchema } from "@ai-creator/types";
 import { sessions, sessionKeyMode } from "../routes/agentStream.js";
@@ -26,6 +26,12 @@ export const agentRouter = router({
     );
     return { available: allowed, default: allowed[0], contextWindows, serverHasModels: AVAILABLE_MODELS.length > 0 };
   }),
+
+  getModelInfo: protectedProcedure
+    .input(z.object({ modelSpec: z.string() }))
+    .query(({ input }) => {
+      return getModelInfoFromSpec(input.modelSpec);
+    }),
 
   listSessions: protectedProcedure
     .input(z.object({ worldId: objectIdSchema }))
