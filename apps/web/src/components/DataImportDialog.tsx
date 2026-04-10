@@ -15,7 +15,7 @@ interface PreviewInfo {
   drafts: number;
   projects: number;
   chapters: number;
-  agentSessions: number;
+  hasMemory: boolean;
 }
 
 function extractPreview(data: any): PreviewInfo | null {
@@ -26,6 +26,10 @@ function extractPreview(data: any): PreviewInfo | null {
   for (const p of d.projects ?? []) {
     totalChapters += (p.chapters ?? []).length;
   }
+  const hasWorldMemory = (d.agentMemory ?? []).some((m: any) => m.content);
+  const hasProjectMemory = (d.projects ?? []).some((p: any) =>
+    (p.agentMemory ?? []).some((m: any) => m.content),
+  );
   return {
     version: data.version,
     exportedAt: data.exportedAt,
@@ -36,7 +40,7 @@ function extractPreview(data: any): PreviewInfo | null {
     drafts: (d.drafts ?? []).length,
     projects: (d.projects ?? []).length,
     chapters: totalChapters,
-    agentSessions: (d.agentSessions ?? []).length,
+    hasMemory: hasWorldMemory || hasProjectMemory,
   };
 }
 
@@ -57,6 +61,7 @@ export default function DataImportDialog({
   const [preview, setPreview] = useState<PreviewInfo | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [merged, setMerged] = useState(false);
+  const [overwriteMemory, setOverwriteMemory] = useState(false);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -137,7 +142,7 @@ export default function DataImportDialog({
     if (!parsedData) return;
     setStage("importing");
     setErrorMsg("");
-    importWorldMut.mutate({ data: parsedData });
+    importWorldMut.mutate({ data: parsedData, overwriteMemory });
   };
 
   const formatDate = (iso: string) => {
@@ -261,13 +266,23 @@ export default function DataImportDialog({
                     <span className="text-white/80">{preview.chapters}</span>
                   </div>
                 )}
-                {preview.agentSessions > 0 && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-white/50">{t("dataImport.agentSessions")}</span>
-                    <span className="text-white/80">{preview.agentSessions}</span>
-                  </div>
-                )}
               </div>
+
+              {/* Memory overwrite option */}
+              {preview.hasMemory && (
+                <label className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={overwriteMemory}
+                    onChange={(e) => setOverwriteMemory(e.target.checked)}
+                    className="mt-0.5 accent-amber-400"
+                  />
+                  <div>
+                    <div className="text-xs text-amber-300/90 font-medium">{t("dataImport.overwriteMemory")}</div>
+                    <div className="text-xs text-white/40 mt-0.5">{t("dataImport.overwriteMemoryHint")}</div>
+                  </div>
+                </label>
+              )}
 
               {/* Warning: world ID mismatch */}
               {currentWorldId && preview.worldId && preview.worldId !== currentWorldId && (

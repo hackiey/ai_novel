@@ -75,11 +75,12 @@ export const exportImportRouter = router({
       if (!world) throw new Error("World not found");
 
       // Fetch all related collections in parallel
+      const worldIdFilter = { $in: [input.worldId, new ObjectId(input.worldId)] };
       const [characters, worldSettings, drafts, projects] = await Promise.all([
-        db.collection("characters").find({ worldId: input.worldId, userId }).toArray(),
-        db.collection("world_settings").find({ worldId: input.worldId, userId }).toArray(),
-        db.collection("drafts").find({ worldId: input.worldId, userId }).toArray(),
-        db.collection("projects").find({ worldId: input.worldId, userId }).toArray(),
+        db.collection("characters").find({ worldId: worldIdFilter, userId }).toArray(),
+        db.collection("world_settings").find({ worldId: worldIdFilter, userId }).toArray(),
+        db.collection("drafts").find({ worldId: worldIdFilter, userId }).toArray(),
+        db.collection("projects").find({ worldId: worldIdFilter, userId }).toArray(),
       ]);
 
       // For each project, fetch chapters
@@ -101,18 +102,6 @@ export const exportImportRouter = router({
         }),
       );
 
-      // Fetch agent sessions and messages for this world
-      const agentSessions = await db.collection("agent_sessions").find({
-        worldId: input.worldId,
-        userId,
-      }).toArray();
-
-      const agentMessages = agentSessions.length > 0
-        ? await db.collection("agent_messages").find({
-            sessionId: { $in: agentSessions.map((s) => s.sessionId) },
-          }).sort({ createdAt: 1 }).toArray()
-        : [];
-
       // Fetch world-level agent memory
       const worldMemoryDoc = await db.collection("agent_memory").findOne({
         worldId: new ObjectId(input.worldId),
@@ -128,8 +117,6 @@ export const exportImportRouter = router({
           worldSettings: worldSettings.map(serializeForExport),
           drafts: drafts.map(serializeForExport),
           projects: projectBundles,
-          agentSessions: agentSessions.map(serializeForExport),
-          agentMessages: agentMessages.map(serializeForExport),
           agentMemory: worldMemoryDoc ? [{ scope: "world", content: worldMemoryDoc.content }] : [],
         },
       };
@@ -138,6 +125,7 @@ export const exportImportRouter = router({
   importWorld: protectedProcedure
     .input(z.object({
       data: z.any(),
+      overwriteMemory: z.boolean().optional().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       const payload = input.data;
@@ -243,61 +231,30 @@ export const exportImportRouter = router({
         );
         insertedChapterIds.push(...ids);
 
-        // Insert project-level agent memory
-        for (const mem of bundle.agentMemory ?? []) {
-          if (mem.content) {
-            await db.collection("agent_memory").updateOne(
-              { projectId: new ObjectId(projectId) },
-              { $set: { content: mem.content, updatedAt: now } },
-              { upsert: true },
-            );
+        // Insert project-level agent memory (only if overwriteMemory is set)
+        if (input.overwriteMemory) {
+          for (const mem of bundle.agentMemory ?? []) {
+            if (mem.content) {
+              await db.collection("agent_memory").updateOne(
+                { projectId: new ObjectId(projectId) },
+                { $set: { content: mem.content, updatedAt: now } },
+                { upsert: true },
+              );
+            }
           }
         }
       }
 
-      // Insert agent sessions (skip duplicates)
-      const agentSessions = data.agentSessions ?? [];
-      if (agentSessions.length > 0) {
-        await insertManySkipDuplicates(db, "agent_sessions",
-          agentSessions.map((sess: any) => {
-            const doc = parseDateFields(sess);
-            const id = doc._id;
-            delete doc._id;
-            return {
-              _id: new ObjectId(id),
-              ...doc,
-              userId,
-              worldId,
-            };
-          }),
-        );
-      }
-
-      // Insert agent messages (use new IDs — messages don't have stable export IDs)
-      const agentMessages = data.agentMessages ?? [];
-      if (agentMessages.length > 0) {
-        // Only insert messages for sessions that exist in this import
-        const sessionIds = new Set(agentSessions.map((s: any) => s.sessionId));
-        const newMessages = agentMessages
-          .filter((msg: any) => sessionIds.has(msg.sessionId))
-          .map((msg: any) => {
-            const doc = parseDateFields(msg);
-            delete doc._id;
-            return { _id: new ObjectId(), ...doc, userId };
-          });
-        if (newMessages.length > 0) {
-          await insertManySkipDuplicates(db, "agent_messages", newMessages);
-        }
-      }
-
-      // Insert world-level agent memory
-      for (const mem of data.agentMemory ?? []) {
-        if (mem.content) {
-          await db.collection("agent_memory").updateOne(
-            { worldId: new ObjectId(worldId) },
-            { $set: { content: mem.content, updatedAt: now } },
-            { upsert: true },
-          );
+      // Insert world-level agent memory (only if overwriteMemory is set)
+      if (input.overwriteMemory) {
+        for (const mem of data.agentMemory ?? []) {
+          if (mem.content) {
+            await db.collection("agent_memory").updateOne(
+              { worldId: new ObjectId(worldId) },
+              { $set: { content: mem.content, updatedAt: now } },
+              { upsert: true },
+            );
+          }
         }
       }
 
