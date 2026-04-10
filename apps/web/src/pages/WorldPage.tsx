@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { Download, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import CharactersTab from "../components/CharactersTab.js";
 import WorldSettingsTab from "../components/WorldSettingsTab.js";
@@ -74,6 +74,17 @@ export default function WorldPage() {
   });
   const updateProjectMut = trpc.project.update.useMutation({
     onSuccess: () => { projectsQuery.refetch(); setEditingProjectId(null); },
+  });
+  const exportWorldMut = trpc.exportImport.exportWorld.useMutation({
+    onSuccess: (data) => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${world?.name || "world"}.aicreator.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
   });
   const world = worldQuery.data;
   const projects = (projectsQuery.data ?? []) as any[];
@@ -159,10 +170,24 @@ export default function WorldPage() {
             <div className="shrink-0 px-4 sm:px-6 pt-5">
               {/* Header */}
               <div className="mb-5">
-                <h1 className="text-xl font-bold text-white/90">{world.name}</h1>
-                {world.description && (
-                  <p className="text-sm text-white/50 mt-1 max-w-2xl">{world.description}</p>
-                )}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <h1 className="text-xl font-bold text-white/90">{world.name}</h1>
+                    {world.description && (
+                      <p className="text-sm text-white/50 mt-1 max-w-2xl">{world.description}</p>
+                    )}
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <button
+                      onClick={() => exportWorldMut.mutate({ worldId })}
+                      disabled={exportWorldMut.isPending}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/50 hover:text-teal-400 border border-white/20 hover:border-teal-400/30 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">{exportWorldMut.isPending ? t("export.exporting") : t("export.exportWorld")}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Projects Bar */}
@@ -421,6 +446,7 @@ export default function WorldPage() {
           }}
         />
       )}
+
     </div>
   );
 }

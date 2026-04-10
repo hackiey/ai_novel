@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { Trash2, FileEdit, Pencil } from "lucide-react";
+import { Trash2, FileEdit, Pencil, Upload } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import { useWriteTheme } from "../contexts/WriteThemeContext.js";
+import DataImportDialog from "../components/DataImportDialog.js";
 
 export default function HomePage() {
   const { t } = useTranslation();
@@ -15,6 +16,7 @@ export default function HomePage() {
   const [editingWorld, setEditingWorld] = useState<{ _id: string; name: string; description?: string } | null>(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [showDataImport, setShowDataImport] = useState(false);
 
   const projectsQuery = trpc.project.list.useQuery();
   const worldsQuery = trpc.world.list.useQuery();
@@ -83,12 +85,21 @@ export default function HomePage() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xs font-semibold text-white/50 uppercase tracking-wide">{t("home.title")}</h2>
         {!showForm && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="px-3 py-1.5 text-xs rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 transition-colors font-medium"
-          >
-            {t("home.newWorld")}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowDataImport(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/50 hover:text-teal-400 border border-white/20 hover:border-teal-400/30 rounded-lg transition-colors"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              {t("dataImport.button")}
+            </button>
+            <button
+              onClick={() => setShowForm(true)}
+              className="px-3 py-1.5 text-xs rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 transition-colors font-medium"
+            >
+              {t("home.newWorld")}
+            </button>
+          </div>
         )}
       </div>
 
@@ -314,6 +325,14 @@ export default function HomePage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Data Import Dialog */}
+      {showDataImport && (
+        <DataImportDialog
+          onClose={() => setShowDataImport(false)}
+          onSuccess={() => { worldsQuery.refetch(); projectsQuery.refetch(); }}
+        />
       )}
     </div>
   );

@@ -18,6 +18,7 @@ async function main() {
   const fastify = Fastify({
     logger: true,
     maxParamLength: 5000,
+    bodyLimit: 50 * 1024 * 1024, // 50MB for large import payloads
   });
 
   // Register CORS

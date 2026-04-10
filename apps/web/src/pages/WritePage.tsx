@@ -87,6 +87,7 @@ export default function WritePage() {
     },
   });
 
+
   const chapters = (chaptersQuery.data ?? []) as any[];
   const sorted = [...chapters].sort((a, b) => a.order - b.order);
   const chapter = chapterQuery.data as any;

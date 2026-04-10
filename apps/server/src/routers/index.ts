@@ -11,6 +11,7 @@ import { agentRouter } from "./agent.js";
 import { searchRouter } from "./search.js";
 import { shareRouter } from "./share.js";
 import { settingsRouter } from "./settings.js";
+import { exportImportRouter } from "./exportImport.js";
 
 export const appRouter = router({
   auth: authRouter,
@@ -25,6 +26,7 @@ export const appRouter = router({
   search: searchRouter,
   share: shareRouter,
   settings: settingsRouter,
+  exportImport: exportImportRouter,
 });
 
 export type AppRouter = typeof appRouter;
