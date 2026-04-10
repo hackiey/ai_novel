@@ -32,6 +32,8 @@ export const characterRouter = router({
         .find({ worldId: { $in: [input.worldId, new ObjectId(input.worldId)] }, userId: userIdFilter(ctx.user.userId) })
         .sort({ updatedAt: -1 })
         .toArray();
+      const importanceOrder: Record<string, number> = { core: 0, major: 1, minor: 2 };
+      docs.sort((a, b) => (importanceOrder[a.importance] ?? 2) - (importanceOrder[b.importance] ?? 2));
       return docs.map(serializeDoc);
     }),
 

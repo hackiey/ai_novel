@@ -29,6 +29,8 @@ export const worldSettingRouter = router({
         .find(filter)
         .sort({ updatedAt: -1 })
         .toArray();
+      const importanceOrder: Record<string, number> = { core: 0, major: 1, minor: 2 };
+      docs.sort((a, b) => (importanceOrder[a.importance] ?? 2) - (importanceOrder[b.importance] ?? 2));
       return docs.map(serializeDoc);
     }),
 
