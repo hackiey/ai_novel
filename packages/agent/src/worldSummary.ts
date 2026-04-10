@@ -110,14 +110,15 @@ export async function getOrRefreshWorldSummary(
 
   // Fetch characters and world settings
   const wid = new ObjectId(worldId);
+  const worldIdFilter = { $in: [worldId, wid] };
   const [characters, settings] = await Promise.all([
     db.collection("characters")
-      .find({ worldId: wid })
+      .find({ worldId: worldIdFilter })
       .project({ name: 1, importance: 1, summary: 1 })
       .sort({ name: 1 })
       .toArray(),
     db.collection("world_settings")
-      .find({ worldId: wid })
+      .find({ worldId: worldIdFilter })
       .project({ title: 1, category: 1, importance: 1, summary: 1 })
       .sort({ category: 1, title: 1 })
       .toArray(),

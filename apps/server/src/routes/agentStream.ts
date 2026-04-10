@@ -251,7 +251,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       if (projectId) {
         // Load chapter list for current project
         const chapters = await db.collection("chapters")
-          .find({ projectId: new ObjectId(projectId) })
+          .find({ projectId: { $in: [projectId, new ObjectId(projectId)] } })
           .sort({ order: 1 })
           .project({ _id: 1, title: 1, order: 1, wordCount: 1 })
           .toArray();
