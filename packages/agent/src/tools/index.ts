@@ -4,6 +4,7 @@ import type { AgentTool, AgentToolResult } from "@mariozechner/pi-agent-core";
 import { ObjectId, type Db } from "mongodb";
 import * as handlers from "./handlers.js";
 import { t, type Locale } from "../i18n.js";
+import { renderSkillPrompt, type SkillData } from "../skills.js";
 
 export type VectorSearchFn = (args: {
   projectId?: string;
@@ -45,10 +46,10 @@ function rrfMerge(rankedLists: SearchResult[][], k = 60): SearchResult[] {
     .map(({ result, rrfScore }) => ({ ...result, score: rrfScore }));
 }
 
-export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocumentChanged?: OnDocumentChangedFn, userId?: string, onWorldSummaryStale?: OnWorldSummaryStaleFn, locale: Locale = "zh", worldId?: string, projectId?: string): AgentTool<any>[] {
+export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocumentChanged?: OnDocumentChangedFn, userId?: string, onWorldSummaryStale?: OnWorldSummaryStaleFn, locale: Locale = "zh", worldId?: string, projectId?: string, skills?: SkillData[]): AgentTool<any>[] {
   const d = t(locale).tools;
 
-  return [
+  const tools: AgentTool<any>[] = [
     {
       name: "semantic_search",
       label: "Semantic Search",
@@ -361,4 +362,37 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       },
     },
   ];
+
+  // Add invoke_skill tool if skills are available
+  if (skills && skills.length > 0) {
+    tools.push({
+      name: "invoke_skill",
+      label: "Invoke Skill",
+      description: d.invoke_skill,
+      parameters: Type.Object({
+        skill_name: StringEnum(
+          skills.map(s => s.skillId) as [string, ...string[]],
+          { description: d.invoke_skill_skill_name },
+        ),
+        args: Type.Optional(Type.Record(
+          Type.String(),
+          Type.Any(),
+          { description: d.invoke_skill_args },
+        )),
+      }),
+      async execute(_toolCallId, toolArgs) {
+        const skill = skills.find(s => s.skillId === toolArgs.skill_name);
+        if (!skill) {
+          return textResult({ error: `Unknown skill: ${toolArgs.skill_name}` });
+        }
+        const rendered = renderSkillPrompt(skill, toolArgs.args ?? {}, locale);
+        return {
+          content: [{ type: "text", text: rendered }],
+          details: undefined,
+        };
+      },
+    });
+  }
+
+  return tools;
 }

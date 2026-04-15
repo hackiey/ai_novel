@@ -12,6 +12,7 @@ import { searchRouter } from "./search.js";
 import { shareRouter } from "./share.js";
 import { settingsRouter } from "./settings.js";
 import { exportImportRouter } from "./exportImport.js";
+import { skillRouter } from "./skill.js";
 
 export const appRouter = router({
   auth: authRouter,
@@ -27,6 +28,7 @@ export const appRouter = router({
   share: shareRouter,
   settings: settingsRouter,
   exportImport: exportImportRouter,
+  skill: skillRouter,
 });
 
 export type AppRouter = typeof appRouter;

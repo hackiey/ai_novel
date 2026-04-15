@@ -193,6 +193,10 @@ const zh = {
 
     generate_synopsis: "获取章节内容，用于生成章节梗概。返回章节全文供AI总结。",
     generate_synopsis_chapterId: "章节ID",
+
+    invoke_skill: "调用一个创作技能。技能是预定义的专业化指导，帮助你完成特定的创作任务。调用后请严格按照返回的指导执行。",
+    invoke_skill_skill_name: "要调用的技能名称",
+    invoke_skill_args: "传递给技能的参数（键值对），具体参数请参考系统提示中各技能的说明。",
   },
 
   // ── File import ──
@@ -404,6 +408,10 @@ const en: typeof zh = {
 
     generate_synopsis: "Retrieve chapter content for generating a chapter synopsis. Returns the full chapter text for AI summarization.",
     generate_synopsis_chapterId: "Chapter ID",
+
+    invoke_skill: "Invoke a creative writing skill. Skills are predefined specialized instructions for specific creative tasks. Follow the returned instructions precisely.",
+    invoke_skill_skill_name: "Name of the skill to invoke",
+    invoke_skill_args: "Arguments to pass to the skill (key-value pairs). See system prompt for each skill's expected arguments.",
   },
 
   // ── File import ──

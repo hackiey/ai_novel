@@ -10,6 +10,7 @@ import { initEmbeddingService } from "./services/embeddingService.js";
 import { ChapterSynopsisService } from "./services/chapterSynopsisService.js";
 import { registerAgentRoutes } from "./routes/agentStream.js";
 import { registerFileImportRoutes } from "./routes/fileImport.js";
+import { seedBuiltinSkills } from "./seeds/skills.js";
 
 const PORT = Number(process.env.PORT) || 3001;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/ai_creator";
@@ -60,6 +61,9 @@ async function main() {
   await db.collection("shares").createIndex({ userId: 1 });
   await db.collection("shares").createIndex({ shareToken: 1 }, { unique: true });
   await db.collection("shares").createIndex({ projectId: 1, userId: 1 }, { unique: true });
+
+  // Seed builtin skills
+  await seedBuiltinSkills(db);
 
   // Ensure vector search indexes (Atlas Search)
   if (embeddingApiKey) {

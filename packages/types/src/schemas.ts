@@ -372,3 +372,48 @@ export const searchResultSchema = z.object({
 
 export type SearchInput = z.infer<typeof searchInputSchema>;
 export type SearchResult = z.infer<typeof searchResultSchema>;
+
+// ============ Skill (技能) ============
+
+export const localizedStringSchema = z.object({
+  zh: z.string(),
+  en: z.string(),
+});
+
+export const skillArgumentSchema = z.object({
+  name: z.string().min(1).max(50),
+  description: localizedStringSchema,
+  required: z.boolean().default(false),
+});
+
+export const skillSchema = z.object({
+  _id: objectIdSchema,
+  skillId: z.string().min(1).max(50).regex(/^[a-z_]+$/),
+  name: localizedStringSchema,
+  description: localizedStringSchema,
+  whenToUse: localizedStringSchema,
+  prompt: localizedStringSchema,
+  arguments: z.array(skillArgumentSchema).default([]),
+  tags: z.array(z.string().max(50)).default([]),
+  isBuiltin: z.boolean().default(false),
+  isPublished: z.boolean().default(false),
+  authorId: objectIdSchema.optional(),
+  ...timestampsSchema.shape,
+});
+
+export const createSkillSchema = z.object({
+  skillId: z.string().min(1).max(50).regex(/^[a-z_]+$/),
+  name: localizedStringSchema,
+  description: localizedStringSchema,
+  whenToUse: localizedStringSchema,
+  prompt: localizedStringSchema,
+  arguments: z.array(skillArgumentSchema).optional(),
+  tags: z.array(z.string().max(50)).optional(),
+});
+
+export const updateSkillSchema = createSkillSchema.partial();
+
+export type Skill = z.infer<typeof skillSchema>;
+export type SkillArgument = z.infer<typeof skillArgumentSchema>;
+export type CreateSkill = z.infer<typeof createSkillSchema>;
+export type UpdateSkill = z.infer<typeof updateSkillSchema>;

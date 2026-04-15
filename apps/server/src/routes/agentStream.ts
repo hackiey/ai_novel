@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { ObjectId } from "mongodb";
 import { CreatorAgentSession, getOrRefreshWorldSummary, parseModelSpec, resolveLocale } from "@ai-creator/agent";
-import type { VectorSearchFn, Locale, Message } from "@ai-creator/agent";
+import type { VectorSearchFn, Locale, Message, SkillData } from "@ai-creator/agent";
 import { getDb } from "../db.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 import { getStoredCompactionState, getUsageStateFromEvents, maybeCompactHistory } from "../services/agentCompactionService.js";
@@ -277,6 +277,26 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       console.error("[WorkingEnvironment] Failed to build:", err);
     }
 
+    // Load available skills
+    const skillDocs = await db.collection("skills")
+      .find({
+        $or: [
+          { isBuiltin: true },
+          { isPublished: true },
+          { authorId: user.userId },
+        ],
+      })
+      .toArray();
+
+    const skills: SkillData[] = skillDocs.map(doc => ({
+      skillId: doc.skillId,
+      name: doc.name,
+      description: doc.description,
+      whenToUse: doc.whenToUse,
+      prompt: doc.prompt,
+      arguments: doc.arguments || [],
+    }));
+
     // Stream agent events
     const allEvents: any[] = [];
     let fullText = "";
@@ -311,6 +331,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
         projectMemory: projectMemoryContent,
         workingEnvironment,
         conversationSummary: compactionState.conversationSummary,
+        skills,
       })) {
         if (event.type === "messages") {
           // Capture structured messages but don't send to client

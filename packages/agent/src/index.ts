@@ -25,4 +25,6 @@ export type {
 } from "./chapterSynopsis.js";
 export { resolveLocale, t } from "./i18n.js";
 export type { Locale } from "./i18n.js";
+export type { SkillData, SkillArgument } from "./skills.js";
+export { renderSkillPrompt } from "./skills.js";
 export type { Message } from "@mariozechner/pi-ai";

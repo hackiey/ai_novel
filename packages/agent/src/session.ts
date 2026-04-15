@@ -6,6 +6,7 @@ import { buildSystemPromptWithContext } from "./systemPrompt.js";
 import { createNovelTools } from "./tools/index.js";
 import type { VectorSearchFn, OnDocumentChangedFn, OnWorldSummaryStaleFn } from "./tools/index.js";
 import type { Locale } from "./i18n.js";
+import type { SkillData } from "./skills.js";
 
 export interface TokenUsage {
   model: string;
@@ -103,8 +104,9 @@ export class CreatorAgentSession {
     projectMemory?: string;
     workingEnvironment?: string;
     conversationSummary?: string;
+    skills?: SkillData[];
   } = {}): AsyncGenerator<AgentEvent> {
-    const { historyMessages, memory, worldSummary, locale = "zh", projectMemory, workingEnvironment, conversationSummary } = options;
+    const { historyMessages, memory, worldSummary, locale = "zh", projectMemory, workingEnvironment, conversationSummary, skills } = options;
     const systemPrompt = buildSystemPromptWithContext(
       this.projectId,
       this.worldId,
@@ -114,9 +116,10 @@ export class CreatorAgentSession {
       projectMemory,
       workingEnvironment,
       conversationSummary,
+      skills,
     );
 
-    const tools = createNovelTools(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale, locale, this.worldId, this.projectId);
+    const tools = createNovelTools(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale, locale, this.worldId, this.projectId, skills);
 
     const abortController = new AbortController();
     this.abortController = abortController;
