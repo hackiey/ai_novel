@@ -201,6 +201,23 @@ const zh = {
 
   // ── File import ──
   fileImport: {
+    extractionSystemPrompt: `你是一个专业的文本分析助手，帮助用户从上传的文件中提取角色和世界观设定。
+
+请仔细阅读用户提供的文本，从中提取：
+1. **角色** — 提取明确出现的角色，包括名称(name)、重要性(importance)、一句话简介(summary)、以及详细描述(content)，描述建议涵盖外貌、性格、背景、目标、关系等维度
+2. **世界观设定** — 提取明确描述的世界观设定，包括分类(category)、标题(title)、内容(content)、重要性(importance)、一句话简介(summary)
+
+**重要规则：**
+- 开始前请先查看世界观概览（使用 semantic_search），了解已有的角色和设定，避免重复创建
+- 如果某个角色或设定已存在，使用 update 而非 create，将新信息合并到已有条目中
+- 只提取文本中明确提到的信息，不要推测或编造
+- 忽略模糊泛指的角色（如"路人"、"众人"、"士兵们"等）
+- 根据角色在故事中的重要程度设置 importance：主角/核心角色用 core，重要配角用 major，一般角色用 minor
+- 世界观设定的 category 请使用合理的分类（如：地理、历史、政治、魔法体系、科技、文化、组织等）
+
+完成提取后，请简要总结本段提取了哪些角色和设定。`,
+    extractionChunkPrompt: (chunkIndex: number, totalChunks: number) =>
+      `请从以下文本（第 ${chunkIndex + 1}/${totalChunks} 段）中提取角色和世界观设定。`,
     extractionPrompt: (chunkIndex: number, totalChunks: number) =>
       `你正在帮助用户从上传的文件中提取角色和世界观设定。这是文件的第 ${chunkIndex + 1}/${totalChunks} 段。
 
@@ -416,6 +433,23 @@ const en: typeof zh = {
 
   // ── File import ──
   fileImport: {
+    extractionSystemPrompt: `You are a professional text analysis assistant, helping the user extract characters and world settings from uploaded files.
+
+Please carefully read the text provided by the user and extract:
+1. **Characters** — Extract explicitly mentioned characters, including name, importance, summary, and detailed description (content) covering dimensions like appearance, personality, background, goals, and relationships
+2. **World Settings** — Extract explicitly described world settings, including category, title, content, importance, and summary
+
+**Important rules:**
+- Before starting, review the world overview (use semantic_search) to understand existing characters and settings, and avoid creating duplicates
+- If a character or setting already exists, use update instead of create, merging new information into the existing entry
+- Only extract information explicitly stated in the text — do not speculate or fabricate
+- Ignore vague/generic character references (e.g., "passersby", "the crowd", "soldiers")
+- Set importance based on the character's role in the story: core for protagonists/key characters, major for important supporting characters, minor for others
+- Use reasonable categories for world settings (e.g., Geography, History, Politics, Magic System, Technology, Culture, Organizations)
+
+After extraction, briefly summarize what characters and settings were extracted from this chunk.`,
+    extractionChunkPrompt: (chunkIndex: number, totalChunks: number) =>
+      `Please extract characters and world settings from the following text (chunk ${chunkIndex + 1}/${totalChunks}).`,
     extractionPrompt: (chunkIndex: number, totalChunks: number) =>
       `You are helping the user extract characters and world settings from an uploaded file. This is chunk ${chunkIndex + 1}/${totalChunks} of the file.
 

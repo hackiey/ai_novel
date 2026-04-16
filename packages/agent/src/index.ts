@@ -27,4 +27,6 @@ export { resolveLocale, t } from "./i18n.js";
 export type { Locale } from "./i18n.js";
 export type { SkillData } from "./skills.js";
 export { renderSkillPrompt } from "./skills.js";
+export { getAgentDefinition, getAgentTypes } from "./agents/index.js";
+export type { AgentDefinition, ToolName, SystemPromptContext } from "./agents/index.js";
 export type { Message } from "@mariozechner/pi-ai";

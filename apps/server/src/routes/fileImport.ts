@@ -266,11 +266,12 @@ async function handleImportStream(
             { $set: { summaryStale: true } }
           ).catch((err) => console.error("[WorldSummary] Failed to mark stale:", err));
         },
+        agentType: "file-import",
       });
 
-      const prompt = i18n.fileImport.extractionPrompt(i, totalChunks);
+      const chunkPrompt = i18n.fileImport.extractionChunkPrompt(i, totalChunks);
       const chunkLabel = i18n.fileImport.chunkLabel(i, totalChunks);
-      const message = `${prompt}\n\n${chunkLabel}\n\n---\n\n${chunks[i]}\n\n---`;
+      const message = `${chunkPrompt}\n\n${chunkLabel}\n\n---\n\n${chunks[i]}\n\n---`;
 
       console.log(`[FileImport] Chunk ${i}: starting chat, message length: ${message.length}`);
       let eventCount = 0;

@@ -2,11 +2,11 @@ import { getModel, type Model, type Api, type UserMessage, type Message, type Si
 import { runAgentLoop, type AgentContext, type AgentEvent as PiAgentEvent, type AgentLoopConfig, type AgentMessage } from "@mariozechner/pi-agent-core";
 import type { Db } from "mongodb";
 import { compactConversation, type ModelInfo } from "./compaction.js";
-import { buildSystemPromptWithContext } from "./systemPrompt.js";
 import { createNovelTools } from "./tools/index.js";
 import type { VectorSearchFn, OnDocumentChangedFn, OnWorldSummaryStaleFn } from "./tools/index.js";
 import type { Locale } from "./i18n.js";
 import type { SkillData } from "./skills.js";
+import { getAgentDefinition } from "./agents/index.js";
 
 export interface TokenUsage {
   model: string;
@@ -45,6 +45,7 @@ export class CreatorAgentSession {
   private vectorSearchFn?: VectorSearchFn;
   private onDocumentChanged?: OnDocumentChangedFn;
   private onWorldSummaryStale?: OnWorldSummaryStaleFn;
+  private agentType: string;
 
   constructor(options: {
     apiKey: string;
@@ -60,6 +61,7 @@ export class CreatorAgentSession {
     vectorSearchFn?: VectorSearchFn;
     onDocumentChanged?: OnDocumentChangedFn;
     onWorldSummaryStale?: OnWorldSummaryStaleFn;
+    agentType?: string;
   }) {
     this.apiKey = options.apiKey;
     let model: Model<any> | undefined;
@@ -94,6 +96,7 @@ export class CreatorAgentSession {
     this.vectorSearchFn = options.vectorSearchFn;
     this.onDocumentChanged = options.onDocumentChanged;
     this.onWorldSummaryStale = options.onWorldSummaryStale;
+    this.agentType = options.agentType ?? "creator";
   }
 
   async *chat(userMessage: string, options: {
@@ -107,9 +110,11 @@ export class CreatorAgentSession {
     skills?: SkillData[];
   } = {}): AsyncGenerator<AgentEvent> {
     const { historyMessages, memory, worldSummary, locale = "zh", projectMemory, workingEnvironment, conversationSummary, skills } = options;
-    const systemPrompt = buildSystemPromptWithContext(
-      this.projectId,
-      this.worldId,
+
+    const agentDef = getAgentDefinition(this.agentType);
+    const systemPrompt = agentDef.buildSystemPrompt({
+      projectId: this.projectId,
+      worldId: this.worldId,
       memory,
       worldSummary,
       locale,
@@ -117,9 +122,12 @@ export class CreatorAgentSession {
       workingEnvironment,
       conversationSummary,
       skills,
-    );
+    });
 
-    const tools = createNovelTools(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale, locale, this.worldId, this.projectId, skills);
+    const allTools = createNovelTools(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale, locale, this.worldId, this.projectId, skills);
+    const tools = agentDef.tools[0] === "*"
+      ? allTools
+      : allTools.filter(t => (agentDef.tools as string[]).includes(t.name));
 
     const abortController = new AbortController();
     this.abortController = abortController;
