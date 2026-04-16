@@ -194,9 +194,9 @@ const zh = {
     generate_synopsis: "获取章节内容，用于生成章节梗概。返回章节全文供AI总结。",
     generate_synopsis_chapterId: "章节ID",
 
-    invoke_skill: "调用一个创作技能。技能是预定义的专业化指导，帮助你完成特定的创作任务。调用后请严格按照返回的指导执行。",
-    invoke_skill_skill_name: "要调用的技能名称",
-    invoke_skill_args: "传递给技能的参数（键值对），具体参数请参考系统提示中各技能的说明。",
+    invoke_skill: "调用一个创作 Skill。Skill 是预定义的专业化指导，帮助你完成特定的创作任务。调用后请严格按照返回的指导执行。",
+    invoke_skill_skill_name: "要调用的 Skill 名称",
+    invoke_skill_args: "传递给 Skill 的参数字符串。参考系统提示中各 Skill 的 argument hint。",
   },
 
   // ── File import ──
@@ -411,7 +411,7 @@ const en: typeof zh = {
 
     invoke_skill: "Invoke a creative writing skill. Skills are predefined specialized instructions for specific creative tasks. Follow the returned instructions precisely.",
     invoke_skill_skill_name: "Name of the skill to invoke",
-    invoke_skill_args: "Arguments to pass to the skill (key-value pairs). See system prompt for each skill's expected arguments.",
+    invoke_skill_args: "Arguments to pass to the skill as a string. See system prompt for each skill's argument hint.",
   },
 
   // ── File import ──

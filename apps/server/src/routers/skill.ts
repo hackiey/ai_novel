@@ -41,8 +41,9 @@ export const skillRouter = router({
       const now = new Date();
       const doc = {
         ...input,
-        arguments: input.arguments ?? [],
         tags: input.tags ?? [],
+        disableModelInvocation: input.disableModelInvocation ?? false,
+        userInvocable: input.userInvocable ?? true,
         isBuiltin: false,
         isPublished: false,
         authorId: ctx.user.userId,

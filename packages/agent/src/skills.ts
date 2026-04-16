@@ -1,27 +1,30 @@
-import type { Locale } from "./i18n.js";
-
-export interface SkillArgument {
-  name: string;
-  description: Record<Locale, string>;
-  required: boolean;
-}
-
 export interface SkillData {
-  skillId: string;
-  name: Record<Locale, string>;
-  description: Record<Locale, string>;
-  whenToUse: Record<Locale, string>;
-  prompt: Record<Locale, string>;
-  arguments: SkillArgument[];
+  name: string;
+  description: string;
+  argumentHint?: string;
+  content: string;
 }
 
-/** Render a skill prompt template, replacing {{argName}} placeholders */
-export function renderSkillPrompt(skill: SkillData, args: Record<string, unknown>, locale: Locale): string {
-  let prompt = skill.prompt[locale] || skill.prompt.zh;
-  for (const arg of skill.arguments) {
-    const value = args[arg.name];
-    const placeholder = `{{${arg.name}}}`;
-    prompt = prompt.replaceAll(placeholder, value != null ? String(value) : (locale === "zh" ? "（未指定）" : "(not specified)"));
+/** Render a skill content template, replacing $ARGUMENTS / $0 / $1 placeholders */
+export function renderSkillPrompt(skill: SkillData, args: string): string {
+  let content = skill.content;
+
+  // Split args into individual arguments
+  const argParts = args.trim() ? args.trim().split(/\s+/) : [];
+
+  // Replace $ARGUMENTS with the full argument string
+  if (content.includes("$ARGUMENTS")) {
+    content = content.replaceAll("$ARGUMENTS", args.trim());
+  } else if (args.trim()) {
+    // If no $ARGUMENTS placeholder exists, append arguments
+    content += `\n\nARGUMENTS: ${args.trim()}`;
   }
-  return prompt;
+
+  // Replace $ARGUMENTS[N] and $N with positional arguments
+  for (let i = 0; i < argParts.length; i++) {
+    content = content.replaceAll(`$ARGUMENTS[${i}]`, argParts[i]);
+    content = content.replaceAll(`$${i}`, argParts[i]);
+  }
+
+  return content;
 }

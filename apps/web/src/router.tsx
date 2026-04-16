@@ -8,7 +8,7 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, Shield, Palette, Languages, LogOut, Share2, KeyRound } from "lucide-react";
+import { ChevronDown, Shield, Palette, Languages, LogOut, Share2, KeyRound, Sparkles } from "lucide-react";
 import BYOKSettingsDialog from "./components/BYOKSettingsDialog.js";
 import HomePage from "./pages/HomePage.js";
 import WritePage from "./pages/WritePage.js";
@@ -18,6 +18,8 @@ import RegisterPage from "./pages/RegisterPage.js";
 import AdminPage from "./pages/AdminPage.js";
 import ReaderPage from "./pages/ReaderPage.js";
 import SharesPage from "./pages/SharesPage.js";
+import SkillMarketPage from "./pages/SkillMarketPage.js";
+import SkillDetailPage from "./pages/SkillDetailPage.js";
 import { getToken } from "./lib/auth.js";
 import { useAuth } from "./contexts/AuthContext.js";
 import { BreadcrumbProvider, useBreadcrumb } from "./contexts/BreadcrumbContext.js";
@@ -155,6 +157,15 @@ function RootInner() {
             )}
           </div>
           <div className="flex items-center gap-2 sm:gap-4 text-sm">
+            {user && (
+              <Link
+                to="/skills"
+                className="text-white/40 hover:text-teal-400 transition-colors"
+                title={t("header.skillMarket")}
+              >
+                <Sparkles className="w-4 h-4" />
+              </Link>
+            )}
             {user && <UserMenu user={user} logout={logout} />}
           </div>
         </div>
@@ -226,6 +237,20 @@ const sharesRoute = createRoute({
   component: SharesPage,
 });
 
+const skillMarketRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/skills",
+  beforeLoad: requireAuth,
+  component: SkillMarketPage,
+});
+
+const skillDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/skills/$skillId",
+  beforeLoad: requireAuth,
+  component: SkillDetailPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   registerRoute,
@@ -235,6 +260,8 @@ const routeTree = rootRoute.addChildren([
   adminRoute,
   readerRoute,
   sharesRoute,
+  skillMarketRoute,
+  skillDetailRoute,
 ]);
 
 export const router = createRouter({ routeTree });

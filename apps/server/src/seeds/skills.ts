@@ -2,18 +2,9 @@ import type { Db } from "mongodb";
 
 const builtinSkills = [
   {
-    skillId: "world_building",
-    name: { zh: "世界观构建", en: "World Building" },
-    description: {
-      zh: "引导构建完整的世界观体系，包括地理、历史、社会制度、魔法/科技体系等",
-      en: "Guide building a complete world system including geography, history, social structure, magic/technology systems, etc.",
-    },
-    whenToUse: {
-      zh: "当用户想要从零开始创建世界观，或者需要系统性地完善现有世界观时",
-      en: "When the user wants to create a world from scratch, or systematically refine an existing world",
-    },
-    prompt: {
-      zh: `# 世界观构建技能
+    name: "world-building",
+    description: "引导构建完整的世界观体系，包括地理、历史、社会制度、魔法/科技体系等。当用户想要从零开始创建世界观，或者需要系统性地完善现有世界观时使用。",
+    content: `# 世界观构建 Skill
 
 请引导用户系统性地构建完整的世界观体系。按以下步骤操作：
 
@@ -65,75 +56,30 @@ const builtinSkills = [
 - 在创建设定时使用丰富、具体的描述
 
 请开始与用户讨论，了解他们想要构建什么样的世界。`,
-      en: `# World Building Skill
-
-Guide the user to systematically build a complete world system. Follow these steps:
-
-## Step 1: Assess Current State
-1. Use semantic_search to find all existing settings in the current world
-2. Understand what type of story the user wants to create (fantasy, sci-fi, realistic, historical, etc.)
-
-## Step 2: Establish Core Framework
-Discuss with the user to determine these core elements:
-- **World Tone**: Realistic / Fantasy / Sci-fi / Hybrid? Light or dark atmosphere?
-- **Era**: Ancient / Medieval / Modern / Future / Alternative?
-- **Core Conflict**: What is the main conflict driving the story?
-
-## Step 3: Build Layer by Layer
-Based on story type, guide the user through these dimensions (by importance):
-
-### Essential Dimensions
-1. **Geography** — Key locations, terrain, climate
-2. **Social Structure** — Nations/organizations, class system, power hierarchy
-3. **Core Rules** — Magic system / technology level / supernatural rules (if applicable)
-
-### Recommended Dimensions
-4. **History** — Major historical events, civilization development
-5. **Culture & Customs** — Language, religion, festivals, taboos
-6. **Economy** — Currency, trade, resource distribution
-
-### Optional Dimensions
-7. **Military** — Weapons, tactics, army organization
-8. **Daily Life** — Food, clothing, shelter, entertainment
-9. **Special Species/Races** — Non-human race characteristics and cultures
-
-## Step 4: Create Settings
-For each discussed dimension:
-1. Use create_world_setting to create world setting entries
-2. Choose appropriate category (Geography, History, Politics, Magic System, Technology, Culture, Organizations, etc.)
-3. Set importance based on relevance to the story (core/major/minor)
-4. Write clear summary and detailed content for each setting
-
-## Step 5: Consistency Check
-During the building process:
-- Check new settings for contradictions with existing ones
-- Ensure logical consistency across all dimensions
-- If inconsistencies are found, proactively alert the user and suggest fixes
-
-## Working Style
-- Don't create all settings at once — discuss with the user step by step, creating settings as each dimension is finalized
-- Ask thought-provoking questions to help the user consider aspects they may have overlooked
-- Provide concrete suggestions and examples, not vague guidance
-- Use rich, specific descriptions when creating settings
-
-Begin by discussing with the user what kind of world they want to build.`,
-    },
-    arguments: [],
     tags: ["world"],
     isBuiltin: true,
     isPublished: true,
+    disableModelInvocation: false,
+    userInvocable: true,
   },
 ];
 
 export async function seedBuiltinSkills(db: Db): Promise<void> {
   const collection = db.collection("skills");
 
-  // Ensure index on skillId
-  await collection.createIndex({ skillId: 1 }, { unique: true });
+  // Ensure index on name
+  await collection.createIndex({ name: 1 }, { unique: true });
+
+  // Drop old skillId index if it exists
+  try {
+    await collection.dropIndex("skillId_1");
+  } catch {
+    // Index may not exist, ignore
+  }
 
   for (const skill of builtinSkills) {
     await collection.updateOne(
-      { skillId: skill.skillId },
+      { name: skill.name },
       {
         $set: {
           ...skill,
@@ -146,6 +92,9 @@ export async function seedBuiltinSkills(db: Db): Promise<void> {
       { upsert: true },
     );
   }
+
+  // Clean up old skillId-based documents that were replaced
+  await collection.deleteMany({ skillId: { $exists: true }, name: { $exists: false } });
 
   console.log(`Seeded ${builtinSkills.length} builtin skill(s)`);
 }

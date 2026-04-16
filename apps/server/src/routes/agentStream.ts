@@ -277,7 +277,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       console.error("[WorkingEnvironment] Failed to build:", err);
     }
 
-    // Load available skills
+    // Load available skills (exclude those with disableModelInvocation)
     const skillDocs = await db.collection("skills")
       .find({
         $or: [
@@ -285,16 +285,15 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
           { isPublished: true },
           { authorId: user.userId },
         ],
+        disableModelInvocation: { $ne: true },
       })
       .toArray();
 
     const skills: SkillData[] = skillDocs.map(doc => ({
-      skillId: doc.skillId,
       name: doc.name,
-      description: doc.description,
-      whenToUse: doc.whenToUse,
-      prompt: doc.prompt,
-      arguments: doc.arguments || [],
+      description: doc.description ?? "",
+      argumentHint: doc.argumentHint,
+      content: doc.content ?? "",
     }));
 
     // Stream agent events

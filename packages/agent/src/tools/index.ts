@@ -371,21 +371,19 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       description: d.invoke_skill,
       parameters: Type.Object({
         skill_name: StringEnum(
-          skills.map(s => s.skillId) as [string, ...string[]],
+          skills.map(s => s.name) as [string, ...string[]],
           { description: d.invoke_skill_skill_name },
         ),
-        args: Type.Optional(Type.Record(
-          Type.String(),
-          Type.Any(),
-          { description: d.invoke_skill_args },
-        )),
+        arguments: Type.Optional(Type.String({
+          description: d.invoke_skill_args,
+        })),
       }),
       async execute(_toolCallId, toolArgs) {
-        const skill = skills.find(s => s.skillId === toolArgs.skill_name);
+        const skill = skills.find(s => s.name === toolArgs.skill_name);
         if (!skill) {
           return textResult({ error: `Unknown skill: ${toolArgs.skill_name}` });
         }
-        const rendered = renderSkillPrompt(skill, toolArgs.args ?? {}, locale);
+        const rendered = renderSkillPrompt(skill, toolArgs.arguments ?? "");
         return {
           content: [{ type: "text", text: rendered }],
           details: undefined,
