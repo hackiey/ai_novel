@@ -59,8 +59,8 @@ export function buildSystemPromptWithContext(
       ? "你可以通过调用 invoke_skill 工具来使用以下 Skill。每个 Skill 提供专业化的创作指导。当用户的需求匹配某个 Skill 时，优先使用。"
       : "Use the invoke_skill tool to activate the skills below. Each skill provides specialized creative writing guidance. Prefer skills when the user's request matches.";
     const lines = skills.map(s => {
-      const hint = s.argumentHint ? ` ${s.argumentHint}` : "";
-      return `- **${s.name}**${hint}: ${s.description}`;
+      const displayName = s.name && s.name !== s.slug ? ` (${s.name})` : "";
+      return `- **${s.slug}**${displayName}: ${s.description}`;
     });
     prompt += `\n\n${heading}\n\n${intro}\n\n${lines.join("\n")}`;
   }

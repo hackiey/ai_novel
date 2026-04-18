@@ -707,6 +707,136 @@ export async function updateMemory(
   return { success: true, scope: args.scope ?? "world", updatedAt: now.toISOString() };
 }
 
+// ============ Skill Search ============
+
+export async function searchSkills(
+  args: { query: string; limit?: number },
+  db: Db
+): Promise<unknown> {
+  const { query, limit = 10 } = args;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = escaped.trim().split(/\s+/).join("|");
+  const regex = { $regex: pattern, $options: "i" };
+
+  const skills = await db
+    .collection("skills")
+    .find({
+      $or: [{ name: regex }, { slug: regex }, { description: regex }, { tags: regex }],
+    })
+    .limit(limit)
+    .toArray();
+
+  const results = skills.map((s) => ({
+    collection: "skill",
+    title: s.name || s.slug,
+    excerpt: [
+      s.name ? `名称: ${s.name}` : "",
+      s.slug ? `Slug: ${s.slug}` : "",
+      s.tags?.length ? `标签: ${s.tags.join(", ")}` : "",
+      s.description ? `描述: ${s.description}` : "",
+    ].filter(Boolean).join("\n"),
+    id: s._id.toHexString(),
+  }));
+
+  return { results, total: results.length };
+}
+
+// ============ Skill Handlers ============
+
+export async function createSkill(
+  args: {
+    slug: string;
+    name: string;
+    description: string;
+    content: string;
+    tags?: string[];
+    disableModelInvocation?: boolean;
+    userInvocable?: boolean;
+  },
+  db: Db,
+  userId?: string
+): Promise<unknown> {
+  if (!/^[a-z0-9-]+$/.test(args.slug)) {
+    return { error: `Invalid skill slug: "${args.slug}". Must match /^[a-z0-9-]+$/` };
+  }
+  const existing = await db.collection("skills").findOne({ slug: args.slug });
+  if (existing) {
+    return { error: `Skill with slug "${args.slug}" already exists (id: ${existing._id.toHexString()})` };
+  }
+  const now = new Date();
+  const isSystemCreation = !userId;
+  const doc: Record<string, unknown> = {
+    slug: args.slug,
+    name: args.name,
+    description: args.description,
+    content: args.content,
+    tags: args.tags ?? [],
+    disableModelInvocation: args.disableModelInvocation ?? false,
+    userInvocable: args.userInvocable ?? true,
+    isBuiltin: isSystemCreation,
+    isPublished: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+  if (userId) doc.authorId = userId;
+  const result = await db.collection("skills").insertOne(doc);
+  return serialize({ ...doc, _id: result.insertedId });
+}
+
+export async function updateSkill(
+  args: {
+    id: string;
+    slug?: string;
+    name?: string;
+    description?: string;
+    content?: string;
+    tags?: string[];
+    disableModelInvocation?: boolean;
+    userInvocable?: boolean;
+  },
+  db: Db
+): Promise<unknown> {
+  const { id, ...updates } = args;
+  if (updates.slug !== undefined && !/^[a-z0-9-]+$/.test(updates.slug)) {
+    return { error: `Invalid skill slug: "${updates.slug}". Must match /^[a-z0-9-]+$/` };
+  }
+  if (updates.slug !== undefined) {
+    const existing = await db.collection("skills").findOne({ slug: updates.slug, _id: { $ne: toObjectId(id) } });
+    if (existing) {
+      return { error: `Skill with slug "${updates.slug}" already exists (id: ${existing._id.toHexString()})` };
+    }
+  }
+  const setFields: Record<string, unknown> = { updatedAt: new Date() };
+  if (updates.slug !== undefined) setFields.slug = updates.slug;
+  if (updates.name !== undefined) setFields.name = updates.name;
+  if (updates.description !== undefined) setFields.description = updates.description;
+  if (updates.content !== undefined) setFields.content = updates.content;
+  if (updates.tags !== undefined) setFields.tags = updates.tags;
+  if (updates.disableModelInvocation !== undefined) setFields.disableModelInvocation = updates.disableModelInvocation;
+  if (updates.userInvocable !== undefined) setFields.userInvocable = updates.userInvocable;
+
+  const result = await db
+    .collection("skills")
+    .findOneAndUpdate(
+      { _id: toObjectId(id) },
+      { $set: setFields },
+      { returnDocument: "after" }
+    );
+  if (!result) return { error: `Skill not found: ${id}` };
+  return serialize(result);
+}
+
+export async function deleteSkill(
+  args: { id: string },
+  db: Db
+): Promise<unknown> {
+  const skill = await db.collection("skills").findOne({ _id: toObjectId(args.id) });
+  if (!skill) return { error: `Skill not found: ${args.id}` };
+  if (skill.isBuiltin) return { error: `Cannot delete builtin skill: ${skill.name || skill.slug}` };
+  await db.collection("skills").deleteOne({ _id: toObjectId(args.id) });
+  return { success: true, deleted: serialize(skill) };
+}
+
 // ============ Generate Synopsis ============
 
 export async function generateSynopsis(

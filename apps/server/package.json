@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "extract-skills": "tsx src/scripts/extractSkills.ts"
   },
   "dependencies": {
     "@ai-creator/agent": "workspace:*",

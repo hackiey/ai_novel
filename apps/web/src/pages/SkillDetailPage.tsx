@@ -50,7 +50,7 @@ export default function SkillDetailPage() {
           {t("skillMarket.backToMarket")}
         </Link>
         <span className="text-white/20">/</span>
-        <span className="text-white/60 font-mono">{skill.name}</span>
+        <span className="text-white/60 font-mono">{skill.slug}</span>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
@@ -58,21 +58,14 @@ export default function SkillDetailPage() {
         <div className="flex-1 min-w-0 space-y-6">
           {/* Title */}
           <div>
-            <h1 className="text-2xl font-bold text-white/90 mb-2 font-mono">
+            <h1 className="text-2xl font-bold text-white/90 mb-2">
               {skill.name}
             </h1>
+            {skill.slug && (
+              <div className="text-xs text-white/40 font-mono mb-2">{skill.slug}</div>
+            )}
             <p className="text-sm text-white/50 leading-relaxed">{skill.description}</p>
           </div>
-
-          {/* Argument hint */}
-          {skill.argumentHint && (
-            <section className={`${cardClass} rounded-xl px-5 py-4`}>
-              <h2 className="text-sm font-medium text-white/70 mb-2">{t("skillMarket.argumentHint")}</h2>
-              <code className="text-sm text-teal-400/80 bg-black/20 px-3 py-1.5 rounded block">
-                {skill.name} {skill.argumentHint}
-              </code>
-            </section>
-          )}
 
           {/* Content */}
           {skill.content && (
@@ -141,11 +134,11 @@ export default function SkillDetailPage() {
             </div>
           )}
 
-          {/* Skill Name */}
+          {/* Skill Slug */}
           <div className={`${cardClass} rounded-xl px-5 py-4`}>
-            <h3 className="text-xs font-medium text-white/50 mb-2">Skill Name</h3>
+            <h3 className="text-xs font-medium text-white/50 mb-2">Slug</h3>
             <code className="text-xs text-white/40 bg-black/20 px-2 py-1 rounded block">
-              {skill.name}
+              {skill.slug}
             </code>
           </div>
         </div>

@@ -194,9 +194,78 @@ const zh = {
     generate_synopsis: "获取章节内容，用于生成章节梗概。返回章节全文供AI总结。",
     generate_synopsis_chapterId: "章节ID",
 
+    search_skills: "语义搜索已有 Skill，根据关键词或描述匹配相关 Skill。用于在创建新 Skill 前检查是否已有类似 Skill。",
+    search_skills_query: "搜索关键词，支持语义理解",
+    search_skills_limit: "返回结果数量上限，默认10",
+
+    create_skill: "创建一个新的 Skill。Skill 的 content 是一段 prompt 模板，用于指导 AI 完成特定创作任务。",
+    create_skill_slug: "Skill 唯一标识，小写字母、数字和连字符组成（如 plot-twist-design），调用 invoke_skill 时使用",
+    create_skill_name: "Skill 显示名称（中文/英文/任意字符，不要求唯一），如\"情节反转设计\"",
+    create_skill_description: "Skill 的简要描述，说明用途和适用场景",
+    create_skill_content: "Skill 的完整 prompt 模板内容（markdown 格式的指令文档）",
+    create_skill_tags: "标签，用于分类。语言必须与正文（content）一致：正文中文则用中文标签（如：情节、角色、世界观、文风、结构、技巧），正文英文则用英文标签",
+
+    update_skill: "更新已有 Skill 的信息。",
+    update_skill_id: "Skill ID",
+    update_skill_slug: "新的 slug（唯一标识，kebab-case）",
+    update_skill_name: "新的显示名称",
+    update_skill_description: "新的描述",
+    update_skill_content: "新的 prompt 模板内容",
+    update_skill_tags: "新的标签",
+
+    delete_skill: "删除一个 Skill。内置 Skill 不可删除。",
+    delete_skill_id: "要删除的 Skill ID",
+
     invoke_skill: "调用一个创作 Skill。Skill 是预定义的专业化指导，帮助你完成特定的创作任务。调用后请严格按照返回的指导执行。",
-    invoke_skill_skill_name: "要调用的 Skill 名称",
-    invoke_skill_args: "传递给 Skill 的参数字符串。参考系统提示中各 Skill 的 argument hint。",
+    invoke_skill_skill_name: "要调用的 Skill slug（唯一标识符，非显示名称）",
+  },
+
+  // ── Skill extract ──
+  skillExtract: {
+    systemPrompt: `你是一个专业的写作方法论分析助手，帮助用户从网文论坛帖子、写作教程、创作经验分享等文档中提取可复用的写作 Skill。
+
+## 什么是 Skill
+
+Skill 是一段结构化的 prompt 模板，用于指导 AI 完成特定的创作任务。一个好的 Skill 应该：
+- 有明确的适用场景和目标
+- 包含具体的操作步骤或思考框架
+- 可以被 AI 直接执行，产出有价值的创作辅助内容
+- 具有通用性，适用于多种小说项目
+
+## 提取规则
+
+1. **先检查已有 Skill**：使用 search_skills 搜索相关 Skill，避免重复创建
+2. **识别可提取的内容**：
+   - 写作技巧和方法论（如：如何写好开头、如何设计反转、如何塑造反派）
+   - 创作模板和框架（如：三幕结构大纲模板、角色卡片模板）
+   - 特定类型的写作指导（如：战斗场面写法、情感戏写法、日常戏写法）
+   - 修改和优化建议（如：节奏调整技巧、文笔提升方法）
+3. **过滤噪声**：
+   - 忽略个人经历分享、闲聊讨论、书评推荐等非方法论内容
+   - 忽略过于简单或空泛的建议（如"多读多写"）
+   - 忽略特定作品的剧情讨论
+4. **Skill 命名**：
+   - slug（唯一标识）：小写英文+连字符，建议用动名词形式描述能力（如 designing-villains、pacing-tension、structuring-outlines），用于 invoke_skill 调用
+   - name（显示名称）：自然语言名称，建议中文（如"反派设计"、"张力节奏控制"）
+5. **description 写法**：
+   - 用第三人称、客观陈述，描述"做什么 + 何时使用"
+   - 避免"你可以…""我可以…"这类第一/第二人称口吻
+   - 例：✓ "为反派角色设计动机、性格弧线和与主角的关系。当用户需要塑造反派时使用。" / ✗ "你是一个反派设计助手"
+6. **Skill content 编写**（重要）：
+   - **禁止**以"你是一个 xxx 助手 / You are an assistant…"开头。content 是直接执行的指令文档，不是角色扮演 prompt
+   - 用**祈使句**直接给指令（如"分析…"、"按以下步骤生成…"），不要描述角色身份
+   - 假设 AI 已具备基础能力，不要解释常识（如"小说由章节组成"），只补充 AI 不知道的具体方法、规则、模板
+   - 结构清晰：可用 \`## 步骤\`、\`## 模板\`、\`## 示例\`、\`## 注意事项\` 等 markdown 章节组织
+   - 提供具体示例（输入 → 输出对照）比抽象描述更有效
+   - 关键约束用粗体或"必须 / 禁止"等强语气标出
+   - 如需查询项目数据，提示 AI 调用相关工具（如 semantic_search 查角色/设定）
+   - **简洁优先**：每段文字都要有信息增量，能去掉的解释性废话一律去掉
+7. **如果已有类似 Skill**：使用 update_skill 合并新内容，而非创建重复的 Skill
+8. **设置合理的 tags**：标签语言必须与 content 正文语言一致。中文正文用中文标签（如：情节、角色、世界观、文风、结构、技巧），英文正文用英文标签（如 plot、character、world、style）
+
+完成提取后，请简要总结本段提取了哪些 Skill。`,
+    chunkPrompt: (chunkIndex: number, totalChunks: number) =>
+      `请从以下文档内容（第 ${chunkIndex + 1}/${totalChunks} 段）中提取可复用的写作 Skill。`,
   },
 
   // ── File import ──
@@ -426,9 +495,78 @@ const en: typeof zh = {
     generate_synopsis: "Retrieve chapter content for generating a chapter synopsis. Returns the full chapter text for AI summarization.",
     generate_synopsis_chapterId: "Chapter ID",
 
+    search_skills: "Semantic search for existing Skills by keyword or description. Use before creating a new Skill to check for similar ones.",
+    search_skills_query: "Search keywords, supports semantic understanding",
+    search_skills_limit: "Maximum number of results, default 10",
+
+    create_skill: "Create a new Skill. A Skill's content is a prompt template that guides AI to perform a specific creative task.",
+    create_skill_slug: "Unique skill identifier (slug), lowercase letters, numbers, and hyphens (e.g., plot-twist-design). Used by invoke_skill.",
+    create_skill_name: "Display name (any characters, not required to be unique), e.g., 'Plot Twist Design'",
+    create_skill_description: "Brief description of the Skill's purpose and use cases",
+    create_skill_content: "Full prompt template content for the Skill (markdown instruction document)",
+    create_skill_tags: "Tags for categorization. Tag language must match the content language: use English tags for English content (e.g., plot, character, world, style), use the same language as content otherwise",
+
+    update_skill: "Update an existing Skill's information.",
+    update_skill_id: "Skill ID",
+    update_skill_slug: "New slug (unique identifier, kebab-case)",
+    update_skill_name: "New display name",
+    update_skill_description: "New description",
+    update_skill_content: "New prompt template content",
+    update_skill_tags: "New tags",
+
+    delete_skill: "Delete a Skill. Built-in Skills cannot be deleted.",
+    delete_skill_id: "Skill ID to delete",
+
     invoke_skill: "Invoke a creative writing skill. Skills are predefined specialized instructions for specific creative tasks. Follow the returned instructions precisely.",
-    invoke_skill_skill_name: "Name of the skill to invoke",
-    invoke_skill_args: "Arguments to pass to the skill as a string. See system prompt for each skill's argument hint.",
+    invoke_skill_skill_name: "Slug of the skill to invoke (unique identifier, not the display name)",
+  },
+
+  // ── Skill extract ──
+  skillExtract: {
+    systemPrompt: `You are a professional writing methodology analyst, helping users extract reusable writing Skills from web novel forum posts, writing tutorials, and creative experience sharing documents.
+
+## What is a Skill
+
+A Skill is a structured prompt template that guides AI to perform a specific creative task. A good Skill should:
+- Have a clear use case and goal
+- Contain concrete operational steps or thinking frameworks
+- Be directly executable by AI, producing valuable creative assistance
+- Be generalizable across multiple novel projects
+
+## Extraction Rules
+
+1. **Check existing Skills first**: Use search_skills to find related Skills and avoid duplicates
+2. **Identify extractable content**:
+   - Writing techniques and methodologies (e.g., how to write great openings, designing plot twists, crafting villains)
+   - Creative templates and frameworks (e.g., three-act structure outline template, character card template)
+   - Genre-specific writing guidance (e.g., battle scene writing, emotional scene writing, slice-of-life writing)
+   - Editing and optimization tips (e.g., pacing adjustment techniques, prose improvement methods)
+3. **Filter noise**:
+   - Ignore personal anecdotes, casual discussions, book reviews, and recommendations
+   - Ignore overly simple or vague advice (e.g., "read more, write more")
+   - Ignore plot discussions about specific works
+4. **Skill naming**:
+   - slug (unique identifier): lowercase English + hyphens. Prefer gerund form describing the capability (e.g., designing-villains, pacing-tension, structuring-outlines). Used by invoke_skill.
+   - name (display name): natural-language name (e.g., "Villain Design", "Tension Pacing")
+5. **Description writing**:
+   - Use third person, objective tone. State "what it does + when to use".
+   - Avoid first/second person ("I can…", "You can…", "You are…").
+   - Example: ✓ "Designs villain motivations, character arcs, and relationships with the protagonist. Use when crafting antagonists." / ✗ "You are a villain design assistant"
+6. **Skill content writing** (important):
+   - **Do NOT** start with "You are an assistant…" / "You are a…". Content is a directly executable instruction document, not a roleplay prompt.
+   - Use **imperative voice** for instructions ("Analyze…", "Generate using these steps…"). Don't describe the AI's identity.
+   - Assume the AI already has baseline competence — don't explain common knowledge ("novels are made of chapters"). Add only what the AI doesn't already know: specific methods, rules, templates.
+   - Clear structure: organize with markdown sections like \`## Steps\`, \`## Template\`, \`## Examples\`, \`## Notes\`.
+   - Concrete examples (input → output pairs) beat abstract descriptions.
+   - Mark hard constraints with **bold** or strong terms ("MUST", "DO NOT").
+   - When data lookups are needed, instruct the AI to call relevant tools (e.g., semantic_search for characters/settings).
+   - **Concise first**: every paragraph must add information. Cut filler explanations.
+7. **If a similar Skill exists**: Use update_skill to merge new content instead of creating duplicates
+8. **Set appropriate tags**: Tag language must match the content language. Use English tags for English content (e.g., plot, character, world, style, structure, technique); use the same language as the content otherwise
+
+After extraction, briefly summarize which Skills were extracted from this chunk.`,
+    chunkPrompt: (chunkIndex: number, totalChunks: number) =>
+      `Please extract reusable writing Skills from the following document content (chunk ${chunkIndex + 1}/${totalChunks}).`,
   },
 
   // ── File import ──

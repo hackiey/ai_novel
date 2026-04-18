@@ -17,6 +17,10 @@ export type ToolName =
   | "update_draft"
   | "update_memory"
   | "generate_synopsis"
+  | "search_skills"
+  | "create_skill"
+  | "update_skill"
+  | "delete_skill"
   | "invoke_skill";
 
 /** Context available when building a system prompt */

@@ -8,6 +8,7 @@ const EMBEDDABLE_COLLECTIONS = [
   "world_settings",
   "drafts",
   "chapters",
+  "skills",
 ] as const;
 
 type EmbeddableCollection = (typeof EMBEDDABLE_COLLECTIONS)[number];
@@ -38,6 +39,11 @@ function buildEmbeddingText(collection: string, doc: any): string {
       return [doc.title, doc.synopsis, contentSlice].filter(Boolean).join("\n");
     }
 
+    case "skills": {
+      const tagsStr = doc.tags?.length ? doc.tags.map((t: string) => `#${t}`).join(" ") : "";
+      return [doc.name, doc.slug, tagsStr, doc.description].filter(Boolean).join("\n");
+    }
+
     default:
       return "";
   }
@@ -50,6 +56,8 @@ function extractTitle(collection: string, doc: any): string {
   switch (collection) {
     case "characters":
       return doc.name || "Untitled Character";
+    case "skills":
+      return doc.name || doc.slug || "Untitled Skill";
     case "chapters":
       return doc.title || `Chapter ${doc.order ?? ""}`.trim();
     default:
@@ -80,6 +88,14 @@ function extractExcerpt(collection: string, doc: any, maxLen = 200): string {
       if (doc.importance) parts.push(`重要性: ${doc.importance}`);
       if (doc.tags?.length) parts.push(`标签: ${doc.tags.join(", ")}`);
       if (doc.content) parts.push(`内容: ${doc.content}`);
+      return parts.join("\n");
+    }
+    case "skills": {
+      const parts: string[] = [];
+      if (doc.name) parts.push(`名称: ${doc.name}`);
+      if (doc.slug) parts.push(`Slug: ${doc.slug}`);
+      if (doc.tags?.length) parts.push(`标签: ${doc.tags.join(", ")}`);
+      if (doc.description) parts.push(`描述: ${doc.description}`);
       return parts.join("\n");
     }
     default: {
@@ -308,6 +324,8 @@ export class ServerEmbeddingService {
       drafts: "drafts",
       chapter: "chapters",
       chapters: "chapters",
+      skill: "skills",
+      skills: "skills",
     };
     const collections: EmbeddableCollection[] =
       scope && scope.length > 0
@@ -328,13 +346,15 @@ export class ServerEmbeddingService {
     // Search each collection in parallel
     const searches = collections.map(async (collName) => {
       try {
-        // characters/world_settings belong to worldId; chapters belong to projectId; drafts can have either
-        // Note: worldId is stored as ObjectId in MongoDB, projectId may be string
+        // characters/world_settings belong to worldId; chapters belong to projectId;
+        // drafts can have either; skills are global (no filter)
         const filter: Record<string, any> = {};
         if (collName === "characters" || collName === "world_settings") {
           if (ids.worldId) filter.worldId = new ObjectId(ids.worldId);
         } else if (collName === "chapters") {
           if (ids.projectId) filter.projectId = ids.projectId;
+        } else if (collName === "skills") {
+          // Skills are global — no worldId/projectId filter
         } else {
           // drafts: prefer worldId, fall back to projectId
           if (ids.worldId) filter.worldId = new ObjectId(ids.worldId);
@@ -357,7 +377,9 @@ export class ServerEmbeddingService {
             $project: {
               _id: 1,
               name: 1,
+              slug: 1,
               title: 1,
+              description: 1,
               order: 1,
               synopsis: 1,
               content: 1,

@@ -10,7 +10,6 @@ import { initEmbeddingService } from "./services/embeddingService.js";
 import { ChapterSynopsisService } from "./services/chapterSynopsisService.js";
 import { registerAgentRoutes } from "./routes/agentStream.js";
 import { registerFileImportRoutes } from "./routes/fileImport.js";
-import { seedBuiltinSkills } from "./seeds/skills.js";
 
 const PORT = Number(process.env.PORT) || 3001;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/ai_creator";
@@ -62,8 +61,7 @@ async function main() {
   await db.collection("shares").createIndex({ shareToken: 1 }, { unique: true });
   await db.collection("shares").createIndex({ projectId: 1, userId: 1 }, { unique: true });
 
-  // Seed builtin skills
-  await seedBuiltinSkills(db);
+  await db.collection("skills").createIndex({ slug: 1 }, { unique: true });
 
   // Ensure vector search indexes (Atlas Search)
   if (embeddingApiKey) {
@@ -73,6 +71,7 @@ async function main() {
       { name: "world_settings", filters: ["worldId"] },
       { name: "drafts", filters: ["worldId", "projectId"] },
       { name: "chapters", filters: ["projectId"] },
+      { name: "skills", filters: [] },
     ];
     for (const { name, filters } of vectorCollections) {
       try {

@@ -290,9 +290,9 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       .toArray();
 
     const skills: SkillData[] = skillDocs.map(doc => ({
+      slug: doc.slug,
       name: doc.name,
       description: doc.description ?? "",
-      argumentHint: doc.argumentHint,
       content: doc.content ?? "",
     }));
 

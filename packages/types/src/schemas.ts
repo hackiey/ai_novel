@@ -377,9 +377,9 @@ export type SearchResult = z.infer<typeof searchResultSchema>;
 
 export const skillSchema = z.object({
   _id: objectIdSchema,
-  name: z.string().min(1).max(64).regex(/^[a-z0-9-]+$/),
+  slug: z.string().min(1).max(64).regex(/^[a-z0-9-]+$/),
+  name: z.string().min(1).max(200),
   description: z.string(),
-  argumentHint: z.string().max(200).optional(),
   content: z.string(),
   tags: z.array(z.string().max(50)).default([]),
   disableModelInvocation: z.boolean().default(false),
@@ -391,9 +391,9 @@ export const skillSchema = z.object({
 });
 
 export const createSkillSchema = z.object({
-  name: z.string().min(1).max(64).regex(/^[a-z0-9-]+$/),
+  slug: z.string().min(1).max(64).regex(/^[a-z0-9-]+$/),
+  name: z.string().min(1).max(200),
   description: z.string(),
-  argumentHint: z.string().max(200).optional(),
   content: z.string(),
   tags: z.array(z.string().max(50)).optional(),
   disableModelInvocation: z.boolean().optional(),

@@ -1,22 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import { createHash } from "crypto";
 import { ObjectId } from "mongodb";
-import { CreatorAgentSession, getOrRefreshWorldSummary, resolveLocale, t } from "@ai-creator/agent";
+import { CreatorAgentSession, getOrRefreshWorldSummary, parseModelSpec, resolveLocale, t } from "@ai-creator/agent";
 import type { VectorSearchFn, Locale } from "@ai-creator/agent";
 import { getDb } from "../db.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 import { verifyToken, type JwtPayload } from "../auth/jwt.js";
-import mammoth from "mammoth";
+import { chunkText, fileToText, ALLOWED_EXTENSIONS } from "../utils/textChunking.js";
 
 const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "openai:gpt-4o";
-
-function parseModelSpec(spec: string): { provider: string; modelId: string } {
-  const idx = spec.indexOf(":");
-  if (idx === -1) {
-    return { provider: "anthropic", modelId: spec };
-  }
-  return { provider: spec.slice(0, idx), modelId: spec.slice(idx + 1) };
-}
 const IMPORT_CHUNK_SIZE_CHARS = Number(process.env.IMPORT_CHUNK_SIZE_CHARS) || 10000;
 const IMPORT_CHUNK_SIZE_WORDS = Number(process.env.IMPORT_CHUNK_SIZE_WORDS) || 10000;
 
@@ -29,138 +21,6 @@ function extractUser(request: { headers: { authorization?: string } }): JwtPaylo
     return null;
   }
 }
-
-function isCJKText(text: string): boolean {
-  const nonWhitespace = text.replace(/\s/g, "");
-  if (nonWhitespace.length === 0) return false;
-  const cjkChars = nonWhitespace.match(/[\u4e00-\u9fff\u3400-\u4dbf\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/g);
-  return (cjkChars?.length ?? 0) / nonWhitespace.length > 0.3;
-}
-
-function chunkText(text: string, chunkChars: number, chunkWords: number): string[] {
-  const cjkMode = isCJKText(text);
-  const paragraphs = text.split(/\n\n+/);
-  const chunks: string[] = [];
-  let current = "";
-
-  function measure(s: string): number {
-    if (cjkMode) return s.length;
-    return s.split(/\s+/).filter(Boolean).length;
-  }
-
-  const limit = cjkMode ? chunkChars : chunkWords;
-
-  for (const para of paragraphs) {
-    const paraSize = measure(para);
-    const currentSize = measure(current);
-
-    if (currentSize + paraSize <= limit) {
-      current += (current ? "\n\n" : "") + para;
-    } else if (currentSize > 0) {
-      chunks.push(current);
-      if (paraSize > limit) {
-        const subChunks = splitLargeParagraph(para, limit, cjkMode);
-        for (let i = 0; i < subChunks.length - 1; i++) {
-          chunks.push(subChunks[i]);
-        }
-        current = subChunks[subChunks.length - 1];
-      } else {
-        current = para;
-      }
-    } else {
-      if (paraSize > limit) {
-        const subChunks = splitLargeParagraph(para, limit, cjkMode);
-        for (let i = 0; i < subChunks.length - 1; i++) {
-          chunks.push(subChunks[i]);
-        }
-        current = subChunks[subChunks.length - 1];
-      } else {
-        current = para;
-      }
-    }
-  }
-
-  if (current.trim()) {
-    chunks.push(current);
-  }
-
-  return chunks;
-}
-
-function splitLargeParagraph(para: string, limit: number, cjkMode: boolean): string[] {
-  const sentences = para.split(/(?<=[。！？.!?\n])\s*/);
-  const chunks: string[] = [];
-  let current = "";
-
-  function measure(s: string): number {
-    if (cjkMode) return s.length;
-    return s.split(/\s+/).filter(Boolean).length;
-  }
-
-  for (const sentence of sentences) {
-    if (measure(current) + measure(sentence) <= limit) {
-      current += sentence;
-    } else {
-      if (current) chunks.push(current);
-      if (measure(sentence) > limit) {
-        if (cjkMode) {
-          for (let i = 0; i < sentence.length; i += limit) {
-            const slice = sentence.slice(i, i + limit);
-            if (i + limit >= sentence.length) {
-              current = slice;
-            } else {
-              chunks.push(slice);
-            }
-          }
-        } else {
-          const words = sentence.split(/\s+/);
-          let acc = "";
-          for (const word of words) {
-            if (measure(acc) + 1 > limit) {
-              chunks.push(acc);
-              acc = word;
-            } else {
-              acc += (acc ? " " : "") + word;
-            }
-          }
-          current = acc;
-        }
-      } else {
-        current = sentence;
-      }
-    }
-  }
-
-  if (current.trim()) {
-    chunks.push(current);
-  }
-
-  return chunks;
-}
-
-async function fileToText(buffer: Buffer, filename: string): Promise<string> {
-  const ext = filename.toLowerCase().split(".").pop();
-  switch (ext) {
-    case "txt":
-    case "md":
-      return buffer.toString("utf-8");
-    case "docx": {
-      const result = await mammoth.extractRawText({ buffer });
-      return result.value;
-    }
-    case "pdf": {
-      const { PDFParse } = await import("pdf-parse");
-      const parser = new PDFParse({ data: new Uint8Array(buffer) });
-      const result = await parser.getText();
-      await parser.destroy();
-      return result.text;
-    }
-    default:
-      throw new Error(`Unsupported file type: .${ext}`);
-  }
-}
-
-const ALLOWED_EXTENSIONS = new Set(["txt", "md", "docx", "pdf"]);
 
 function computeMd5(buffer: Buffer): string {
   return createHash("md5").update(buffer).digest("hex");
@@ -240,7 +100,10 @@ async function handleImportStream(
       }
 
       const selectedModel = model || DEFAULT_MODEL;
-      const { provider, modelId } = parseModelSpec(selectedModel);
+      const parsed = parseModelSpec(selectedModel);
+      const provider = parsed.provider === "custom" ? "openai" : parsed.provider;
+      const modelId = parsed.modelId;
+      const reasoning = parsed.reasoning;
       const providerEnvPrefix = provider.toUpperCase().replace(/-/g, "_");
       const apiKey = process.env[`${providerEnvPrefix}_API_KEY`]
         || process.env.LLM_API_KEY
@@ -252,6 +115,7 @@ async function handleImportStream(
         provider,
         modelId,
         baseURL,
+        reasoning,
         db,
         projectId: worldId,
         worldId,

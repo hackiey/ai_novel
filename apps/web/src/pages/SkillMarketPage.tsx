@@ -30,9 +30,10 @@ export default function SkillMarketPage() {
       const q = search.trim().toLowerCase();
       list = list.filter((s: any) => {
         const name = (s.name ?? "").toLowerCase();
+        const slug = (s.slug ?? "").toLowerCase();
         const desc = (s.description ?? "").toLowerCase();
         const tags = (s.tags ?? []).join(" ").toLowerCase();
-        return name.includes(q) || desc.includes(q) || tags.includes(q);
+        return name.includes(q) || slug.includes(q) || desc.includes(q) || tags.includes(q);
       });
     }
 
@@ -109,9 +110,14 @@ export default function SkillMarketPage() {
               {/* Main info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-sm font-medium text-white/90 group-hover:text-teal-400 transition-colors font-mono">
+                  <span className="text-sm font-medium text-white/90 group-hover:text-teal-400 transition-colors">
                     {skill.name}
                   </span>
+                  {skill.slug && (
+                    <span className="text-[10px] text-white/30 font-mono">
+                      {skill.slug}
+                    </span>
+                  )}
                   {skill.isBuiltin && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/15 text-teal-400">
                       {t("skillMarket.builtin")}

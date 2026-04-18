@@ -4,7 +4,7 @@ import type { AgentTool, AgentToolResult } from "@mariozechner/pi-agent-core";
 import { ObjectId, type Db } from "mongodb";
 import * as handlers from "./handlers.js";
 import { t, type Locale } from "../i18n.js";
-import { renderSkillPrompt, type SkillData } from "../skills.js";
+import { type SkillData } from "../skills.js";
 
 export type VectorSearchFn = (args: {
   projectId?: string;
@@ -361,6 +361,78 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         return textResult(result);
       },
     },
+
+    {
+      name: "search_skills",
+      label: "Search Skills",
+      description: d.search_skills,
+      parameters: Type.Object({
+        query: Type.String({ description: d.search_skills_query }),
+        limit: Type.Optional(Type.Number({ description: d.search_skills_limit })),
+      }),
+      async execute(_toolCallId, args) {
+        if (vectorSearchFn) {
+          try {
+            const result = await vectorSearchFn({ query: args.query, scope: ["skill"], limit: args.limit ?? 10 });
+            return textResult(result);
+          } catch (err) {
+            console.error("[search_skills] Vector search failed, falling back to regex:", err);
+          }
+        }
+        const result = await handlers.searchSkills(args, db);
+        return textResult(result);
+      },
+    },
+
+    {
+      name: "create_skill",
+      label: "Create Skill",
+      description: d.create_skill,
+      parameters: Type.Object({
+        slug: Type.String({ description: d.create_skill_slug }),
+        name: Type.String({ description: d.create_skill_name }),
+        description: Type.String({ description: d.create_skill_description }),
+        content: Type.String({ description: d.create_skill_content }),
+        tags: Type.Optional(Type.Array(Type.String(), { description: d.create_skill_tags })),
+      }),
+      async execute(_toolCallId, args) {
+        const result = await handlers.createSkill(args, db, userId);
+        if ((result as any)?._id) onDocumentChanged?.("skills", String((result as any)._id));
+        return textResult(result);
+      },
+    },
+
+    {
+      name: "update_skill",
+      label: "Update Skill",
+      description: d.update_skill,
+      parameters: Type.Object({
+        id: Type.String({ description: d.update_skill_id }),
+        slug: Type.Optional(Type.String({ description: d.update_skill_slug })),
+        name: Type.Optional(Type.String({ description: d.update_skill_name })),
+        description: Type.Optional(Type.String({ description: d.update_skill_description })),
+        content: Type.Optional(Type.String({ description: d.update_skill_content })),
+        tags: Type.Optional(Type.Array(Type.String(), { description: d.update_skill_tags })),
+      }),
+      async execute(_toolCallId, args) {
+        const result = await handlers.updateSkill(args, db);
+        onDocumentChanged?.("skills", args.id);
+        return textResult(result);
+      },
+    },
+
+    {
+      name: "delete_skill",
+      label: "Delete Skill",
+      description: d.delete_skill,
+      parameters: Type.Object({
+        id: Type.String({ description: d.delete_skill_id }),
+      }),
+      async execute(_toolCallId, args) {
+        const result = await handlers.deleteSkill(args, db);
+        return textResult(result);
+      },
+    },
   ];
 
   // Add invoke_skill tool if skills are available
@@ -371,21 +443,17 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       description: d.invoke_skill,
       parameters: Type.Object({
         skill_name: StringEnum(
-          skills.map(s => s.name) as [string, ...string[]],
+          skills.map(s => s.slug) as [string, ...string[]],
           { description: d.invoke_skill_skill_name },
         ),
-        arguments: Type.Optional(Type.String({
-          description: d.invoke_skill_args,
-        })),
       }),
       async execute(_toolCallId, toolArgs) {
-        const skill = skills.find(s => s.name === toolArgs.skill_name);
+        const skill = skills.find(s => s.slug === toolArgs.skill_name);
         if (!skill) {
           return textResult({ error: `Unknown skill: ${toolArgs.skill_name}` });
         }
-        const rendered = renderSkillPrompt(skill, toolArgs.arguments ?? "");
         return {
-          content: [{ type: "text", text: rendered }],
+          content: [{ type: "text", text: skill.content }],
           details: undefined,
         };
       },
