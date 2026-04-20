@@ -141,6 +141,7 @@ Configure in `apps/server/.env`:
 
 - [x] AI Agent-assisted writing (data management, smart continuation, semantic search, memory, file import)
 - [x] Immersive multi-platform writing experience (Web / Mobile)
+- [x] **Skill System** — Extract writing methodologies from web-novel forum posts and tutorials into reusable Skills. The AI invokes them on demand during writing; per-project / per-world enablement scope.
 - [ ] **Automated Writing Pipeline** — AI generates chapter drafts from outlines → self-reviews for consistency, logic, and style → auto-revises → human final review. Hands-free novel production.
 - [ ] **Interactive Fiction Experience** — Readers step into a fully realized world as a character, converse with inhabitants, make choices, and drive the plot forward for a personalized story experience.
 
