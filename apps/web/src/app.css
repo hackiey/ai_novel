@@ -9,6 +9,16 @@
   display: none; /* Chrome/Safari */
 }
 
+/* Hide page-level scrollbar (body/html) globally */
+html, body {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
 /* ─── Glassmorphism Panel ─── */
 .glass-panel {
   background: rgba(0, 0, 0, 0.18);
