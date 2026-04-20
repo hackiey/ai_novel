@@ -825,7 +825,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
         open={showCompactionSettings}
         onClose={() => setShowCompactionSettings(false)}
       />
-      {projectId && (
+      {(projectId || worldId) && (
         <SkillSettingsDialog
           open={showSkillSettings}
           onClose={() => setShowSkillSettings(false)}

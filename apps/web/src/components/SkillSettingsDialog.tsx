@@ -9,7 +9,7 @@ type Mode = "all" | "custom";
 interface Props {
   open: boolean;
   onClose: () => void;
-  projectId: string;
+  projectId?: string;
   worldId?: string;
 }
 
@@ -17,7 +17,10 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
   const panelRef = useRef<HTMLDivElement>(null);
 
   const skillsQuery = trpc.skill.list.useQuery(undefined, { enabled: open });
-  const projectQuery = trpc.project.getById.useQuery({ id: projectId }, { enabled: open });
+  const projectQuery = trpc.project.getById.useQuery(
+    { id: projectId! },
+    { enabled: open && !!projectId },
+  );
   const worldQuery = trpc.world.getById.useQuery(
     { id: worldId! },
     { enabled: open && !!worldId },
@@ -27,7 +30,8 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
   const updateWorld = trpc.world.update.useMutation();
   const utils = trpc.useUtils();
 
-  const [scope, setScope] = useState<Scope>("project");
+  const initialScope: Scope = projectId ? "project" : "world";
+  const [scope, setScope] = useState<Scope>(initialScope);
   const [mode, setMode] = useState<Mode>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saveStatus, setSaveStatus] = useState("");
@@ -108,10 +112,10 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
   async function handleSave() {
     const enabledSkillIds = mode === "all" ? null : Array.from(selected);
     try {
-      if (scope === "project") {
+      if (scope === "project" && projectId) {
         await updateProject.mutateAsync({ id: projectId, data: { enabledSkillIds } as any });
         await utils.project.getById.invalidate({ id: projectId });
-      } else if (worldId) {
+      } else if (scope === "world" && worldId) {
         await updateWorld.mutateAsync({ id: worldId, data: { enabledSkillIds } as any });
         await utils.world.getById.invalidate({ id: worldId });
       }
@@ -150,7 +154,7 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
           <div className="px-5 pt-4">
             <div className="flex items-center gap-2 mb-3">
               {(["project", "world"] as Scope[]).map((s) => {
-                const disabled = s === "world" && !worldId;
+                const disabled = (s === "world" && !worldId) || (s === "project" && !projectId);
                 return (
                   <button
                     key={s}
