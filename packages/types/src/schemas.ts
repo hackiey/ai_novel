@@ -73,6 +73,7 @@ export const worldSchema = z.object({
   summaryConfig: z.object({
     fullSummaryMaxItems: z.number().default(500),
   }).default({}),
+  enabledSkillIds: z.array(objectIdSchema).optional(),
   ...timestampsSchema.shape,
 });
 
@@ -81,7 +82,9 @@ export const createWorldSchema = z.object({
   description: z.string().max(2000).optional(),
 });
 
-export const updateWorldSchema = createWorldSchema.partial();
+export const updateWorldSchema = createWorldSchema.partial().extend({
+  enabledSkillIds: z.array(objectIdSchema).nullable().optional(),
+});
 
 export type World = z.infer<typeof worldSchema>;
 export type CreateWorld = z.infer<typeof createWorldSchema>;
@@ -99,6 +102,7 @@ export const projectSchema = z.object({
     genre: z.string().max(100).default(""),
     targetLength: z.number().int().positive().optional(),
   }).default({}),
+  enabledSkillIds: z.array(objectIdSchema).optional(),
   ...timestampsSchema.shape,
 });
 
@@ -112,7 +116,9 @@ export const createProjectSchema = z.object({
   }).optional(),
 });
 
-export const updateProjectSchema = createProjectSchema.partial();
+export const updateProjectSchema = createProjectSchema.partial().extend({
+  enabledSkillIds: z.array(objectIdSchema).nullable().optional(),
+});
 
 export type Project = z.infer<typeof projectSchema>;
 export type CreateProject = z.infer<typeof createProjectSchema>;

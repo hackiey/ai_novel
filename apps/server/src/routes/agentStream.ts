@@ -277,17 +277,40 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       console.error("[WorkingEnvironment] Failed to build:", err);
     }
 
+    // Resolve enabled skill ids: project takes precedence over world; both undefined = all enabled
+    let allowedSkillIds: ObjectId[] | undefined;
+    if (projectId) {
+      const projectDoc = await db.collection("projects").findOne(
+        { _id: new ObjectId(projectId) },
+        { projection: { enabledSkillIds: 1 } },
+      );
+      if (projectDoc?.enabledSkillIds !== undefined) {
+        allowedSkillIds = projectDoc.enabledSkillIds as ObjectId[];
+      }
+    }
+    if (allowedSkillIds === undefined && worldId) {
+      const worldDoc = await db.collection("worlds").findOne(
+        { _id: new ObjectId(worldId) },
+        { projection: { enabledSkillIds: 1 } },
+      );
+      if (worldDoc?.enabledSkillIds !== undefined) {
+        allowedSkillIds = worldDoc.enabledSkillIds as ObjectId[];
+      }
+    }
+
     // Load available skills (exclude those with disableModelInvocation)
-    const skillDocs = await db.collection("skills")
-      .find({
-        $or: [
-          { isBuiltin: true },
-          { isPublished: true },
-          { authorId: user.userId },
-        ],
-        disableModelInvocation: { $ne: true },
-      })
-      .toArray();
+    const skillFilter: Record<string, any> = {
+      $or: [
+        { isBuiltin: true },
+        { isPublished: true },
+        { authorId: user.userId },
+      ],
+      disableModelInvocation: { $ne: true },
+    };
+    if (allowedSkillIds !== undefined) {
+      skillFilter._id = { $in: allowedSkillIds };
+    }
+    const skillDocs = await db.collection("skills").find(skillFilter).toArray();
 
     const skills: SkillData[] = skillDocs.map(doc => ({
       slug: doc.slug,

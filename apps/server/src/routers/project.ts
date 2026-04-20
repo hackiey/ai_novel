@@ -54,16 +54,25 @@ export const projectRouter = router({
       const updateFields: Record<string, any> = {
         updatedAt: new Date(),
       };
+      const unsetFields: Record<string, ""> = {};
       if (input.data.name !== undefined) updateFields.name = input.data.name;
       if (input.data.description !== undefined) updateFields.description = input.data.description;
       if (input.data.settings !== undefined) updateFields.settings = input.data.settings;
       if (input.data.worldId !== undefined) updateFields.worldId = input.data.worldId;
+      if (input.data.enabledSkillIds === null) {
+        unsetFields.enabledSkillIds = "";
+      } else if (input.data.enabledSkillIds !== undefined) {
+        updateFields.enabledSkillIds = input.data.enabledSkillIds.map((id) => new ObjectId(id));
+      }
+
+      const updateOps: Record<string, unknown> = { $set: updateFields };
+      if (Object.keys(unsetFields).length > 0) updateOps.$unset = unsetFields;
 
       const result = await ctx.db
         .collection("projects")
         .findOneAndUpdate(
           { _id: new ObjectId(input.id), userId: userIdFilter(ctx.user.userId) },
-          { $set: updateFields },
+          updateOps,
           { returnDocument: "after" }
         );
       return serializeDoc(result);

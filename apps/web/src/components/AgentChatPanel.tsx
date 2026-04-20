@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { BotMessageSquare, BookOpen, ChevronDown, History, KeyRound, Loader2, Pencil, Plus, RotateCcw, Settings, X } from "lucide-react";
+import { BotMessageSquare, BookOpen, ChevronDown, History, KeyRound, Loader2, Pencil, Plus, RotateCcw, Settings, Sparkles, X } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import { getToken } from "../lib/auth.js";
 import { getBYOKForModel, getBYOKModelSpecs, hasBYOKKeys } from "../lib/byokStorage.js";
 import { getCompactionSettings } from "../lib/compactionSettings.js";
 import { AgentEvent, AssistantMessageContent } from "./AgentMessageDisplay.js";
 import CompactionSettingsDialog from "./CompactionSettingsDialog.js";
+import SkillSettingsDialog from "./SkillSettingsDialog.js";
 
 const API_BASE = "";
 
@@ -82,6 +83,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
   const [projectMemoryDraft, setProjectMemoryDraft] = useState<string | null>(null);
   const [memorySaveStatus, setMemorySaveStatus] = useState<Record<string, string>>({});
   const [showCompactionSettings, setShowCompactionSettings] = useState(false);
+  const [showSkillSettings, setShowSkillSettings] = useState(false);
 
   // Auto-resize textarea: grow with content, cap at 120px
   useEffect(() => {
@@ -435,6 +437,15 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
           >
             {t("chat.aiAssistant")}
             <Settings className="w-3.5 h-3.5 opacity-40" />
+          </button>
+          <button
+            onClick={() => setShowSkillSettings(true)}
+            className={`p-1.5 rounded-md transition-colors ${
+              imm ? "text-white/50 hover:text-white hover:bg-white/10" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+            }`}
+            title="Skill 启用配置"
+          >
+            <Sparkles className="w-4 h-4" />
           </button>
           <button
             onClick={() => { setShowHistory((v) => !v); setShowMemory(false); }}
@@ -814,6 +825,14 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
         open={showCompactionSettings}
         onClose={() => setShowCompactionSettings(false)}
       />
+      {projectId && (
+        <SkillSettingsDialog
+          open={showSkillSettings}
+          onClose={() => setShowSkillSettings(false)}
+          projectId={projectId}
+          worldId={worldId}
+        />
+      )}
     </div>
   );
 }
