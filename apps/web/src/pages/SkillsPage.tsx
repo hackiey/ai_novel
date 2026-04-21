@@ -7,7 +7,7 @@ import { useWriteTheme } from "../contexts/WriteThemeContext.js";
 
 type FilterTab = "all" | "builtin" | "published";
 
-export default function SkillMarketPage() {
+export default function SkillsPage() {
   const { t } = useTranslation();
   const { theme } = useWriteTheme();
   const cardClass = theme === "starfield" ? "glass-panel-lighter" : "glass-panel-light";
@@ -41,9 +41,9 @@ export default function SkillMarketPage() {
   }, [skills, filter, search]);
 
   const tabs: { key: FilterTab; label: string }[] = [
-    { key: "all", label: t("skillMarket.all") },
-    { key: "builtin", label: t("skillMarket.builtinTab") },
-    { key: "published", label: t("skillMarket.published") },
+    { key: "all", label: t("skills.all") },
+    { key: "builtin", label: t("skills.builtinTab") },
+    { key: "published", label: t("skills.published") },
   ];
 
   return (
@@ -52,9 +52,9 @@ export default function SkillMarketPage() {
       <div className="mb-6">
         <h1 className="text-xl font-bold text-white/90 flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-teal-400" />
-          {t("skillMarket.title")}
+          {t("skills.title")}
         </h1>
-        <p className="text-sm text-white/40 mt-1">{t("skillMarket.subtitle")}</p>
+        <p className="text-sm text-white/40 mt-1">{t("skills.subtitle")}</p>
       </div>
 
       {/* Search bar */}
@@ -64,7 +64,7 @@ export default function SkillMarketPage() {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={t("skillMarket.search")}
+          placeholder={t("skills.search")}
           className="flex-1 bg-transparent text-sm text-white/80 placeholder-white/30 outline-none"
         />
       </div>
@@ -91,7 +91,7 @@ export default function SkillMarketPage() {
         <div className="text-center text-white/40 text-sm py-12">{t("common.loading")}</div>
       ) : filtered.length === 0 ? (
         <div className="text-center text-white/30 text-sm py-16">
-          {search.trim() ? t("skillMarket.noResults") : t("skillMarket.empty")}
+          {search.trim() ? t("skills.noResults") : t("skills.empty")}
         </div>
       ) : (
         <div className={`${cardClass} rounded-xl overflow-hidden divide-y divide-white/5`}>
@@ -120,7 +120,7 @@ export default function SkillMarketPage() {
                   )}
                   {skill.isBuiltin && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/15 text-teal-400">
-                      {t("skillMarket.builtin")}
+                      {t("skills.builtin")}
                     </span>
                   )}
                 </div>

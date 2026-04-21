@@ -18,7 +18,7 @@ import RegisterPage from "./pages/RegisterPage.js";
 import AdminPage from "./pages/AdminPage.js";
 import ReaderPage from "./pages/ReaderPage.js";
 import SharesPage from "./pages/SharesPage.js";
-import SkillMarketPage from "./pages/SkillMarketPage.js";
+import SkillsPage from "./pages/SkillsPage.js";
 import SkillDetailPage from "./pages/SkillDetailPage.js";
 import { getToken } from "./lib/auth.js";
 import { useAuth } from "./contexts/AuthContext.js";
@@ -161,7 +161,7 @@ function RootInner() {
               <Link
                 to="/skills"
                 className="text-white/40 hover:text-teal-400 transition-colors"
-                title={t("header.skillMarket")}
+                title={t("header.skills")}
               >
                 <Sparkles className="w-4 h-4" />
               </Link>
@@ -237,11 +237,11 @@ const sharesRoute = createRoute({
   component: SharesPage,
 });
 
-const skillMarketRoute = createRoute({
+const skillsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/skills",
   beforeLoad: requireAuth,
-  component: SkillMarketPage,
+  component: SkillsPage,
 });
 
 const skillDetailRoute = createRoute({
@@ -260,7 +260,7 @@ const routeTree = rootRoute.addChildren([
   adminRoute,
   readerRoute,
   sharesRoute,
-  skillMarketRoute,
+  skillsRoute,
   skillDetailRoute,
 ]);
 

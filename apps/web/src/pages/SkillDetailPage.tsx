@@ -24,7 +24,7 @@ export default function SkillDetailPage() {
   if (!skill) {
     return (
       <div className="px-4 sm:px-6 py-8 max-w-5xl mx-auto">
-        <div className="text-center text-white/30 text-sm py-16">{t("skillMarket.notFound")}</div>
+        <div className="text-center text-white/30 text-sm py-16">{t("skills.notFound")}</div>
       </div>
     );
   }
@@ -47,7 +47,7 @@ export default function SkillDetailPage() {
           className="flex items-center gap-1.5 text-white/40 hover:text-teal-400 transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          {t("skillMarket.backToMarket")}
+          {t("skills.backToList")}
         </Link>
         <span className="text-white/20">/</span>
         <span className="text-white/60 font-mono">{skill.slug}</span>
@@ -70,7 +70,7 @@ export default function SkillDetailPage() {
           {/* Content */}
           {skill.content && (
             <section className={`${cardClass} rounded-xl px-5 py-4`}>
-              <h2 className="text-sm font-medium text-white/70 mb-3">{t("skillMarket.content")}</h2>
+              <h2 className="text-sm font-medium text-white/70 mb-3">{t("skills.content")}</h2>
               <pre className="text-xs text-white/45 bg-black/20 rounded-lg p-4 whitespace-pre-wrap break-words leading-relaxed">
                 {skill.content}
               </pre>
@@ -85,29 +85,29 @@ export default function SkillDetailPage() {
             {skill.isBuiltin && (
               <div className="flex items-center gap-2 text-xs">
                 <BadgeCheck className="w-3.5 h-3.5 text-teal-400" />
-                <span className="text-teal-400">{t("skillMarket.builtin")}</span>
+                <span className="text-teal-400">{t("skills.builtin")}</span>
               </div>
             )}
             {skill.isPublished && (
               <div className="flex items-center gap-2 text-xs">
                 <Globe className="w-3.5 h-3.5 text-blue-400" />
-                <span className="text-blue-400">{t("skillMarket.published")}</span>
+                <span className="text-blue-400">{t("skills.published")}</span>
               </div>
             )}
             <div className="flex items-center gap-2 text-xs text-white/35">
               <Calendar className="w-3.5 h-3.5" />
-              <span>{t("skillMarket.createdAt")}: {formatDate(skill.createdAt)}</span>
+              <span>{t("skills.createdAt")}: {formatDate(skill.createdAt)}</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-white/35">
               <Calendar className="w-3.5 h-3.5" />
-              <span>{t("skillMarket.updatedAt")}: {formatDate(skill.updatedAt)}</span>
+              <span>{t("skills.updatedAt")}: {formatDate(skill.updatedAt)}</span>
             </div>
           </div>
 
           {/* Tags */}
           {skill.tags?.length > 0 && (
             <div className={`${cardClass} rounded-xl px-5 py-4`}>
-              <h3 className="text-xs font-medium text-white/50 mb-2">{t("skillMarket.tags")}</h3>
+              <h3 className="text-xs font-medium text-white/50 mb-2">{t("skills.tags")}</h3>
               <div className="flex flex-wrap gap-1.5">
                 {skill.tags.map((tag: string) => (
                   <span
