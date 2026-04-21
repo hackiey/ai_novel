@@ -46,6 +46,7 @@ export class CreatorAgentSession {
   private onDocumentChanged?: OnDocumentChangedFn;
   private onWorldSummaryStale?: OnWorldSummaryStaleFn;
   private agentType: string;
+  private skillCollection: string;
 
   constructor(options: {
     apiKey: string;
@@ -62,6 +63,7 @@ export class CreatorAgentSession {
     onDocumentChanged?: OnDocumentChangedFn;
     onWorldSummaryStale?: OnWorldSummaryStaleFn;
     agentType?: string;
+    skillCollection?: string;
   }) {
     this.apiKey = options.apiKey;
     let model: Model<any> | undefined;
@@ -97,6 +99,7 @@ export class CreatorAgentSession {
     this.onDocumentChanged = options.onDocumentChanged;
     this.onWorldSummaryStale = options.onWorldSummaryStale;
     this.agentType = options.agentType ?? "creator";
+    this.skillCollection = options.skillCollection ?? "skills";
   }
 
   async *chat(userMessage: string, options: {
@@ -124,7 +127,7 @@ export class CreatorAgentSession {
       skills,
     });
 
-    const allTools = createNovelTools(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale, locale, this.worldId, this.projectId, skills);
+    const allTools = createNovelTools(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale, locale, this.worldId, this.projectId, skills, this.skillCollection);
     const tools = agentDef.tools[0] === "*"
       ? allTools
       : allTools.filter(t => (agentDef.tools as string[]).includes(t.name));
@@ -169,22 +172,24 @@ export class CreatorAgentSession {
           typeof m === "object" && m !== null && "role" in m &&
           (m.role === "user" || m.role === "assistant" || m.role === "toolResult")
         );
-        console.log("\n========== [AgentSession] LLM Request ==========");
-        console.log("[System Prompt] (%d chars):\n%s", systemPrompt.length, systemPrompt);
-        console.log("\n[Messages] %d total:", llmMessages.length);
-        for (let i = 0; i < llmMessages.length; i++) {
-          const m = llmMessages[i];
-          console.log("\n--- Message %d [%s] ---", i, m.role);
-          if (m.role === "user") {
-            console.log(typeof m.content === "string" ? m.content : JSON.stringify(m.content, null, 2));
-          } else if (m.role === "assistant") {
-            console.log(JSON.stringify(m.content, null, 2));
-          } else if (m.role === "toolResult") {
-            console.log("toolName=%s isError=%s", m.toolName, m.isError);
-            console.log(JSON.stringify(m.content, null, 2));
+        if (process.env.DEBUG_AGENT) {
+          console.log("\n========== [AgentSession] LLM Request ==========");
+          console.log("[System Prompt] (%d chars):\n%s", systemPrompt.length, systemPrompt);
+          console.log("\n[Messages] %d total:", llmMessages.length);
+          for (let i = 0; i < llmMessages.length; i++) {
+            const m = llmMessages[i];
+            console.log("\n--- Message %d [%s] ---", i, m.role);
+            if (m.role === "user") {
+              console.log(typeof m.content === "string" ? m.content : JSON.stringify(m.content, null, 2));
+            } else if (m.role === "assistant") {
+              console.log(JSON.stringify(m.content, null, 2));
+            } else if (m.role === "toolResult") {
+              console.log("toolName=%s isError=%s", m.toolName, m.isError);
+              console.log(JSON.stringify(m.content, null, 2));
+            }
           }
+          console.log("========== [End LLM Request] ==========\n");
         }
-        console.log("========== [End LLM Request] ==========\n");
         return llmMessages;
       },
     };
@@ -225,7 +230,7 @@ export class CreatorAgentSession {
         while (eventQueue.length > 0) {
           const event = eventQueue.shift()!;
 
-          if (event.type !== "message_update") {
+          if (event.type !== "message_update" && process.env.DEBUG_AGENT) {
             console.log("[AgentSession] event: %s %s", event.type, JSON.stringify(
               event.type === "tool_execution_start" ? { tool: event.toolName, args: event.args } :
               event.type === "tool_execution_end" ? { tool: event.toolName, result: event.result } :

@@ -388,11 +388,10 @@ export const skillSchema = z.object({
   description: z.string(),
   content: z.string(),
   tags: z.array(z.string().max(50)).default([]),
-  disableModelInvocation: z.boolean().default(false),
-  userInvocable: z.boolean().default(true),
   isBuiltin: z.boolean().default(false),
   isPublished: z.boolean().default(false),
   authorId: objectIdSchema.optional(),
+  builtinHash: z.string().optional(),
   ...timestampsSchema.shape,
 });
 
@@ -402,8 +401,6 @@ export const createSkillSchema = z.object({
   description: z.string(),
   content: z.string(),
   tags: z.array(z.string().max(50)).optional(),
-  disableModelInvocation: z.boolean().optional(),
-  userInvocable: z.boolean().optional(),
 });
 
 export const updateSkillSchema = createSkillSchema.partial();

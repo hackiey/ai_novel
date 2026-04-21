@@ -298,14 +298,13 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       }
     }
 
-    // Load available skills (exclude those with disableModelInvocation)
+    // Load available skills
     const skillFilter: Record<string, any> = {
       $or: [
         { isBuiltin: true },
         { isPublished: true },
         { authorId: user.userId },
       ],
-      disableModelInvocation: { $ne: true },
     };
     if (allowedSkillIds !== undefined) {
       skillFilter._id = { $in: allowedSkillIds };

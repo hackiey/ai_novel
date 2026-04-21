@@ -9,6 +9,7 @@ const EMBEDDABLE_COLLECTIONS = [
   "drafts",
   "chapters",
   "skills",
+  "skill_drafts",
 ] as const;
 
 type EmbeddableCollection = (typeof EMBEDDABLE_COLLECTIONS)[number];
@@ -39,7 +40,8 @@ function buildEmbeddingText(collection: string, doc: any): string {
       return [doc.title, doc.synopsis, contentSlice].filter(Boolean).join("\n");
     }
 
-    case "skills": {
+    case "skills":
+    case "skill_drafts": {
       const tagsStr = doc.tags?.length ? doc.tags.map((t: string) => `#${t}`).join(" ") : "";
       return [doc.name, doc.slug, tagsStr, doc.description].filter(Boolean).join("\n");
     }
@@ -57,6 +59,7 @@ function extractTitle(collection: string, doc: any): string {
     case "characters":
       return doc.name || "Untitled Character";
     case "skills":
+    case "skill_drafts":
       return doc.name || doc.slug || "Untitled Skill";
     case "chapters":
       return doc.title || `Chapter ${doc.order ?? ""}`.trim();
@@ -90,7 +93,8 @@ function extractExcerpt(collection: string, doc: any, maxLen = 200): string {
       if (doc.content) parts.push(`内容: ${doc.content}`);
       return parts.join("\n");
     }
-    case "skills": {
+    case "skills":
+    case "skill_drafts": {
       const parts: string[] = [];
       if (doc.name) parts.push(`名称: ${doc.name}`);
       if (doc.slug) parts.push(`Slug: ${doc.slug}`);
@@ -326,6 +330,8 @@ export class ServerEmbeddingService {
       chapters: "chapters",
       skill: "skills",
       skills: "skills",
+      skill_draft: "skill_drafts",
+      skill_drafts: "skill_drafts",
     };
     const collections: EmbeddableCollection[] =
       scope && scope.length > 0
@@ -353,8 +359,8 @@ export class ServerEmbeddingService {
           if (ids.worldId) filter.worldId = new ObjectId(ids.worldId);
         } else if (collName === "chapters") {
           if (ids.projectId) filter.projectId = ids.projectId;
-        } else if (collName === "skills") {
-          // Skills are global — no worldId/projectId filter
+        } else if (collName === "skills" || collName === "skill_drafts") {
+          // Skills and skill_drafts are global — no worldId/projectId filter
         } else {
           // drafts: prefer worldId, fall back to projectId
           if (ids.worldId) filter.worldId = new ObjectId(ids.worldId);

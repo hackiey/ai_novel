@@ -42,8 +42,6 @@ export const skillRouter = router({
       const doc = {
         ...input,
         tags: input.tags ?? [],
-        disableModelInvocation: input.disableModelInvocation ?? false,
-        userInvocable: input.userInvocable ?? true,
         isBuiltin: false,
         isPublished: false,
         authorId: ctx.user.userId,
@@ -62,11 +60,10 @@ export const skillRouter = router({
       });
       if (!existing) return null;
 
-      // Only author or admin can update; builtin skills require admin
-      if (existing.isBuiltin && ctx.user.role !== "admin") {
-        return null;
-      }
-      if (!existing.isBuiltin && String(existing.authorId) !== ctx.user.userId && ctx.user.role !== "admin") {
+      // Builtin skills are read-only — managed via code repository
+      if (existing.isBuiltin) return null;
+      // Only author or admin can update non-builtin
+      if (String(existing.authorId) !== ctx.user.userId && ctx.user.role !== "admin") {
         return null;
       }
 

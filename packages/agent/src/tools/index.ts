@@ -46,8 +46,12 @@ function rrfMerge(rankedLists: SearchResult[][], k = 60): SearchResult[] {
     .map(({ result, rrfScore }) => ({ ...result, score: rrfScore }));
 }
 
-export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocumentChanged?: OnDocumentChangedFn, userId?: string, onWorldSummaryStale?: OnWorldSummaryStaleFn, locale: Locale = "zh", worldId?: string, projectId?: string, skills?: SkillData[]): AgentTool<any>[] {
+const MAX_SEARCH_SKILLS_CALLS = 3;
+
+export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocumentChanged?: OnDocumentChangedFn, userId?: string, onWorldSummaryStale?: OnWorldSummaryStaleFn, locale: Locale = "zh", worldId?: string, projectId?: string, skills?: SkillData[], skillCollection: string = "skills"): AgentTool<any>[] {
   const d = t(locale).tools;
+  const skillScope = skillCollection === "skill_drafts" ? "skill_draft" : "skill";
+  let searchSkillsCallCount = 0;
 
   const tools: AgentTool<any>[] = [
     {
@@ -367,20 +371,69 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       label: "Search Skills",
       description: d.search_skills,
       parameters: Type.Object({
-        query: Type.String({ description: d.search_skills_query }),
+        query: Type.Union([
+          Type.String({ description: d.search_skills_query }),
+          Type.Array(Type.String(), { maxItems: 5, description: d.search_skills_query }),
+        ], { description: d.search_skills_query }),
         limit: Type.Optional(Type.Number({ description: d.search_skills_limit })),
       }),
       async execute(_toolCallId, args) {
-        if (vectorSearchFn) {
-          try {
-            const result = await vectorSearchFn({ query: args.query, scope: ["skill"], limit: args.limit ?? 10 });
-            return textResult(result);
-          } catch (err) {
-            console.error("[search_skills] Vector search failed, falling back to regex:", err);
-          }
+        if (searchSkillsCallCount >= MAX_SEARCH_SKILLS_CALLS) {
+          return textResult({
+            error: `search_skills 已达本轮调用上限（${MAX_SEARCH_SKILLS_CALLS} 次）。请基于已有结果做决策，不要继续搜索。`,
+          });
         }
-        const result = await handlers.searchSkills(args, db);
-        return textResult(result);
+        searchSkillsCallCount++;
+
+        const queries: string[] = (typeof args.query === "string" ? [args.query] : args.query).slice(0, 5);
+        const limit = args.limit ?? 10;
+
+        console.log("[search_skills] call", searchSkillsCallCount, "with", queries.length, "queries:", JSON.stringify(queries));
+
+        const resultLists = await Promise.all(
+          queries.map(async (q): Promise<SearchResult[]> => {
+            if (vectorSearchFn) {
+              try {
+                const result = await vectorSearchFn({ query: q, scope: [skillScope], limit });
+                return result.results;
+              } catch (err) {
+                console.error("[search_skills] Vector search failed for query, falling back to regex:", q, err);
+              }
+            }
+            const result = await handlers.searchSkills({ query: q, limit }, db, skillCollection) as { results: SearchResult[]; total: number };
+            return result.results.map((r, i) => ({ ...r, score: r.score ?? (1 - i * 0.01) }));
+          })
+        );
+
+        const ranked = queries.length === 1 ? resultLists[0] : rrfMerge(resultLists).slice(0, limit);
+
+        // Fetch full docs by _id and return all fields
+        const ids = ranked.map((r) => new ObjectId(r.id));
+        const fullDocs = ids.length === 0 ? [] : await db
+          .collection(skillCollection)
+          .find({ _id: { $in: ids } })
+          .project({ embedding: 0, embeddingText: 0, embeddingUpdatedAt: 0 })
+          .toArray();
+        const docMap = new Map(fullDocs.map((d) => [d._id.toHexString(), d]));
+
+        const results = ranked
+          .map((r) => {
+            const doc = docMap.get(r.id);
+            if (!doc) return null;
+            return {
+              _id: doc._id.toHexString(),
+              slug: doc.slug,
+              name: doc.name,
+              description: doc.description,
+              tags: doc.tags ?? [],
+              content: doc.content,
+              score: r.score,
+            };
+          })
+          .filter(Boolean);
+
+        console.log("[search_skills] returning", results.length, "results with full content");
+        return textResult({ results, total: results.length });
       },
     },
 
@@ -396,8 +449,8 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         tags: Type.Optional(Type.Array(Type.String(), { description: d.create_skill_tags })),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.createSkill(args, db, userId);
-        if ((result as any)?._id) onDocumentChanged?.("skills", String((result as any)._id));
+        const result = await handlers.createSkill(args, db, userId, skillCollection);
+        if ((result as any)?._id) onDocumentChanged?.(skillCollection, String((result as any)._id));
         return textResult(result);
       },
     },
@@ -415,8 +468,8 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         tags: Type.Optional(Type.Array(Type.String(), { description: d.update_skill_tags })),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.updateSkill(args, db);
-        onDocumentChanged?.("skills", args.id);
+        const result = await handlers.updateSkill(args, db, skillCollection);
+        onDocumentChanged?.(skillCollection, args.id);
         return textResult(result);
       },
     },
@@ -429,7 +482,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         id: Type.String({ description: d.delete_skill_id }),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.deleteSkill(args, db);
+        const result = await handlers.deleteSkill(args, db, skillCollection);
         return textResult(result);
       },
     },

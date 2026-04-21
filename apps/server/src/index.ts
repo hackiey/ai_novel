@@ -6,7 +6,8 @@ import { fastifyTRPCPlugin, FastifyTRPCPluginOptions } from "@trpc/server/adapte
 import { connectDb, disconnectDb } from "./db.js";
 import { createContext } from "./trpc.js";
 import { appRouter, AppRouter } from "./routers/index.js";
-import { initEmbeddingService } from "./services/embeddingService.js";
+import { initEmbeddingService, getEmbeddingService } from "./services/embeddingService.js";
+import { syncBuiltinSkills } from "./builtinSkills.js";
 import { ChapterSynopsisService } from "./services/chapterSynopsisService.js";
 import { registerAgentRoutes } from "./routes/agentStream.js";
 import { registerFileImportRoutes } from "./routes/fileImport.js";
@@ -62,6 +63,7 @@ async function main() {
   await db.collection("shares").createIndex({ projectId: 1, userId: 1 }, { unique: true });
 
   await db.collection("skills").createIndex({ slug: 1 }, { unique: true });
+  await db.collection("skill_drafts").createIndex({ slug: 1 }, { unique: true });
 
   // Ensure vector search indexes (Atlas Search)
   if (embeddingApiKey) {
@@ -72,6 +74,7 @@ async function main() {
       { name: "drafts", filters: ["worldId", "projectId"] },
       { name: "chapters", filters: ["projectId"] },
       { name: "skills", filters: [] },
+      { name: "skill_drafts", filters: [] },
     ];
     for (const { name, filters } of vectorCollections) {
       try {
@@ -97,6 +100,14 @@ async function main() {
         }
       }
     }
+  }
+
+  // Sync built-in skills from code repository
+  try {
+    const stats = await syncBuiltinSkills(db, getEmbeddingService());
+    console.log(`[builtin-skills] +${stats.inserted} ~${stats.updated} =${stats.skipped} -${stats.deleted}${stats.conflicts ? ` !${stats.conflicts}` : ""}`);
+  } catch (err) {
+    console.error("[builtin-skills] sync failed:", err);
   }
 
   // Register tRPC

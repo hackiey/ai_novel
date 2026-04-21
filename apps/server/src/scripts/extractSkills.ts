@@ -87,6 +87,7 @@ async function main() {
   console.log(`[extract-skills] File: ${filePath}`);
   console.log(`[extract-skills] Model: ${provider}:${modelId}${reasoning ? ` (reasoning: ${reasoning})` : ""}`);
   console.log(`[extract-skills] Locale: ${locale}`);
+  console.log(`[extract-skills] Output: skill_drafts collection (use exportBuiltinSkill to promote to .md)`);
 
   await connectDb(mongoUri);
   const db = getDb();
@@ -116,6 +117,37 @@ async function main() {
       );
       return { results, total: results.length };
     };
+  }
+
+  // Ensure skill_drafts indexes exist (this script may run without the main server ever booting)
+  await db.collection("skill_drafts").createIndex({ slug: 1 }, { unique: true });
+  console.log(`[extract-skills] Ensured slug unique index on skill_drafts`);
+
+  if (embeddingApiKey) {
+    const dimensions = process.env.EMBEDDING_DIMENSIONS ? Number(process.env.EMBEDDING_DIMENSIONS) : 1536;
+    try {
+      const existing = await db.collection("skill_drafts").listSearchIndexes("vector_index").toArray();
+      if (existing.length === 0) {
+        await db.collection("skill_drafts").createSearchIndex({
+          name: "vector_index",
+          type: "vectorSearch",
+          definition: {
+            fields: [
+              { type: "vector", path: "embedding", numDimensions: dimensions, similarity: "cosine" },
+            ],
+          },
+        });
+        console.log(`[extract-skills] Created vector_index on skill_drafts (dimensions=${dimensions})`);
+        console.log(`[extract-skills] Note: Atlas Vector Search index build may take a few minutes to become queryable`);
+      } else {
+        console.log(`[extract-skills] vector_index on skill_drafts already exists`);
+      }
+    } catch (err: any) {
+      if (!err.message?.includes("already exists")) {
+        console.warn(`[extract-skills] Could not create vector_index on skill_drafts: ${err.message}`);
+        console.warn(`[extract-skills] (search_skills will fall back to regex; only Atlas clusters support vector search)`);
+      }
+    }
   }
 
   try {
@@ -149,6 +181,7 @@ async function main() {
           ? (collection, id) => embeddingService.enqueue(collection, id)
           : undefined,
         agentType: "skill-extract",
+        skillCollection: "skill_drafts",
       });
 
       const chunkPrompt = i18n.skillExtract.chunkPrompt(i, totalChunks);

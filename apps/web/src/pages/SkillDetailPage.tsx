@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "@tanstack/react-router";
-import { ArrowLeft, Tag, Calendar, BadgeCheck, Globe, EyeOff, Bot } from "lucide-react";
+import { ArrowLeft, Tag, Calendar, BadgeCheck, Globe } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import { useWriteTheme } from "../contexts/WriteThemeContext.js";
 
@@ -92,18 +92,6 @@ export default function SkillDetailPage() {
               <div className="flex items-center gap-2 text-xs">
                 <Globe className="w-3.5 h-3.5 text-blue-400" />
                 <span className="text-blue-400">{t("skillMarket.published")}</span>
-              </div>
-            )}
-            {skill.disableModelInvocation && (
-              <div className="flex items-center gap-2 text-xs">
-                <EyeOff className="w-3.5 h-3.5 text-amber-400/70" />
-                <span className="text-amber-400/70">{t("skillMarket.modelInvocationDisabled")}</span>
-              </div>
-            )}
-            {skill.userInvocable === false && (
-              <div className="flex items-center gap-2 text-xs">
-                <Bot className="w-3.5 h-3.5 text-white/40" />
-                <span className="text-white/40">{t("skillMarket.agentOnly")}</span>
               </div>
             )}
             <div className="flex items-center gap-2 text-xs text-white/35">
