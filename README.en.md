@@ -20,7 +20,7 @@
 
 ---
 
-> **AI Creator** is not just another "AI chat + editor." It ships with a purpose-built AI writing partner that manages your characters and settings, intelligently continues chapters, searches your creative knowledge base, and remembers your preferences — like an experienced co-editor, not a generic chatbot.
+> **AI Creator** is not just another "AI chat + editor." It ships with a purpose-built AI writing partner that manages your characters and settings, intelligently continues chapters, searches your creative knowledge base, and remembers your preferences. Bundled with **391+ built-in writing Skills** (opening hooks, villain design, payoff timing, pacing control, and more) that the AI invokes on demand — more reliable than intuition alone. Like an experienced co-editor, not a generic chatbot.
 
 ---
 
@@ -42,6 +42,20 @@ At the heart of AI Creator is an AI Agent with a rich set of specialized tools. 
 | **Usage Transparency** | Real-time token usage and cost per turn, broken down by input / output / cache |
 
 > **Example**: Say "create a hot-tempered but kind-hearted blacksmith living in the northern city" and the AI writes it to the database. Next time it continues a chapter, this character is automatically referenced — no need to remind it.
+
+### 🎯 Skill System: Reusable Writing Methodologies
+
+A Skill is a polished prompt template that distills a craft technique — "how to write a great opening hook," "how to design a villain," "how to land a face-slap payoff" — into a callable instruction. When a task matches a Skill, the AI calls `invoke_skill` to fetch the full methodology and follows it, beating intuition-based answers.
+
+| Capability | Description |
+|------------|-------------|
+| **Built-in Library** | **391+ built-in Skills** covering plot, pacing, characters, worldbuilding, prose, payoff design, foreshadowing, and more |
+| **Custom Enablement** | Each project picks which Skills to enable, keeping the prompt focused |
+| **Smart Recommendation** | A dedicated recommend agent runs asynchronously after each main turn, matches 3–8 relevant Skills against recent context, and surfaces a checkbox card — one click to add |
+| **On-Demand Search** | Trigger the recommend agent on demand from the Skill settings dialog or the SKILLS page by describing what you need |
+| **Extract from Docs** | Upload forum posts / tutorials and the dedicated skill-extract agent identifies reusable methodologies and stores them |
+
+> **Design note**: The main creator agent does NOT carry `search_skills` / `propose_skills` tools, so it never derails mid-writing to "search for a relevant skill." Recommendation lives in a separate agent — clean separation of concerns.
 
 ### ✍️ Immersive Writing Experience
 
@@ -141,7 +155,7 @@ Configure in `apps/server/.env`:
 
 - [x] AI Agent-assisted writing (data management, smart continuation, semantic search, memory, file import)
 - [x] Immersive multi-platform writing experience (Web / Mobile)
-- [x] **Skill System** — Extract writing methodologies from web-novel forum posts and tutorials into reusable Skills. The AI invokes them on demand during writing; per-project / per-world enablement scope.
+- [x] **Skill System** — 391+ built-in Skills, per-project enablement, dedicated recommend agent that surfaces matches automatically, main agent invokes them on demand
 - [ ] **Automated Writing Pipeline** — AI generates chapter drafts from outlines → self-reviews for consistency, logic, and style → auto-revises → human final review. Hands-free novel production.
 - [ ] **Interactive Fiction Experience** — Readers step into a fully realized world as a character, converse with inhabitants, make choices, and drive the plot forward for a personalized story experience.
 
