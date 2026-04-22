@@ -13,16 +13,17 @@ import {
   DEFAULT_CHUNK_SIZE_WORDS,
 } from "../utils/textChunking.js";
 
-function parseArgs(argv: string[]): { filePath: string; model?: string; locale: string } {
+function parseArgs(argv: string[]): { filePath: string; model?: string; locale: string; fromChunk: number } {
   const args = argv.slice(2);
   if (args.length === 0) {
-    console.error("Usage: tsx extractSkills.ts <file-path> [--model provider:modelId] [--locale zh|en]");
+    console.error("Usage: tsx extractSkills.ts <file-path> [--model provider:modelId] [--locale zh|en] [--from <chunkNumber>]");
     process.exit(1);
   }
 
   let filePath: string | undefined;
   let model: string | undefined;
   let locale = "zh";
+  let fromChunk = 1;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -30,6 +31,13 @@ function parseArgs(argv: string[]): { filePath: string; model?: string; locale: 
       model = args[++i];
     } else if (a === "--locale") {
       locale = args[++i];
+    } else if (a === "--from" || a === "--resume-from") {
+      const n = Number(args[++i]);
+      if (!Number.isInteger(n) || n < 1) {
+        console.error(`--from must be an integer >= 1, got: ${args[i]}`);
+        process.exit(1);
+      }
+      fromChunk = n;
     } else if (!a.startsWith("--")) {
       filePath = a;
     } else {
@@ -43,7 +51,7 @@ function parseArgs(argv: string[]): { filePath: string; model?: string; locale: 
     process.exit(1);
   }
 
-  return { filePath: resolve(filePath), model, locale };
+  return { filePath: resolve(filePath), model, locale, fromChunk };
 }
 
 async function sleep(ms: number) {
@@ -51,7 +59,7 @@ async function sleep(ms: number) {
 }
 
 async function main() {
-  const { filePath, model, locale: rawLocale } = parseArgs(process.argv);
+  const { filePath, model, locale: rawLocale, fromChunk } = parseArgs(process.argv);
   const locale: Locale = resolveLocale(rawLocale);
 
   const filename = basename(filePath);
@@ -162,10 +170,33 @@ async function main() {
     const totalChunks = chunks.length;
     console.log(`[extract-skills] Total chunks: ${totalChunks}`);
 
+    if (fromChunk > totalChunks) {
+      console.error(`[extract-skills] --from ${fromChunk} exceeds total chunks (${totalChunks}). Nothing to do.`);
+      return;
+    }
+    if (fromChunk > 1) {
+      console.log(`[extract-skills] Resuming from chunk ${fromChunk}/${totalChunks} (skipping ${fromChunk - 1})`);
+    }
+
     const i18n = t(locale);
 
-    for (let i = 0; i < totalChunks; i++) {
+    // Aggregate usage across all chunks
+    const totalUsage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, costTotal: 0 };
+    let lastModel = "";
+
+    function fmtUsd(n: number): string {
+      if (n === 0) return "$0";
+      if (n < 0.01) return `$${n.toFixed(5)}`;
+      return `$${n.toFixed(4)}`;
+    }
+    function fmtTok(n: number): string {
+      if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+      return String(n);
+    }
+
+    for (let i = fromChunk - 1; i < totalChunks; i++) {
       console.log(`\n========== Chunk ${i + 1}/${totalChunks} ==========`);
+      const chunkUsage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, costTotal: 0 };
 
       const session = new CreatorAgentSession({
         apiKey,
@@ -204,6 +235,18 @@ async function main() {
             case "error":
               console.error(`\n[error] ${event.error}`);
               break;
+            case "usage": {
+              // Skip aggregated summary events to avoid double counting per-turn entries
+              if (event.usage.isSummary) break;
+              chunkUsage.input += event.usage.input;
+              chunkUsage.output += event.usage.output;
+              chunkUsage.cacheRead += event.usage.cacheRead;
+              chunkUsage.cacheWrite += event.usage.cacheWrite;
+              chunkUsage.totalTokens += event.usage.totalTokens;
+              chunkUsage.costTotal += event.usage.cost?.total ?? 0;
+              if (event.usage.model && event.usage.model !== "unknown") lastModel = event.usage.model;
+              break;
+            }
             case "done":
               process.stdout.write("\n");
               break;
@@ -215,8 +258,30 @@ async function main() {
         session.close();
       }
 
+      // Per-chunk usage summary
+      console.log(
+        `[usage] chunk ${i + 1}: in=${fmtTok(chunkUsage.input)} out=${fmtTok(chunkUsage.output)} ` +
+        `cache(r/w)=${fmtTok(chunkUsage.cacheRead)}/${fmtTok(chunkUsage.cacheWrite)} ` +
+        `total=${fmtTok(chunkUsage.totalTokens)} cost=${fmtUsd(chunkUsage.costTotal)}`
+      );
+
+      // Accumulate
+      totalUsage.input += chunkUsage.input;
+      totalUsage.output += chunkUsage.output;
+      totalUsage.cacheRead += chunkUsage.cacheRead;
+      totalUsage.cacheWrite += chunkUsage.cacheWrite;
+      totalUsage.totalTokens += chunkUsage.totalTokens;
+      totalUsage.costTotal += chunkUsage.costTotal;
+
       console.log(`========== Chunk ${i + 1}/${totalChunks} done ==========`);
     }
+
+    // Grand total
+    console.log(
+      `\n[usage] TOTAL (${lastModel || "unknown"}): in=${fmtTok(totalUsage.input)} out=${fmtTok(totalUsage.output)} ` +
+      `cache(r/w)=${fmtTok(totalUsage.cacheRead)}/${fmtTok(totalUsage.cacheWrite)} ` +
+      `tokens=${fmtTok(totalUsage.totalTokens)} cost=${fmtUsd(totalUsage.costTotal)}`
+    );
 
     // Wait for embedding queue to flush (debounced 3s + processing time)
     if (embeddingService) {

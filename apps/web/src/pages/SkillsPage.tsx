@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "@tanstack/react-router";
-import { Sparkles, Search, Tag, ChevronRight } from "lucide-react";
+import { Sparkles, Search, Tag, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import { useWriteTheme } from "../contexts/WriteThemeContext.js";
 
@@ -17,15 +17,18 @@ export default function SkillsPage() {
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterTab>("all");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [tagsExpanded, setTagsExpanded] = useState(false);
+  const [tagsOverflow, setTagsOverflow] = useState(false);
+  const tagRowRef = useRef<HTMLDivElement>(null);
 
-  const filtered = useMemo(() => {
+  // Apply tab + search filters (NOT tag) — used for both tag count basis and final list
+  const beforeTag = useMemo(() => {
     let list = skills;
 
-    // filter tab
     if (filter === "builtin") list = list.filter((s: any) => s.isBuiltin);
     if (filter === "published") list = list.filter((s: any) => s.isPublished && !s.isBuiltin);
 
-    // search
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter((s: any) => {
@@ -39,6 +42,54 @@ export default function SkillsPage() {
 
     return list;
   }, [skills, filter, search]);
+
+  // Tag counts based on beforeTag set, sorted desc by count; hide tags with count == 1
+  const tagCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of beforeTag) {
+      for (const tag of (s.tags ?? [])) {
+        counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .filter(([, count]) => count > 1)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [beforeTag]);
+
+  // Final filtered list applies selected tag
+  const filtered = useMemo(() => {
+    if (!selectedTag) return beforeTag;
+    return beforeTag.filter((s: any) => (s.tags ?? []).includes(selectedTag));
+  }, [beforeTag, selectedTag]);
+
+  // Reset tag if it becomes invalid (e.g., after switching filter tab)
+  useEffect(() => {
+    if (selectedTag && !tagCounts.some(([t]) => t === selectedTag)) {
+      setSelectedTag(null);
+    }
+  }, [selectedTag, tagCounts]);
+
+  // Detect whether tag row overflows two lines (check after render and on resize)
+  useEffect(() => {
+    const el = tagRowRef.current;
+    if (!el) {
+      setTagsOverflow(false);
+      return;
+    }
+    const measure = () => {
+      // Temporarily remove cap to measure full height
+      const prevMaxHeight = el.style.maxHeight;
+      el.style.maxHeight = "none";
+      const fullHeight = el.scrollHeight;
+      el.style.maxHeight = prevMaxHeight;
+      // Two-row threshold (line ≈ 22px + gap)
+      setTagsOverflow(fullHeight > 56);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [tagCounts]);
 
   const tabs: { key: FilterTab; label: string }[] = [
     { key: "all", label: t("skills.all") },
@@ -70,7 +121,7 @@ export default function SkillsPage() {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-1 mb-5">
+      <div className="flex items-center gap-1 mb-3">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -85,6 +136,62 @@ export default function SkillsPage() {
           </button>
         ))}
       </div>
+
+      {/* Tag filter */}
+      {tagCounts.length > 0 && (
+        <div className="mb-5">
+          <div
+            ref={tagRowRef}
+            className="flex flex-wrap items-center gap-1.5 overflow-hidden"
+            style={{ maxHeight: tagsExpanded ? "none" : "56px" }}
+          >
+            <button
+              onClick={() => setSelectedTag(null)}
+              className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full transition-colors ${
+                selectedTag === null
+                  ? "bg-teal-500/15 text-teal-400"
+                  : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60"
+              }`}
+            >
+              {t("skills.all")}
+              <span className="opacity-70">({beforeTag.length})</span>
+            </button>
+            {tagCounts.map(([tag, count]) => (
+              <button
+                key={tag}
+                onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full transition-colors ${
+                  selectedTag === tag
+                    ? "bg-teal-500/15 text-teal-400"
+                    : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60"
+                }`}
+              >
+                <Tag className="w-2.5 h-2.5" />
+                {tag}
+                <span className="opacity-70">({count})</span>
+              </button>
+            ))}
+          </div>
+          {(tagsOverflow || tagsExpanded) && (
+            <button
+              onClick={() => setTagsExpanded((v) => !v)}
+              className="mt-2 inline-flex items-center gap-1 text-[11px] text-white/40 hover:text-teal-400 transition-colors"
+            >
+              {tagsExpanded ? (
+                <>
+                  <ChevronUp className="w-3 h-3" />
+                  收起
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3 h-3" />
+                  展开全部 ({tagCounts.length})
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Skill list */}
       {skillsQuery.isLoading ? (
