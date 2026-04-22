@@ -4,6 +4,35 @@ import { Check, ChevronRight, Loader2 } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
+import SkillProposalCard, { type ProposedSkill } from "./SkillProposalCard.js";
+
+export interface SkillProposalContext {
+  projectId?: string;
+  /** Set of skill slugs currently enabled on the project. */
+  alreadyEnabledSlugs: Set<string>;
+}
+
+/**
+ * Extracts our typed payload from the `propose_skills` tool result.
+ * The agent runtime wraps every tool return in `{ content: [{ type: "text", text: "<JSON>" }] }`
+ * so we have to dig in two layers to get to `{ reason, skills }`.
+ */
+export function parseProposeSkillsResult(result: any): { reason: string; skills: ProposedSkill[] } | null {
+  try {
+    if (!result) return null;
+    let payload: any = result;
+    if (typeof result === "string") {
+      payload = JSON.parse(result);
+    }
+    const text = payload?.content?.[0]?.text;
+    if (typeof text !== "string") return null;
+    const parsed = JSON.parse(text);
+    if (!parsed || !Array.isArray(parsed.skills)) return null;
+    return { reason: typeof parsed.reason === "string" ? parsed.reason : "", skills: parsed.skills };
+  } catch {
+    return null;
+  }
+}
 
 export interface AgentEvent {
   type: "text" | "tool_use" | "tool_result" | "done" | "error" | "session" | "usage" | "compaction";
@@ -226,11 +255,15 @@ export function ToolCallBlock({ toolName, toolInput, result, pending, immersive 
   );
 }
 
-export function AssistantMessageContent({ events, content, isStreaming, immersive }: {
+export function AssistantMessageContent({ events, content, isStreaming, immersive, skillProposalContext, thinkingLabel }: {
   events?: AgentEvent[];
   content: string;
   isStreaming: boolean;
   immersive?: boolean;
+  skillProposalContext?: SkillProposalContext;
+  /** Override the spinner label (defaults to "thinking…"). Used to distinguish the
+   * skill-recommend agent's progress from the main agent's. */
+  thinkingLabel?: string;
 }) {
   const { t } = useTranslation();
   const segments = buildSegments(events, content, isStreaming);
@@ -241,11 +274,13 @@ export function AssistantMessageContent({ events, content, isStreaming, immersiv
       (segments[segments.length - 1] as Extract<Segment, { type: "tools" }>).calls.every(c => !c.pending))
   );
 
+  const spinnerText = thinkingLabel ?? t("chat.thinking");
+
   if (segments.length === 0 && showThinking) {
     return (
       <div className={`flex items-center gap-2 text-xs ${immersive ? "text-teal-400" : "text-teal-600"}`}>
         <Loader2 className="w-4 h-4 animate-spin" />
-        <span>{t("chat.thinking")}</span>
+        <span>{spinnerText}</span>
       </div>
     );
   }
@@ -282,16 +317,31 @@ export function AssistantMessageContent({ events, content, isStreaming, immersiv
 
         return (
           <div key={i} className="space-y-1 max-w-[90%]">
-            {seg.calls.map((call, j) => (
-              <ToolCallBlock key={j} {...call} immersive={immersive} />
-            ))}
+            {seg.calls.map((call, j) => {
+              if (call.toolName === "propose_skills" && !call.pending && skillProposalContext) {
+                const parsed = parseProposeSkillsResult(call.result);
+                if (parsed) {
+                  return (
+                    <SkillProposalCard
+                      key={j}
+                      projectId={skillProposalContext.projectId}
+                      reason={parsed.reason}
+                      skills={parsed.skills}
+                      alreadyEnabledSlugs={skillProposalContext.alreadyEnabledSlugs}
+                      immersive={immersive}
+                    />
+                  );
+                }
+              }
+              return <ToolCallBlock key={j} {...call} immersive={immersive} />;
+            })}
           </div>
         );
       })}
       {showThinking && segments.length > 0 && (
         <div className={`flex items-center gap-2 text-xs mt-2 ${immersive ? "text-teal-400" : "text-teal-600"}`}>
           <Loader2 className="w-4 h-4 animate-spin" />
-          <span>{t("chat.thinking")}</span>
+          <span>{spinnerText}</span>
         </div>
       )}
     </>

@@ -149,6 +149,15 @@ function RootInner() {
             >
               {t("header.brand")}
             </Link>
+            {user && (
+              <Link
+                to="/skills"
+                className="ml-6 sm:ml-8 inline-flex items-center gap-1.5 text-sm font-medium tracking-wider text-white/50 hover:text-teal-400 transition-colors shrink-0"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>SKILLS</span>
+              </Link>
+            )}
             {breadcrumb && (
               <div className="hidden sm:flex items-center gap-3 min-w-0">
                 <span className="text-white/20 shrink-0">/</span>
@@ -157,15 +166,6 @@ function RootInner() {
             )}
           </div>
           <div className="flex items-center gap-2 sm:gap-4 text-sm">
-            {user && (
-              <Link
-                to="/skills"
-                className="text-white/40 hover:text-teal-400 transition-colors"
-                title={t("header.skills")}
-              >
-                <Sparkles className="w-4 h-4" />
-              </Link>
-            )}
             {user && <UserMenu user={user} logout={logout} />}
           </div>
         </div>

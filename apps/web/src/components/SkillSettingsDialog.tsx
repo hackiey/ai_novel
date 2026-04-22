@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { X, Sparkles, Tag } from "lucide-react";
+import { X, Sparkles, Tag, Search } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
+import SkillSearchDialog from "./SkillSearchDialog.js";
+import { useSkillsRecommend } from "../lib/skillsRecommendPref.js";
 
 type Scope = "project" | "world";
-type Mode = "all" | "custom";
 
 interface Props {
   open: boolean;
@@ -29,10 +30,11 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
   const updateProject = trpc.project.update.useMutation();
   const updateWorld = trpc.world.update.useMutation();
   const utils = trpc.useUtils();
+  const { enabled: recommendEnabled, setEnabled: setRecommendEnabled } = useSkillsRecommend(projectId);
+  const [showSearch, setShowSearch] = useState(false);
 
   const initialScope: Scope = projectId ? "project" : "world";
   const [scope, setScope] = useState<Scope>(initialScope);
-  const [mode, setMode] = useState<Mode>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saveStatus, setSaveStatus] = useState("");
   const [search, setSearch] = useState("");
@@ -41,26 +43,27 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
   const project = projectQuery.data as any;
   const world = worldQuery.data as any;
 
-  const projectEnabledIds: string[] | undefined = project?.enabledSkillIds?.map((id: any) => String(id));
-  const worldEnabledIds: string[] | undefined = world?.enabledSkillIds?.map((id: any) => String(id));
+  // The server normalizes legacy `enabledSkillIds` (ObjectId[]) into
+  // `enabledSkillSlugs` (string[]) on read, so the frontend only ever deals with slugs.
+  const projectEnabledSlugs: string[] | undefined = project?.enabledSkillSlugs;
+  const worldEnabledSlugs: string[] | undefined = world?.enabledSkillSlugs;
 
-  // Sync local state from server data when scope changes or dialog opens
+  // Sync local state from server data when scope changes / dialog opens.
+  // Legacy data has enabledSkillSlugs=undefined (server treats it as "all enabled" for
+  // backward compat). The dialog shows that as an empty selection — the user must
+  // explicitly pick what they want; saving an empty list disables all skills.
   useEffect(() => {
     if (!open) return;
-    const sourceIds = scope === "project" ? projectEnabledIds : worldEnabledIds;
-    if (sourceIds === undefined) {
-      setMode("all");
-      setSelected(new Set());
-    } else {
-      setMode("custom");
-      setSelected(new Set(sourceIds));
-    }
+    const sourceSlugs = scope === "project" ? projectEnabledSlugs : worldEnabledSlugs;
+    setSelected(new Set(sourceSlugs ?? []));
     setSaveStatus("");
-  }, [open, scope, project?._id, world?._id, projectEnabledIds?.join(","), worldEnabledIds?.join(",")]);
+  }, [open, scope, project?._id, world?._id, projectEnabledSlugs?.join(","), worldEnabledSlugs?.join(",")]);
 
-  // Click outside / Escape
+  // Click outside / Escape. Suspended while the nested SkillSearchDialog is open —
+  // otherwise clicking inside that child dialog (which lives in a separate portal,
+  // so its target is "outside" this panel) would close us and unmount the child.
   useEffect(() => {
-    if (!open) return;
+    if (!open || showSearch) return;
     function handleClick(e: MouseEvent) {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) onClose();
     }
@@ -74,7 +77,7 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
       document.removeEventListener("mousedown", handleClick);
       document.removeEventListener("keydown", handleKey);
     };
-  }, [open, onClose]);
+  }, [open, onClose, showSearch]);
 
   const filteredSkills = useMemo(() => {
     if (!search.trim()) return skills;
@@ -88,21 +91,36 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
     });
   }, [skills, search]);
 
+  // Sort by saved (server-truth) enabled set so toggling a checkbox doesn't reorder
+  // mid-interaction. Order refreshes after Save (which invalidates the project query).
+  const savedEnabledSet = useMemo(() => {
+    const sourceSlugs = scope === "project" ? projectEnabledSlugs : worldEnabledSlugs;
+    return new Set(sourceSlugs ?? []);
+  }, [scope, projectEnabledSlugs, worldEnabledSlugs]);
+
+  const sortedSkills = useMemo(() => {
+    return [...filteredSkills].sort((a, b) => {
+      const aOn = savedEnabledSet.has(String(a.slug)) ? 0 : 1;
+      const bOn = savedEnabledSet.has(String(b.slug)) ? 0 : 1;
+      return aOn - bOn;
+    });
+  }, [filteredSkills, savedEnabledSet]);
+
   // Determine which scope is currently active (for display)
   const activeScope: "project" | "world" | "default" =
-    projectEnabledIds !== undefined ? "project" :
-    worldEnabledIds !== undefined ? "world" :
+    projectEnabledSlugs !== undefined ? "project" :
+    worldEnabledSlugs !== undefined ? "world" :
     "default";
 
-  function toggle(id: string) {
+  function toggle(slug: string) {
     const next = new Set(selected);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
+    if (next.has(slug)) next.delete(slug);
+    else next.add(slug);
     setSelected(next);
   }
 
   function selectAll() {
-    setSelected(new Set(skills.map((s: any) => String(s._id))));
+    setSelected(new Set(skills.map((s: any) => String(s.slug))));
   }
 
   function clearAll() {
@@ -110,13 +128,13 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
   }
 
   async function handleSave() {
-    const enabledSkillIds = mode === "all" ? null : Array.from(selected);
+    const enabledSkillSlugs = Array.from(selected);
     try {
       if (scope === "project" && projectId) {
-        await updateProject.mutateAsync({ id: projectId, data: { enabledSkillIds } as any });
+        await updateProject.mutateAsync({ id: projectId, data: { enabledSkillSlugs } as any });
         await utils.project.getById.invalidate({ id: projectId });
       } else if (scope === "world" && worldId) {
-        await updateWorld.mutateAsync({ id: worldId, data: { enabledSkillIds } as any });
+        await updateWorld.mutateAsync({ id: worldId, data: { enabledSkillSlugs } as any });
         await utils.world.getById.invalidate({ id: worldId });
       }
       setSaveStatus("已保存");
@@ -133,10 +151,17 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
   const sourceLabel =
     activeScope === "project" ? "项目级覆盖" :
     activeScope === "world" ? "世界级配置" :
-    "默认（全部启用）";
+    "默认（未自定义，加载全部）";
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/50 backdrop-blur-sm">
+    <>
+    <SkillSearchDialog
+      open={showSearch}
+      onClose={() => setShowSearch(false)}
+      projectId={projectId}
+      worldId={worldId}
+    />
+    <div className="fixed inset-0 z-[60] overflow-y-auto scrollbar-none bg-black/50 backdrop-blur-sm">
       <div className="min-h-full flex items-center justify-center p-4">
         <div ref={panelRef} className="glass-panel-solid rounded-2xl w-full max-w-lg mx-auto flex flex-col" style={{ maxHeight: "85vh" }}>
           {/* Header */}
@@ -145,9 +170,21 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
               <Sparkles className="w-4 h-4 text-teal-400" />
               Skill 启用配置
             </h2>
-            <button onClick={onClose} className="text-white/40 hover:text-white/70 transition-colors">
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              {projectId && (
+                <button
+                  onClick={() => setShowSearch(true)}
+                  className="text-[11px] px-2 py-1 rounded-md bg-teal-500/15 text-teal-300 hover:bg-teal-500/25 transition-colors flex items-center gap-1"
+                  title="基于描述搜索 Skill"
+                >
+                  <Search className="w-3 h-3" />
+                  推荐 Skill
+                </button>
+              )}
+              <button onClick={onClose} className="text-white/40 hover:text-white/70 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Scope tabs */}
@@ -170,8 +207,8 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
                   >
                     {scopeLabel(s)}
                     {!disabled && (
-                      (s === "project" && projectEnabledIds !== undefined) ||
-                      (s === "world" && worldEnabledIds !== undefined)
+                      (s === "project" && projectEnabledSlugs !== undefined) ||
+                      (s === "world" && worldEnabledSlugs !== undefined)
                         ? <span className="ml-1.5 text-[10px] opacity-70">●</span>
                         : null
                     )}
@@ -179,90 +216,85 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
                 );
               })}
             </div>
-            <p className="text-[10px] text-white/35">
-              当前生效：<span className="text-white/55">{sourceLabel}</span>
-              {activeScope !== "default" && <span className="ml-1">· 项目级优先于世界级</span>}
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] text-white/35">
+                当前生效：<span className="text-white/55">{sourceLabel}</span>
+                {activeScope !== "default" && <span className="ml-1">· 项目级优先于世界级</span>}
+              </p>
+              {scope === "project" && projectId && (
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-white/70 shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={recommendEnabled}
+                    onChange={(e) => setRecommendEnabled(e.target.checked)}
+                    className="accent-teal-500"
+                  />
+                  对话后自动推荐 Skill
+                </label>
+              )}
+            </div>
           </div>
 
-          {/* Mode */}
-          <div className="px-5 pt-4 pb-2 flex items-center gap-4">
-            {(["all", "custom"] as Mode[]).map((m) => (
-              <label key={m} className="flex items-center gap-2 cursor-pointer text-xs text-white/70">
-                <input
-                  type="radio"
-                  name="skill-mode"
-                  checked={mode === m}
-                  onChange={() => setMode(m)}
-                  className="accent-teal-500"
-                />
-                {m === "all" ? "使用所有可用 Skill" : "自定义启用"}
-              </label>
-            ))}
-          </div>
-
-          {/* Custom skill list */}
-          {mode === "custom" && (
-            <div className="flex-1 min-h-0 px-5 pt-2 pb-2 flex flex-col">
-              <div className="flex items-center gap-2 mb-2">
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="搜索 Skill"
-                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white/80 placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                />
-                <button onClick={selectAll} className="text-[10px] text-white/40 hover:text-teal-400 transition-colors px-1">全选</button>
-                <button onClick={clearAll} className="text-[10px] text-white/40 hover:text-teal-400 transition-colors px-1">清空</button>
-              </div>
-              <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-white/5 divide-y divide-white/5">
-                {skillsQuery.isLoading ? (
-                  <div className="text-center text-white/30 text-xs py-8">加载中…</div>
-                ) : filteredSkills.length === 0 ? (
-                  <div className="text-center text-white/25 text-xs py-8">无可用 Skill</div>
-                ) : (
-                  filteredSkills.map((s: any) => {
-                    const id = String(s._id);
-                    const checked = selected.has(id);
-                    return (
-                      <label
-                        key={id}
-                        className="flex items-start gap-3 px-3 py-2.5 hover:bg-white/5 cursor-pointer transition-colors"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggle(id)}
-                          className="mt-0.5 accent-teal-500 shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-xs text-white/85">{s.name}</span>
-                            <span className="text-[10px] text-white/30 font-mono">{s.slug}</span>
-                            {s.isBuiltin && (
-                              <span className="text-[9px] px-1 py-px rounded bg-teal-500/15 text-teal-400">内置</span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-white/35 leading-snug line-clamp-2">{s.description}</p>
-                          {s.tags?.length > 0 && (
-                            <div className="flex flex-wrap items-center gap-1 mt-1">
-                              {s.tags.slice(0, 4).map((tag: string) => (
-                                <span key={tag} className="inline-flex items-center gap-0.5 text-[9px] px-1 py-px rounded bg-white/5 text-white/30">
-                                  <Tag className="w-2 h-2" />
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
+          {/* Skill list */}
+          <div className="flex-1 min-h-0 px-5 pt-2 pb-2 flex flex-col">
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="搜索 Skill"
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white/80 placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              />
+              <button onClick={selectAll} className="text-[10px] text-white/40 hover:text-teal-400 transition-colors px-1">全选</button>
+              <button onClick={clearAll} className="text-[10px] text-white/40 hover:text-teal-400 transition-colors px-1">清空</button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none rounded-lg border border-white/5 divide-y divide-white/5">
+              {skillsQuery.isLoading ? (
+                <div className="text-center text-white/30 text-xs py-8">加载中…</div>
+              ) : sortedSkills.length === 0 ? (
+                <div className="text-center text-white/25 text-xs py-8">无可用 Skill</div>
+              ) : (
+                sortedSkills.map((s: any) => {
+                  const slug = String(s.slug);
+                  const checked = selected.has(slug);
+                  return (
+                    <label
+                      key={slug}
+                      className="flex items-start gap-3 px-3 py-2.5 hover:bg-white/5 cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggle(slug)}
+                        className="mt-0.5 accent-teal-500 shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-xs text-white/85">{s.name}</span>
+                          <span className="text-[10px] text-white/30 font-mono">{s.slug}</span>
+                          {s.isBuiltin && (
+                            <span className="text-[9px] px-1 py-px rounded bg-teal-500/15 text-teal-400">内置</span>
                           )}
                         </div>
-                      </label>
-                    );
-                  })
-                )}
-              </div>
-              <p className="text-[10px] text-white/30 mt-2">已选 {selected.size} / {skills.length}</p>
+                        <p className="text-[11px] text-white/35 leading-snug whitespace-pre-wrap">{s.description}</p>
+                        {s.tags?.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1 mt-1">
+                            {s.tags.slice(0, 4).map((tag: string) => (
+                              <span key={tag} className="inline-flex items-center gap-0.5 text-[9px] px-1 py-px rounded bg-white/5 text-white/30">
+                                <Tag className="w-2 h-2" />
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })
+              )}
             </div>
-          )}
+            <p className="text-[10px] text-white/30 mt-2">已选 {selected.size} / {skills.length}</p>
+          </div>
 
           {/* Footer */}
           <div className="px-5 py-4 border-t border-white/10 flex items-center justify-end gap-3">
@@ -283,7 +315,8 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
           </div>
         </div>
       </div>
-    </div>,
+    </div>
+    </>,
     document.body,
   );
 }

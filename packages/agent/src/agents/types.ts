@@ -18,6 +18,7 @@ export type ToolName =
   | "update_memory"
   | "generate_synopsis"
   | "search_skills"
+  | "propose_skills"
   | "create_skill"
   | "update_skill"
   | "delete_skill"

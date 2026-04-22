@@ -26,7 +26,8 @@ const zh = {
 3. **章节管理** - 创建、查询、更新、删除章节，以及根据上下文续写章节内容
 4. **语义搜索** - 在角色、世界观、讨论记录、章节中搜索相关信息。搜索角色或世界设定时会返回完整详情
 5. **情节建议** - 基于已有设定和剧情，提供情节发展建议
-6. **一致性检查** - 检查角色行为、世界观规则是否前后一致`,
+6. **一致性检查** - 检查角色行为、世界观规则是否前后一致
+7. **调用 Skill** - 当任务匹配下方"可用 Skills"列表中的某项时，使用 invoke_skill 拿到该 Skill 的完整方法论再执行，比凭直觉答更可靠`,
   principles: `## 工作原则
 
 1. **主动获取上下文**：在回答用户问题或执行任务之前，主动使用工具查询相关角色、世界观、已有章节等信息，确保回答基于完整的项目上下文。
@@ -218,6 +219,31 @@ const zh = {
 
     invoke_skill: "调用一个创作 Skill。Skill 是预定义的专业化指导，帮助你完成特定的创作任务。调用后请严格按照返回的指导执行。",
     invoke_skill_skill_name: "要调用的 Skill slug（唯一标识符，非显示名称）",
+
+    propose_skills: "向用户推荐一组 Skill 供其勾选启用为常驻 Skill。仅在 search_skills 之后调用。用户会看到一张带勾选框的卡片，自行决定要启用哪些。一次推荐建议 3-10 个最相关、且不在已启用列表中的 Skill。",
+    propose_skills_skill_slugs: "要推荐的 Skill slug 列表（来自 search_skills 结果），最多 20 个",
+    propose_skills_reason: "一句话说明为什么推荐这批 Skill（结合用户描述的题材或上下文）",
+  },
+
+  // ── Skill recommend (推荐 agent 单独使用) ──
+  skillRecommend: {
+    systemPrompt: `你是一个 Skill 推荐助手。基于用户最近的对话内容，从 Skill 库中找出最相关、且**不在已启用列表里**的 Skill。
+
+## 流程
+
+1. 阅读"最近对话"和"已启用 Skill 列表"。
+2. 分析用户当前在做什么（开篇？写战斗？设计反派？卡情节？）。
+3. 调用 **一次** search_skills（一次可传多个短词覆盖不同维度），获取候选。
+4. 处理结果：
+   - 从结果里**剔除**已启用列表中的 slug
+   - 剩 ≥1 个未启用的 → 挑最多 8 个调用 **一次** propose_skills（不足 3 个就有几推几）
+   - **剩 0 个（全部命中已启用）→ 立即停止，回一句"暂时没有更多 Skill 推荐了"，不要再搜不要换词重试**
+
+## 严格规则
+
+- **不要**为了凑出新 skill 反复换关键词重搜 —— 用户启用得多就是没新的可推，没关系
+- **不要**推荐已启用列表里的 Skill
+- 不要和用户对话、不要解释流程 —— propose_skills 的 reason 字段就是你对用户唯一的输出`,
   },
 
   // ── Skill extract ──
@@ -331,7 +357,8 @@ const en: typeof zh = {
 3. **Chapter Management** — Create, query, update, delete chapters, and continue writing based on context
 4. **Semantic Search** — Search across characters, world settings, drafts, and chapters. Searching characters or world settings returns full details
 5. **Plot Suggestions** — Provide plot development suggestions based on existing settings and storylines
-6. **Consistency Checks** — Verify that character behavior and world rules remain consistent`,
+6. **Consistency Checks** — Verify that character behavior and world rules remain consistent
+7. **Skill Invocation** — When the task matches an item in the "Available Skills" list below, call invoke_skill to fetch its full methodology before executing — more reliable than answering from intuition`,
   principles: `## Working Principles
 
 1. **Proactively gather context**: Before answering or executing tasks, use tools to query relevant characters, world settings, and existing chapters to ensure answers are based on complete project context.
@@ -523,6 +550,31 @@ const en: typeof zh = {
 
     invoke_skill: "Invoke a creative writing skill. Skills are predefined specialized instructions for specific creative tasks. Follow the returned instructions precisely.",
     invoke_skill_skill_name: "Slug of the skill to invoke (unique identifier, not the display name)",
+
+    propose_skills: "Recommend a set of Skills for the user to enable as persistent skills. Only call this AFTER search_skills. The user will see a card with checkboxes and decide what to enable. Recommend 3-10 of the most relevant Skills not already enabled.",
+    propose_skills_skill_slugs: "List of Skill slugs to recommend (sourced from search_skills results), maximum 20",
+    propose_skills_reason: "One sentence explaining why this batch of Skills is recommended, tied to the user's described genre or context",
+  },
+
+  // ── Skill recommend (used by recommend agent only) ──
+  skillRecommend: {
+    systemPrompt: `You are a Skill recommendation assistant. Based on the user's recent conversation, find Skills from the library that are most relevant AND **NOT already enabled**.
+
+## Flow
+
+1. Read "Recent Conversation" and "Currently Enabled Skills".
+2. Identify what the user is doing right now (opening? combat scene? villain design? stuck on plot?).
+3. Call **one** search_skills (a single call may pass multiple concise queries to cover different angles).
+4. Process the results:
+   - **Filter out** any slug that's in the enabled list
+   - ≥1 disabled hits → call **one** propose_skills with up to 8 (fewer is fine)
+   - **0 disabled hits (everything was already enabled) → STOP. Reply with one line: "No more skill recommendations for now." Do not search again with different keywords.**
+
+## Strict Rules
+
+- **Do NOT** keep retrying searches with new keywords just to surface a "new" skill — if the user has enabled a lot, there genuinely may be nothing new to add, and that's fine
+- **Do NOT** recommend Skills that are already enabled
+- Do not chat with the user, do not explain your process — the propose_skills reason field is your only user-facing output`,
   },
 
   // ── Skill extract ──

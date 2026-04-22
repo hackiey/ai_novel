@@ -4,6 +4,7 @@ import { CreatorAgentSession, getOrRefreshWorldSummary, parseModelSpec, resolveL
 import type { VectorSearchFn, Locale, Message, SkillData } from "@ai-creator/agent";
 import { getDb } from "../db.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
+import { resolveEnabledSkillSlugs } from "../utils/enabledSkills.js";
 import { getStoredCompactionState, getUsageStateFromEvents, maybeCompactHistory } from "../services/agentCompactionService.js";
 import { verifyToken, type JwtPayload } from "../auth/jwt.js";
 import { getUserAllowedModels } from "../auth/permissionGroups.js";
@@ -277,39 +278,50 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       console.error("[WorkingEnvironment] Failed to build:", err);
     }
 
-    // Resolve enabled skill ids: project takes precedence over world; both undefined = all enabled
-    let allowedSkillIds: ObjectId[] | undefined;
+    // Resolve enabled skill slugs: project takes precedence over world; both undefined = all enabled.
+    let allowedSlugs: string[] | undefined;
     if (projectId) {
       const projectDoc = await db.collection("projects").findOne(
         { _id: new ObjectId(projectId) },
-        { projection: { enabledSkillIds: 1 } },
+        { projection: { enabledSkillSlugs: 1, enabledSkillIds: 1 } },
       );
-      if (projectDoc?.enabledSkillIds !== undefined) {
-        allowedSkillIds = projectDoc.enabledSkillIds as ObjectId[];
-      }
+      allowedSlugs = await resolveEnabledSkillSlugs(db, projectDoc);
     }
-    if (allowedSkillIds === undefined && worldId) {
+    if (allowedSlugs === undefined && worldId) {
       const worldDoc = await db.collection("worlds").findOne(
         { _id: new ObjectId(worldId) },
-        { projection: { enabledSkillIds: 1 } },
+        { projection: { enabledSkillSlugs: 1, enabledSkillIds: 1 } },
       );
-      if (worldDoc?.enabledSkillIds !== undefined) {
-        allowedSkillIds = worldDoc.enabledSkillIds as ObjectId[];
-      }
+      allowedSlugs = await resolveEnabledSkillSlugs(db, worldDoc);
     }
 
-    // Load available skills
-    const skillFilter: Record<string, any> = {
+    // Load available skills. New projects start with `enabledSkillSlugs: []` which yields
+    // an empty result here; legacy projects without the field get the full set. Either
+    // way the main agent never proposes new skills — that's the recommend agent's job.
+    const baseSkillFilter: Record<string, any> = {
       $or: [
         { isBuiltin: true },
         { isPublished: true },
         { authorId: user.userId },
       ],
     };
-    if (allowedSkillIds !== undefined) {
-      skillFilter._id = { $in: allowedSkillIds };
+    let skillFilter: Record<string, any> = baseSkillFilter;
+    if (allowedSlugs !== undefined) {
+      skillFilter = { ...baseSkillFilter, slug: { $in: allowedSlugs } };
     }
-    const skillDocs = await db.collection("skills").find(skillFilter).toArray();
+    const skillDocs = allowedSlugs !== undefined && allowedSlugs.length === 0
+      ? []
+      : await db.collection("skills").find(skillFilter).toArray();
+
+    console.log(
+      "[agentStream] skills loaded: %d (allowedSlugs=%s, projectId=%s)",
+      skillDocs.length,
+      allowedSlugs === undefined ? "undefined(legacy/all)" : `[${allowedSlugs.length}]`,
+      projectId,
+    );
+    if (skillDocs.length > 0 && skillDocs.length <= 20) {
+      console.log("[agentStream] skill slugs: %s", skillDocs.map((d) => d.slug).join(", "));
+    }
 
     const skills: SkillData[] = skillDocs.map(doc => ({
       slug: doc.slug,

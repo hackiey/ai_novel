@@ -73,7 +73,10 @@ export const worldSchema = z.object({
   summaryConfig: z.object({
     fullSummaryMaxItems: z.number().default(500),
   }).default({}),
-  enabledSkillIds: z.array(objectIdSchema).optional(),
+  // Skill identifiers stored as slugs (stable across re-imports of builtin skills,
+  // unlike Mongo ObjectIds which can change). Legacy documents may still have
+  // `enabledSkillIds: ObjectId[]` — server reads translate them lazily.
+  enabledSkillSlugs: z.array(z.string()).optional(),
   ...timestampsSchema.shape,
 });
 
@@ -83,7 +86,7 @@ export const createWorldSchema = z.object({
 });
 
 export const updateWorldSchema = createWorldSchema.partial().extend({
-  enabledSkillIds: z.array(objectIdSchema).nullable().optional(),
+  enabledSkillSlugs: z.array(z.string()).nullable().optional(),
 });
 
 export type World = z.infer<typeof worldSchema>;
@@ -102,7 +105,13 @@ export const projectSchema = z.object({
     genre: z.string().max(100).default(""),
     targetLength: z.number().int().positive().optional(),
   }).default({}),
-  enabledSkillIds: z.array(objectIdSchema).optional(),
+  // See worldSchema.enabledSkillSlugs note. Legacy `enabledSkillIds: ObjectId[]` may
+  // exist on older docs — server-side reads translate them on the fly.
+  enabledSkillSlugs: z.array(z.string()).optional(),
+  // skillsInitialized / skillsRecommendEnabled were previously stored on the project;
+  // both are now obsolete — initialization is implicit and recommendation toggling lives
+  // in the browser's localStorage (see apps/web/src/lib/skillsRecommendPref.ts). Old
+  // documents may still carry these fields; Zod strips them silently.
   ...timestampsSchema.shape,
 });
 
@@ -117,7 +126,7 @@ export const createProjectSchema = z.object({
 });
 
 export const updateProjectSchema = createProjectSchema.partial().extend({
-  enabledSkillIds: z.array(objectIdSchema).nullable().optional(),
+  enabledSkillSlugs: z.array(z.string()).nullable().optional(),
 });
 
 export type Project = z.infer<typeof projectSchema>;

@@ -1,12 +1,13 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { BotMessageSquare, BookOpen, ChevronDown, History, KeyRound, Loader2, Pencil, Plus, RotateCcw, Settings, Sparkles, X } from "lucide-react";
+import { ArrowUp, BotMessageSquare, BookOpen, Check, ChevronDown, History, KeyRound, Loader2, Pencil, Plus, RotateCcw, Settings, Sparkles, X } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import { getToken } from "../lib/auth.js";
 import { getBYOKForModel, getBYOKModelSpecs, hasBYOKKeys } from "../lib/byokStorage.js";
 import { getCompactionSettings } from "../lib/compactionSettings.js";
-import { AgentEvent, AssistantMessageContent } from "./AgentMessageDisplay.js";
+import { AgentEvent, AssistantMessageContent, type SkillProposalContext } from "./AgentMessageDisplay.js";
+import { useSkillsRecommend } from "../lib/skillsRecommendPref.js";
 import CompactionSettingsDialog from "./CompactionSettingsDialog.js";
 import SkillSettingsDialog from "./SkillSettingsDialog.js";
 
@@ -31,6 +32,9 @@ interface ChatMessage {
   content: string;
   events?: AgentEvent[];
   createdAt?: string;
+  /** "recommendation" tags assistant messages produced by the skill-recommend agent
+   * so the UI can label them and use a distinct loading text. */
+  source?: "main" | "recommendation";
 }
 
 // Tools that edit chapter content — require review flow
@@ -49,6 +53,134 @@ function formatTokenK(value: number | undefined): string {
   const scaled = value / 1000;
   const formatted = scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1);
   return `${formatted.replace(/\.0$/, "")}k`;
+}
+
+function formatModelDisplay(spec: string): string {
+  const afterColon = spec.includes(":") ? spec.split(":")[1] : spec;
+  const slashIdx = afterColon.lastIndexOf("/");
+  const reasoningLevels = ["minimal", "low", "medium", "high", "xhigh"];
+  if (slashIdx !== -1 && reasoningLevels.includes(afterColon.slice(slashIdx + 1))) {
+    return `${afterColon.slice(0, slashIdx)} (${afterColon.slice(slashIdx + 1)})`;
+  }
+  return afterColon;
+}
+
+function ModelDropdown({
+  immersive,
+  currentModelSpec,
+  defaultModel,
+  serverModels,
+  onSelect,
+  selectLabel,
+  byokLabel,
+}: {
+  immersive: boolean;
+  currentModelSpec: string | undefined;
+  defaultModel: string | undefined;
+  serverModels: string[];
+  onSelect: (model: string) => void;
+  selectLabel: string;
+  byokLabel: string;
+}) {
+  const byokModels = getBYOKModelSpecs();
+  const allModels = [...serverModels, ...byokModels.filter((m) => !serverModels.includes(m))];
+  const value = currentModelSpec || defaultModel || allModels[0];
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    const id = setTimeout(() => document.addEventListener("mousedown", handleClick), 0);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      clearTimeout(id);
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  if (allModels.length === 0) return null;
+
+  const showByokBadge = !!(value && getBYOKForModel(value));
+
+  return (
+    <div ref={wrapperRef} className="relative inline-flex items-center h-6">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        title={selectLabel}
+        className={`inline-flex items-center gap-1 h-6 px-1 rounded text-[11px] leading-none transition-colors ${
+          immersive
+            ? "text-white/70 hover:text-white hover:bg-white/10"
+            : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+        }`}
+      >
+        {showByokBadge && (
+          <KeyRound
+            className={`w-2.5 h-2.5 shrink-0 ${immersive ? "text-amber-400/70" : "text-amber-500/80"}`}
+            aria-label={byokLabel}
+          />
+        )}
+        <span className="max-w-[140px] truncate">{formatModelDisplay(value || "")}</span>
+        <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${open ? "rotate-180" : ""} ${immersive ? "text-white/40" : "text-gray-400"}`} />
+      </button>
+      {open && (
+        <div
+          className={`absolute bottom-full right-0 mb-2 z-50 max-w-[280px] max-h-72 overflow-y-auto scrollbar-none rounded-lg border shadow-xl py-1 ${
+            immersive
+              ? "bg-neutral-900/90 border-white/10 backdrop-blur-md"
+              : "bg-white border-gray-200"
+          }`}
+          style={{ minWidth: "max-content" }}
+        >
+          {allModels.map((m) => {
+            const isCurrent = m === value;
+            const isByok = !!getBYOKForModel(m);
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => {
+                  onSelect(m);
+                  setOpen(false);
+                }}
+                className={`w-full text-left pl-2.5 pr-3 py-1 text-[11px] flex items-center gap-1.5 transition-colors ${
+                  immersive
+                    ? "text-white/75 hover:bg-white/8"
+                    : "text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                <Check
+                  className={`w-3 h-3 shrink-0 transition-opacity ${
+                    isCurrent
+                      ? immersive ? "text-teal-400 opacity-100" : "text-teal-600 opacity-100"
+                      : "opacity-0"
+                  }`}
+                  strokeWidth={3}
+                />
+                {isByok && (
+                  <KeyRound className={`w-2.5 h-2.5 shrink-0 ${immersive ? "text-amber-400/70" : "text-amber-500/80"}`} />
+                )}
+                <span className={`flex-1 whitespace-nowrap ${
+                  isCurrent
+                    ? immersive ? "text-white" : "text-gray-900 font-medium"
+                    : ""
+                }`}>{formatModelDisplay(m)}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function AgentChatPanel({ projectId, worldId, currentChapterId, onChapterEdit, variant = "default" }: Props) {
@@ -72,6 +204,20 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
   const queryClient = useQueryClient();
   const truncateMessagesMutation = trpc.agent.truncateMessages.useMutation();
   const modelsQuery = trpc.agent.getModels.useQuery();
+  const projectQuery = trpc.project.getById.useQuery(
+    { id: projectId! },
+    { enabled: !!projectId },
+  );
+  const project = projectQuery.data as
+    | { _id: string; enabledSkillSlugs?: string[] }
+    | undefined;
+  const enabledSkillSlugSet = useMemo(() => {
+    return new Set(project?.enabledSkillSlugs ?? []);
+  }, [project?.enabledSkillSlugs]);
+  const skillProposalContext: SkillProposalContext | undefined = projectId
+    ? { projectId, alreadyEnabledSlugs: enabledSkillSlugSet }
+    : undefined;
+  const { enabled: recommendChecked, setEnabled: setRecommendChecked } = useSkillsRecommend(projectId);
   const memoryQuery = trpc.agent.getMemory.useQuery(
     { worldId, projectId },
     { enabled: showMemory && !!(worldId || projectId) },
@@ -165,11 +311,90 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
     }
   }, [queryClient]);
 
+  // Threshold below which we trigger automatic skill recommendations after each turn.
+  const RECOMMEND_SKILLS_THRESHOLD = 50;
+
+  async function streamSkillRecommendation(precedingMessages: ChatMessage[]) {
+    if (!projectId) return;
+    const recentMessages = precedingMessages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+    if (recentMessages.length === 0) return;
+
+    setMessages((prev) => [...prev, { role: "assistant", content: "", events: [], source: "recommendation" }]);
+
+    try {
+      const token = getToken();
+      const modelToUse = currentModelSpec;
+      const byok = modelToUse ? getBYOKForModel(modelToUse) : null;
+      const response = await fetch(`${API_BASE}/api/agent/recommend-skills`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          projectId,
+          worldId,
+          recentMessages,
+          locale: i18n.language,
+          model: modelToUse,
+          ...(byok?.apiKey ? { apiKey: byok.apiKey } : {}),
+          ...(byok?.baseURL ? { baseURL: byok.baseURL } : {}),
+        }),
+      });
+      if (!response.ok || !response.body) return;
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullText = "";
+      const allEvents: AgentEvent[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6);
+          if (payload === "[DONE]") continue;
+          try {
+            const event: AgentEvent = JSON.parse(payload);
+            if (event.type === "session") continue;
+            allEvents.push(event);
+            if (event.type === "text" && event.text) fullText += event.text;
+            setMessages((prev) => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last && last.role === "assistant") {
+                updated[updated.length - 1] = { ...last, content: fullText, events: [...allEvents] };
+              }
+              return updated;
+            });
+          } catch {
+            // skip malformed
+          }
+        }
+      }
+    } catch {
+      // swallow — recommendation is opportunistic and should never disrupt the main flow
+    }
+  }
+
   async function sendMessage(text: string) {
     if (!text || isLoading) return;
 
     userScrolledUp.current = false;
     setIsLoading(true);
+
+    // Snapshot recommend-eligibility BEFORE the turn so a mid-turn `addEnabledSkills`
+    // (from clicking a previous propose_skills card) doesn't change the decision.
+    const recommendEnabled = recommendChecked;
+    const enabledCount = project?.enabledSkillSlugs?.length ?? Number.POSITIVE_INFINITY;
+    const shouldRecommendAfter = !!projectId
+      && recommendEnabled
+      && enabledCount < RECOMMEND_SKILLS_THRESHOLD;
 
     const userMsg: ChatMessage = { role: "user", content: text };
     setMessages((prev) => [...prev, userMsg]);
@@ -349,6 +574,16 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
 
       // Refresh session list
       sessionsQuery.refetch();
+
+      // Opportunistic skill recommendation: after a normal turn (project already initialized)
+      // and below the threshold, ask the recommend agent to surface 3-8 relevant skills.
+      if (shouldRecommendAfter) {
+        const preceding: ChatMessage[] = [
+          { role: "user", content: text },
+          { role: "assistant", content: fullText },
+        ];
+        await streamSkillRecommendation(preceding);
+      }
     } catch (err: any) {
       if (err.name === "AbortError") {
         // User stopped generation — keep partial content as-is
@@ -439,15 +674,6 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
             <Settings className="w-3.5 h-3.5 opacity-40" />
           </button>
           <button
-            onClick={() => setShowSkillSettings(true)}
-            className={`p-1.5 rounded-md transition-colors ${
-              imm ? "text-white/50 hover:text-white hover:bg-white/10" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-            }`}
-            title="Skill 启用配置"
-          >
-            <Sparkles className="w-4 h-4" />
-          </button>
-          <button
             onClick={() => { setShowHistory((v) => !v); setShowMemory(false); }}
             className={`p-1.5 rounded-md transition-colors ${
               showHistory
@@ -481,52 +707,6 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
           </button>
         </div>
         <div className="flex items-center gap-1.5">
-          {!showMemory && (() => {
-            const byokModels = getBYOKModelSpecs();
-            const serverModels = modelsQuery.data?.available ?? [];
-            const allModels = [...serverModels, ...byokModels.filter((m) => !serverModels.includes(m))];
-            const showByokBadge = currentModelSpec && getBYOKForModel(currentModelSpec);
-
-            if (allModels.length === 0) return null;
-
-            return (
-              <div className="flex items-center gap-1">
-                {showByokBadge && (
-                  <span className="flex items-center gap-0.5 text-[10px] text-amber-400/70" title={t("byok.usingOwnKey")}>
-                    <KeyRound className="w-3 h-3" />
-                  </span>
-                )}
-                <div className="relative">
-                  <select
-                    value={currentModelSpec || modelsQuery.data?.default || allModels[0]}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    className={`appearance-none text-xs rounded-md pl-2 pr-6 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer ${
-                      imm
-                        ? "bg-white/10 border border-white/15 text-white/80 hover:bg-white/15"
-                        : "bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200"
-                    }`}
-                    title={t("chat.selectModel")}
-                  >
-                    {allModels.map((m: string) => {
-                      const afterColon = m.includes(":") ? m.split(":")[1] : m;
-                      const slashIdx = afterColon.lastIndexOf("/");
-                      const reasoningLevels = ["minimal", "low", "medium", "high", "xhigh"];
-                      let display = afterColon;
-                      if (slashIdx !== -1 && reasoningLevels.includes(afterColon.slice(slashIdx + 1))) {
-                        display = `${afterColon.slice(0, slashIdx)} (${afterColon.slice(slashIdx + 1)})`;
-                      }
-                      return (
-                        <option key={m} value={m}>
-                          {display}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <ChevronDown className={`w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none ${imm ? "text-white/40" : "text-gray-400"}`} />
-                </div>
-              </div>
-            );
-          })()}
           {!showMemory && (
             <button
               onClick={handleNewSession}
@@ -764,7 +944,24 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                   )
                 ) : (
                   <div className="space-y-2">
-                    <AssistantMessageContent events={msg.events} content={msg.content} isStreaming={isLoading && i === messages.length - 1} immersive={imm} />
+                    {msg.source === "recommendation" && (
+                      <div className={`inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full ${
+                        imm
+                          ? "bg-teal-500/15 text-teal-300/90 border border-teal-300/20"
+                          : "bg-teal-50 text-teal-700 border border-teal-200"
+                      }`}>
+                        <Sparkles className="w-3 h-3" />
+                        Skill 推荐
+                      </div>
+                    )}
+                    <AssistantMessageContent
+                      events={msg.events}
+                      content={msg.content}
+                      isStreaming={isLoading && i === messages.length - 1}
+                      immersive={imm}
+                      skillProposalContext={skillProposalContext}
+                      thinkingLabel={msg.source === "recommendation" ? "正在为你筛选 Skill…" : undefined}
+                    />
                   </div>
                 )}
               </div>
@@ -778,9 +975,13 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
             )}
           </div>
 
-          {/* Input */}
+          {/* Input — unified card holding textarea + bottom controls (skill toggle, context, model, send) */}
           <div className={`border-t p-2 shrink-0 ${imm ? "border-white/10" : "border-gray-200"}`}>
-            <div className="flex gap-2 items-end">
+            <div className={`rounded-2xl border transition-shadow focus-within:ring-1 focus-within:ring-teal-500/40 ${
+              imm
+                ? "bg-white/5 border-white/15"
+                : "bg-white border-gray-300"
+            }`}>
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -788,35 +989,147 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                 onKeyDown={handleKeyDown}
                 placeholder={t("chat.inputPlaceholder")}
                 rows={1}
-                className={`w-0 flex-1 rounded-lg px-3 py-2 text-sm leading-normal focus:outline-none focus:ring-1 focus:ring-teal-500 resize-none overflow-y-auto scrollbar-none ${
+                className={`w-full bg-transparent border-0 px-3 pt-2.5 pb-1 text-sm leading-normal focus:outline-none resize-none overflow-y-auto scrollbar-none ${
                   imm
-                    ? "bg-white/5 border border-white/10 text-white/90 placeholder-white/30"
-                    : "bg-white border border-gray-300 text-gray-900 placeholder-gray-400"
+                    ? "text-white/90 placeholder-white/30"
+                    : "text-gray-900 placeholder-gray-400"
                 }`}
-                style={{ height: "38px", maxHeight: "120px" }}
+                style={{ minHeight: "32px", maxHeight: "120px" }}
               />
-              {isLoading ? (
-                <button
-                  onClick={handleStop}
-                  className="px-3 py-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-sm hover:bg-red-500/30 transition-colors shrink-0"
-                  title={t("chat.stop")}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                    <rect x="6" y="6" width="12" height="12" rx="1" />
-                  </svg>
-                </button>
-              ) : (
-                <button
-                  onClick={handleSend}
-                  disabled={!input.trim()}
-                  className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-white/80 text-sm hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
-                >
-                  {t("chat.send")}
-                </button>
-              )}
-            </div>
-            <div className={`mt-1 px-1 text-[11px] ${imm ? "text-white/35" : "text-gray-400"}`}>
-              {tokenLabel} {formatTokenK(currentContextTokens)} / {currentModelContextWindow > 0 ? formatTokenK(currentModelContextWindow) : "--"}
+              <div className="flex items-center gap-2 px-2 pb-2">
+                {/* Left: Skill pill (recommend toggle + settings shortcut) */}
+                {(projectId || worldId) && (
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded-full border ${
+                      imm ? "border-white/10" : "border-gray-200"
+                    }`}
+                  >
+                    <span className={`text-[11px] ${imm ? "text-white/55" : "text-gray-600"}`}>
+                      Skill
+                    </span>
+                    {projectId && (
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={recommendChecked}
+                        onClick={() => setRecommendChecked(!recommendChecked)}
+                        title={recommendChecked
+                          ? "自动推荐 Skill：已开启（每次回复后推荐）"
+                          : "自动推荐 Skill：已关闭"}
+                        className="group relative inline-flex items-center gap-1"
+                      >
+                        <span className={`text-[11px] ${
+                          recommendChecked
+                            ? imm ? "text-teal-300" : "text-teal-700"
+                            : imm ? "text-white/55 group-hover:text-white/80" : "text-gray-600 group-hover:text-gray-800"
+                        }`}>
+                          推荐
+                        </span>
+                        <span
+                          className={`relative inline-block w-7 h-3.5 rounded-full transition-colors ${
+                            recommendChecked
+                              ? imm ? "bg-teal-500/60" : "bg-teal-500"
+                              : imm ? "bg-white/15 group-hover:bg-white/25" : "bg-gray-300 group-hover:bg-gray-400"
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-[2px] left-[2px] w-2.5 h-2.5 rounded-full bg-white shadow transition-transform ${
+                              recommendChecked ? "translate-x-[14px]" : "translate-x-0"
+                            }`}
+                          />
+                        </span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowSkillSettings(true)}
+                      title="Skill 启用配置"
+                      className={`p-0.5 rounded transition-colors ${
+                        imm
+                          ? "text-white/45 hover:text-white/80 hover:bg-white/10"
+                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                      }`}
+                    >
+                      <Sparkles className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Right cluster: context · model · send */}
+                <div className="ml-auto flex items-center gap-1.5">
+                  {/* Context circular indicator */}
+                  {(() => {
+                    const hasWindow = currentModelContextWindow > 0;
+                    const ratio = hasWindow
+                      ? Math.min(1, currentContextTokens / currentModelContextWindow)
+                      : 0;
+                    const pct = hasWindow ? Math.round(ratio * 100) : null;
+                    const r = 5.5;
+                    const c = 2 * Math.PI * r;
+                    const colorCls =
+                      !hasWindow ? (imm ? "text-white/30" : "text-gray-400") :
+                      ratio > 0.9 ? "text-rose-400" :
+                      ratio > 0.7 ? "text-amber-400" :
+                      imm ? "text-teal-400" : "text-teal-500";
+                    const title = hasWindow
+                      ? `${tokenLabel} ${formatTokenK(currentContextTokens)} / ${formatTokenK(currentModelContextWindow)} (${pct}%)`
+                      : `${tokenLabel} ${formatTokenK(currentContextTokens)} / 未知`;
+                    return (
+                      <span className={`inline-flex items-center px-1 ${colorCls}`} title={title} aria-label={title}>
+                        <svg width="14" height="14" viewBox="0 0 14 14" className="shrink-0">
+                          <circle cx="7" cy="7" r={r} fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="1.5" />
+                          {hasWindow && ratio > 0 && (
+                            <circle
+                              cx="7" cy="7" r={r} fill="none"
+                              stroke="currentColor" strokeWidth="1.5"
+                              strokeDasharray={`${ratio * c} ${c}`}
+                              strokeLinecap="round"
+                              transform="rotate(-90 7 7)"
+                            />
+                          )}
+                        </svg>
+                      </span>
+                    );
+                  })()}
+
+                  {/* Model selector (custom dropdown) */}
+                  <ModelDropdown
+                    immersive={imm}
+                    currentModelSpec={currentModelSpec}
+                    defaultModel={modelsQuery.data?.default}
+                    serverModels={modelsQuery.data?.available ?? []}
+                    onSelect={setSelectedModel}
+                    selectLabel={t("chat.selectModel")}
+                    byokLabel={t("byok.usingOwnKey")}
+                  />
+
+                  {/* Send / Stop button — circular, prominent */}
+                  {isLoading ? (
+                    <button
+                      onClick={handleStop}
+                      title={t("chat.stop")}
+                      className="w-7 h-7 rounded-full inline-flex items-center justify-center bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:bg-rose-500/30 transition-colors shrink-0"
+                    >
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+                        <rect x="6" y="6" width="12" height="12" rx="1" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleSend}
+                      disabled={!input.trim()}
+                      title={t("chat.send")}
+                      className={`w-7 h-7 rounded-full inline-flex items-center justify-center transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+                        imm
+                          ? "bg-white/85 text-gray-900 hover:bg-white"
+                          : "bg-gray-800 text-white hover:bg-gray-900"
+                      }`}
+                    >
+                      <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </>

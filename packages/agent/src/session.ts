@@ -128,9 +128,37 @@ export class CreatorAgentSession {
     });
 
     const allTools = createNovelTools(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale, locale, this.worldId, this.projectId, skills, this.skillCollection);
-    const tools = agentDef.tools[0] === "*"
+    let tools = agentDef.tools[0] === "*"
       ? allTools
       : allTools.filter(t => (agentDef.tools as string[]).includes(t.name));
+
+    // Tools that exist in createNovelTools but should NOT be exposed to the catch-all
+    // creator agent. Each is owned by a specialized agent:
+    //   - search_skills / propose_skills → skill-recommend agent (and onboarding flow)
+    //   - create_skill / update_skill / delete_skill → skill-extract agent (skill authoring)
+    // Specialized agents opt in via explicit tool whitelist, so this filter (which only
+    // applies to "*" agents) leaves them untouched.
+    const CREATOR_DENYLIST = new Set([
+      "search_skills",
+      "propose_skills",
+      "create_skill",
+      "update_skill",
+      "delete_skill",
+    ]);
+    if (agentDef.tools[0] === "*") {
+      tools = tools.filter(t => !CREATOR_DENYLIST.has(t.name));
+    }
+
+    // Always-on diagnostic dump: full system prompt + tool list. Useful for verifying
+    // what the model actually sees on each turn (skills section, memory, working env).
+    console.log("\n========== [Session.chat] agent=%s project=%s world=%s ==========", this.agentType, this.projectId, this.worldId);
+    console.log("[System Prompt] (%d chars):\n%s", systemPrompt.length, systemPrompt);
+    console.log("\n[Tools] %d:", tools.length);
+    for (const tool of tools) {
+      const desc = (tool.description ?? "").replace(/\s+/g, " ");
+      console.log("  - %s — %s", tool.name, desc.length > 160 ? desc.slice(0, 157) + "..." : desc);
+    }
+    console.log("========== [end Session.chat header] ==========\n");
 
     const abortController = new AbortController();
     this.abortController = abortController;

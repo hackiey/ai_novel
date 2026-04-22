@@ -438,6 +438,39 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
     },
 
     {
+      name: "propose_skills",
+      label: "Propose Skills",
+      description: d.propose_skills,
+      parameters: Type.Object({
+        skill_slugs: Type.Array(Type.String(), { minItems: 1, maxItems: 20, description: d.propose_skills_skill_slugs }),
+        reason: Type.String({ description: d.propose_skills_reason }),
+      }),
+      async execute(_toolCallId, args) {
+        const slugs = Array.from(new Set(args.skill_slugs)).slice(0, 20);
+        if (slugs.length === 0) {
+          return textResult({ reason: args.reason, skills: [] });
+        }
+        const docs = await db
+          .collection(skillCollection)
+          .find({ slug: { $in: slugs } })
+          .project({ embedding: 0, embeddingText: 0, embeddingUpdatedAt: 0, content: 0 })
+          .toArray();
+        const result = {
+          reason: args.reason,
+          skills: docs.map((doc) => ({
+            _id: doc._id.toHexString(),
+            slug: doc.slug,
+            name: doc.name,
+            description: doc.description,
+            tags: doc.tags ?? [],
+            isBuiltin: !!doc.isBuiltin,
+          })),
+        };
+        return textResult(result);
+      },
+    },
+
+    {
       name: "create_skill",
       label: "Create Skill",
       description: d.create_skill,

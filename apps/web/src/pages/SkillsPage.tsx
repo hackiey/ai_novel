@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { Sparkles, Search, Tag, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { trpc } from "../lib/trpc.js";
 import { useWriteTheme } from "../contexts/WriteThemeContext.js";
+import SkillSearchDialog from "../components/SkillSearchDialog.js";
 
 type FilterTab = "all" | "builtin" | "published";
 
@@ -20,6 +21,8 @@ export default function SkillsPage() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [tagsExpanded, setTagsExpanded] = useState(false);
   const [tagsOverflow, setTagsOverflow] = useState(false);
+  const [collapsedTagHeight, setCollapsedTagHeight] = useState(56);
+  const [showSearchDialog, setShowSearchDialog] = useState(false);
   const tagRowRef = useRef<HTMLDivElement>(null);
 
   // Apply tab + search filters (NOT tag) — used for both tag count basis and final list
@@ -69,7 +72,8 @@ export default function SkillsPage() {
     }
   }, [selectedTag, tagCounts]);
 
-  // Detect whether tag row overflows two lines (check after render and on resize)
+  // Detect whether tag row overflows two lines, and compute exact 2-row height from
+  // the actual chip dimensions so we don't bleed a third row's top edge.
   useEffect(() => {
     const el = tagRowRef.current;
     if (!el) {
@@ -77,13 +81,19 @@ export default function SkillsPage() {
       return;
     }
     const measure = () => {
-      // Temporarily remove cap to measure full height
+      const first = el.firstElementChild as HTMLElement | null;
+      if (!first) return;
+      const rowH = first.offsetHeight;
+      const cs = window.getComputedStyle(el);
+      const gap = parseFloat(cs.rowGap || cs.gap || "6") || 6;
+      const twoRows = Math.ceil(rowH * 2 + gap);
+      setCollapsedTagHeight(twoRows);
+
       const prevMaxHeight = el.style.maxHeight;
       el.style.maxHeight = "none";
       const fullHeight = el.scrollHeight;
       el.style.maxHeight = prevMaxHeight;
-      // Two-row threshold (line ≈ 22px + gap)
-      setTagsOverflow(fullHeight > 56);
+      setTagsOverflow(fullHeight > twoRows + 1);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -100,13 +110,29 @@ export default function SkillsPage() {
   return (
     <div className="px-4 sm:px-6 py-8 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-white/90 flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-teal-400" />
-          {t("skills.title")}
-        </h1>
-        <p className="text-sm text-white/40 mt-1">{t("skills.subtitle")}</p>
+      <div className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-white/90 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-teal-400" />
+            {t("skills.title")}
+          </h1>
+          <p className="text-sm text-white/40 mt-1">{t("skills.subtitle")}</p>
+        </div>
+        <button
+          onClick={() => setShowSearchDialog(true)}
+          className="shrink-0 mt-1 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/15 text-teal-300 hover:bg-teal-500/25 transition-colors"
+          title="基于描述向某个项目推荐 Skill"
+        >
+          <Search className="w-3.5 h-3.5" />
+          推荐到项目
+        </button>
       </div>
+
+      <SkillSearchDialog
+        open={showSearchDialog}
+        onClose={() => setShowSearchDialog(false)}
+      />
+
 
       {/* Search bar */}
       <div className={`${cardClass} rounded-xl px-4 py-2.5 flex items-center gap-3 mb-4`}>
@@ -143,7 +169,7 @@ export default function SkillsPage() {
           <div
             ref={tagRowRef}
             className="flex flex-wrap items-center gap-1.5 overflow-hidden"
-            style={{ maxHeight: tagsExpanded ? "none" : "56px" }}
+            style={{ maxHeight: tagsExpanded ? "none" : `${collapsedTagHeight}px` }}
           >
             <button
               onClick={() => setSelectedTag(null)}
@@ -207,10 +233,10 @@ export default function SkillsPage() {
               key={skill._id}
               to="/skills/$skillId"
               params={{ skillId: skill._id }}
-              className="flex items-center gap-4 px-5 py-3.5 hover:bg-white/5 transition-colors group"
+              className="flex items-start gap-4 px-5 py-3.5 hover:bg-white/5 transition-colors group"
             >
               {/* Index */}
-              <span className="text-xs text-white/20 w-6 text-right shrink-0 tabular-nums">
+              <span className="text-xs text-white/20 w-6 text-right shrink-0 tabular-nums mt-1">
                 {index + 1}
               </span>
 
@@ -231,13 +257,13 @@ export default function SkillsPage() {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-white/35 truncate">
+                <p className="text-xs text-white/35 whitespace-pre-wrap leading-snug">
                   {skill.description}
                 </p>
               </div>
 
               {/* Tags */}
-              <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+              <div className="hidden sm:flex items-center gap-1.5 shrink-0 mt-1">
                 {(skill.tags ?? []).slice(0, 3).map((tag: string) => (
                   <span
                     key={tag}
@@ -250,7 +276,7 @@ export default function SkillsPage() {
               </div>
 
               {/* Arrow */}
-              <ChevronRight className="w-4 h-4 text-white/15 group-hover:text-white/40 shrink-0 transition-colors" />
+              <ChevronRight className="w-4 h-4 text-white/15 group-hover:text-white/40 shrink-0 transition-colors mt-1" />
             </Link>
           ))}
         </div>
