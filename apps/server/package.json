@@ -8,8 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "extract-skills": "tsx src/scripts/extractSkills.ts",
-    "export-skill": "tsx src/scripts/exportBuiltinSkill.ts",
-    "migrate-enabled-skills": "tsx src/scripts/migrate-enabled-skill-slugs.ts"
+    "export-skill": "tsx src/scripts/exportBuiltinSkill.ts"
   },
   "dependencies": {
     "@ai-creator/agent": "workspace:*",
