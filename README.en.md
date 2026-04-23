@@ -20,7 +20,7 @@
 
 ---
 
-> **AI Creator** is not just another "AI chat + editor." It ships with a purpose-built AI writing partner that manages your characters and settings, intelligently continues chapters, searches your creative knowledge base, and remembers your preferences. Bundled with **391+ built-in writing Skills** (opening hooks, villain design, payoff timing, pacing control, and more) that the AI invokes on demand — more reliable than intuition alone. Like an experienced co-editor, not a generic chatbot.
+> **AI Creator** ships with an AI writing partner that actually understands your story: it queries your settings library and prior chapters on demand, **defeating the LLM's amnesia and inconsistency at the root** — characters, foreshadowing, and worldbuilding stay coherent even hundreds of thousands of words in. Backed by **391+ built-in writing Skills** (opening hooks, villain design, payoff timing, and more) invoked on demand — like an experienced co-editor, not a generic chatbot.
 
 ---
 
