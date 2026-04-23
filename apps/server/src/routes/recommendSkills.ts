@@ -69,7 +69,7 @@ export function registerRecommendSkillsRoutes(fastify: FastifyInstance) {
     // Fetch project to validate ownership and read currently enabled skills
     const projectDoc = await db.collection("projects").findOne(
       { _id: new ObjectId(projectId), userId: user.userId },
-      { projection: { enabledSkillSlugs: 1, enabledSkillIds: 1, skillsRecommendEnabled: 1 } },
+      { projection: { enabledSkillSlugs: 1 } },
     );
     if (!projectDoc) return reply.status(404).send({ error: "Project not found" });
 
@@ -123,7 +123,7 @@ export function registerRecommendSkillsRoutes(fastify: FastifyInstance) {
     }
 
     // Build the synthetic user prompt: either recent transcript or a one-off query
-    const enabledSlugs: string[] = (await resolveEnabledSkillSlugs(db, projectDoc)) ?? [];
+    const enabledSlugs: string[] = resolveEnabledSkillSlugs(projectDoc);
 
     const enabledLine = locale === "zh"
       ? `已启用 Skill（不要再推荐这些 slug）：${enabledSlugs.length ? enabledSlugs.join(", ") : "（无）"}`

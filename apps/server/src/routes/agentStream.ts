@@ -278,45 +278,39 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       console.error("[WorkingEnvironment] Failed to build:", err);
     }
 
-    // Resolve enabled skill slugs: project takes precedence over world; both undefined = all enabled.
-    let allowedSlugs: string[] | undefined;
+    // Resolve enabled skill slugs. Project scope wins when present; otherwise fall back
+    // to world scope. The main agent never proposes new skills — that's the recommend
+    // agent's job — so an empty list yields zero loaded skills.
+    let allowedSlugs: string[] = [];
     if (projectId) {
       const projectDoc = await db.collection("projects").findOne(
         { _id: new ObjectId(projectId) },
-        { projection: { enabledSkillSlugs: 1, enabledSkillIds: 1 } },
+        { projection: { enabledSkillSlugs: 1 } },
       );
-      allowedSlugs = await resolveEnabledSkillSlugs(db, projectDoc);
-    }
-    if (allowedSlugs === undefined && worldId) {
+      allowedSlugs = resolveEnabledSkillSlugs(projectDoc);
+    } else if (worldId) {
       const worldDoc = await db.collection("worlds").findOne(
         { _id: new ObjectId(worldId) },
-        { projection: { enabledSkillSlugs: 1, enabledSkillIds: 1 } },
+        { projection: { enabledSkillSlugs: 1 } },
       );
-      allowedSlugs = await resolveEnabledSkillSlugs(db, worldDoc);
+      allowedSlugs = resolveEnabledSkillSlugs(worldDoc);
     }
 
-    // Load available skills. New projects start with `enabledSkillSlugs: []` which yields
-    // an empty result here; legacy projects without the field get the full set. Either
-    // way the main agent never proposes new skills — that's the recommend agent's job.
-    const baseSkillFilter: Record<string, any> = {
-      $or: [
-        { isBuiltin: true },
-        { isPublished: true },
-        { authorId: user.userId },
-      ],
-    };
-    let skillFilter: Record<string, any> = baseSkillFilter;
-    if (allowedSlugs !== undefined) {
-      skillFilter = { ...baseSkillFilter, slug: { $in: allowedSlugs } };
-    }
-    const skillDocs = allowedSlugs !== undefined && allowedSlugs.length === 0
+    const skillDocs = allowedSlugs.length === 0
       ? []
-      : await db.collection("skills").find(skillFilter).toArray();
+      : await db.collection("skills").find({
+          slug: { $in: allowedSlugs },
+          $or: [
+            { isBuiltin: true },
+            { isPublished: true },
+            { authorId: user.userId },
+          ],
+        }).toArray();
 
     console.log(
-      "[agentStream] skills loaded: %d (allowedSlugs=%s, projectId=%s)",
+      "[agentStream] skills loaded: %d (allowed=%d, projectId=%s)",
       skillDocs.length,
-      allowedSlugs === undefined ? "undefined(legacy/all)" : `[${allowedSlugs.length}]`,
+      allowedSlugs.length,
       projectId,
     );
     if (skillDocs.length > 0 && skillDocs.length <= 20) {

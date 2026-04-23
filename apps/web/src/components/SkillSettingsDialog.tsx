@@ -43,21 +43,16 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
   const project = projectQuery.data as any;
   const world = worldQuery.data as any;
 
-  // The server normalizes legacy `enabledSkillIds` (ObjectId[]) into
-  // `enabledSkillSlugs` (string[]) on read, so the frontend only ever deals with slugs.
-  const projectEnabledSlugs: string[] | undefined = project?.enabledSkillSlugs;
-  const worldEnabledSlugs: string[] | undefined = world?.enabledSkillSlugs;
+  const projectEnabledSlugs: string[] = project?.enabledSkillSlugs ?? [];
+  const worldEnabledSlugs: string[] = world?.enabledSkillSlugs ?? [];
 
   // Sync local state from server data when scope changes / dialog opens.
-  // Legacy data has enabledSkillSlugs=undefined (server treats it as "all enabled" for
-  // backward compat). The dialog shows that as an empty selection — the user must
-  // explicitly pick what they want; saving an empty list disables all skills.
   useEffect(() => {
     if (!open) return;
     const sourceSlugs = scope === "project" ? projectEnabledSlugs : worldEnabledSlugs;
-    setSelected(new Set(sourceSlugs ?? []));
+    setSelected(new Set(sourceSlugs));
     setSaveStatus("");
-  }, [open, scope, project?._id, world?._id, projectEnabledSlugs?.join(","), worldEnabledSlugs?.join(",")]);
+  }, [open, scope, project?._id, world?._id, projectEnabledSlugs.join(","), worldEnabledSlugs.join(",")]);
 
   // Click outside / Escape. Suspended while the nested SkillSearchDialog is open —
   // otherwise clicking inside that child dialog (which lives in a separate portal,
@@ -106,11 +101,12 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
     });
   }, [filteredSkills, savedEnabledSet]);
 
-  // Determine which scope is currently active (for display)
-  const activeScope: "project" | "world" | "default" =
-    projectEnabledSlugs !== undefined ? "project" :
-    worldEnabledSlugs !== undefined ? "world" :
-    "default";
+  // For a project chat, project's slugs are authoritative even when empty;
+  // world is only consulted when no project is in scope.
+  const activeScope: "project" | "world" | "empty" =
+    projectId ? (projectEnabledSlugs.length > 0 ? "project" : "empty")
+    : worldEnabledSlugs.length > 0 ? "world"
+    : "empty";
 
   function toggle(slug: string) {
     const next = new Set(selected);
@@ -151,7 +147,7 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
   const sourceLabel =
     activeScope === "project" ? "项目级覆盖" :
     activeScope === "world" ? "世界级配置" :
-    "默认（未自定义，加载全部）";
+    "未启用任何 Skill";
 
   return createPortal(
     <>
@@ -207,8 +203,8 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
                   >
                     {scopeLabel(s)}
                     {!disabled && (
-                      (s === "project" && projectEnabledSlugs !== undefined) ||
-                      (s === "world" && worldEnabledSlugs !== undefined)
+                      (s === "project" && projectEnabledSlugs.length > 0) ||
+                      (s === "world" && worldEnabledSlugs.length > 0)
                         ? <span className="ml-1.5 text-[10px] opacity-70">●</span>
                         : null
                     )}
@@ -219,7 +215,7 @@ export default function SkillSettingsDialog({ open, onClose, projectId, worldId 
             <div className="flex items-center justify-between gap-3">
               <p className="text-[10px] text-white/35">
                 当前生效：<span className="text-white/55">{sourceLabel}</span>
-                {activeScope !== "default" && <span className="ml-1">· 项目级优先于世界级</span>}
+                {projectId && <span className="ml-1">· 项目级优先于世界级</span>}
               </p>
               {scope === "project" && projectId && (
                 <label className="flex items-center gap-2 cursor-pointer text-xs text-white/70 shrink-0">

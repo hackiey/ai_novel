@@ -1,44 +1,18 @@
-import { ObjectId, type Db } from "mongodb";
-
 /**
- * Resolve a project/world's enabled skills as a slug array.
+ * Resolve a project/world's enabled skill slugs.
  *
- * Handles three states + legacy migration:
- * - `enabledSkillSlugs: string[]` → returned as-is (post-migration shape)
- * - `enabledSkillIds: ObjectId[]` (legacy) → translated to slugs via the skills collection
- * - neither field present → returns `undefined` (caller should treat as "all enabled")
- *
- * Returns `[]` (empty array, NOT undefined) when the field is set but empty —
- * this distinguishes "user explicitly disabled everything" from "legacy default".
+ * Always returns a string array. Missing field defaults to `[]` — callers
+ * should treat that as "no skills enabled at this scope". Persisted documents
+ * are guaranteed to carry `enabledSkillSlugs` after the one-time migration
+ * (see scripts/migrate-enabled-skill-slugs.ts); the `[]` fallback only guards
+ * against rows inserted by code paths that forget the default.
  */
-export async function resolveEnabledSkillSlugs(
-  db: Db,
+export function resolveEnabledSkillSlugs(
   doc: Record<string, unknown> | null | undefined,
-): Promise<string[] | undefined> {
-  if (!doc) return undefined;
-
+): string[] {
+  if (!doc) return [];
   if (Array.isArray(doc.enabledSkillSlugs)) {
     return doc.enabledSkillSlugs as string[];
   }
-
-  if (Array.isArray(doc.enabledSkillIds)) {
-    const ids = doc.enabledSkillIds as unknown[];
-    if (ids.length === 0) return [];
-    const oids = ids
-      .map((id): ObjectId | null => {
-        if (id instanceof ObjectId) return id;
-        if (typeof id === "string" && /^[a-f0-9]{24}$/i.test(id)) return new ObjectId(id);
-        return null;
-      })
-      .filter((x): x is ObjectId => x !== null);
-    if (oids.length === 0) return [];
-    const skillDocs = await db
-      .collection("skills")
-      .find({ _id: { $in: oids } })
-      .project({ slug: 1 })
-      .toArray();
-    return skillDocs.map((d) => d.slug as string);
-  }
-
-  return undefined;
+  return [];
 }
