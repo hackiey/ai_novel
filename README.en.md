@@ -38,6 +38,7 @@ At the heart of AI Creator is an AI Agent with a rich set of specialized tools. 
 | **Dual-Layer Memory** | World-level (shared across novels) + project-level (single novel) memory, automatically injected into context |
 | **Chapter Synopsis** | Auto-generates summaries after chapter changes, referencing up to 50K words of preceding content for continuity |
 | **File Import** | Upload txt / md / docx / pdf; AI chunks and extracts characters, locations, factions into structured data |
+| **Skill Invocation** | 391+ built-in writing methodologies (opening hooks, villain design, payoff timing, etc.); when a task matches, the AI auto-invokes one to get the full playbook before answering |
 | **Context Compaction** | Auto-compresses history when context grows long, preserving last 2 turns + AI-generated high-quality summary |
 | **Usage Transparency** | Real-time token usage and cost per turn, broken down by input / output / cache |
 
