@@ -119,7 +119,8 @@ Don't want to self-host? Try the public instance I maintain:
 
 ### Requirements
 
-- Node.js >= 20, pnpm >= 9, MongoDB
+- Node.js >= 20, pnpm >= 9
+- MongoDB (Atlas edition required if you want **Semantic Search** — see the [Semantic Search](#-semantic-search) section below)
 
 ### Install & Run
 
@@ -143,12 +144,43 @@ Configure in `apps/server/.env`:
 
 | Variable | Description |
 |----------|-------------|
-| `MONGODB_URI` | MongoDB connection string (required) |
+| `MONGODB_URI` | MongoDB connection string (required — Atlas edition needed to enable semantic search) |
 | `JWT_SECRET` | JWT signing secret (required) |
 | `LLM_API_KEY` | Generic API key, or `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY` (at least one required) |
 | `AVAILABLE_MODELS` | Allowed models, format `provider:modelId`, comma-separated |
 | `DEFAULT_MODEL` | Default model, format `provider:modelId` |
 | `EMBEDDING_*` | Embedding service config (optional, enables semantic search) |
+
+---
+
+## 🔍 Semantic Search
+
+Keyword search only matches literal text — it misses content that uses synonyms, paraphrases the same idea, or refers to something by a different name. Semantic search uses vector matching so the AI can recall relevant content **by meaning, not by literal text** when continuing the story, looking up settings, or drafting new chapters. It's the key capability behind long-form consistency.
+
+### Benefits
+
+- **Cross-collection recall** — one query covers characters, world settings, drafts, and chapter content
+- **Handles paraphrase** — "the black-robed mage" and "a sorcerer in dark robes" get linked
+- **Fights LLM amnesia** — the agent proactively retrieves related lore and history before writing, avoiding contradictions in characters, settings, and foreshadowing
+- **Graceful degradation** — falls back to regex matching when not configured. Nothing breaks, but recall quality is limited.
+
+### Requirements
+
+1. **MongoDB must be the Atlas edition** (provides `$vectorSearch`). Vanilla community MongoDB does not work. Pick one:
+   - **Official Docker image** (free, runs locally): [`mongodb/mongodb-atlas-local`](https://hub.docker.com/r/mongodb/mongodb-atlas-local)
+     ```bash
+     docker run -d --name mongo-atlas -p 27017:27017 mongodb/mongodb-atlas-local
+     # Connection string: mongodb://localhost:27017/?directConnection=true
+     ```
+   - **MongoDB Atlas cloud**: use the connection string from [Atlas](https://www.mongodb.com/atlas).
+2. **Configure an embedding service** (any OpenAI-compatible embeddings endpoint works):
+   ```env
+   EMBEDDING_API_KEY=sk-...
+   EMBEDDING_BASE_URL=https://api.openai.com/v1
+   EMBEDDING_MODEL=text-embedding-3-small
+   EMBEDDING_DIMENSIONS=1536
+   ```
+   The server auto-generates and updates vectors on document create/update (3s debounce + change detection).
 
 ---
 

@@ -119,7 +119,8 @@ Skill 是一段经过打磨的 prompt 模板，把"如何写好开篇钩子""如
 
 ### 环境要求
 
-- Node.js >= 20、pnpm >= 9、MongoDB
+- Node.js >= 20、pnpm >= 9
+- MongoDB（如需启用「语义检索」请使用 Atlas 版本，详见下方[语义检索](#-语义检索)章节）
 
 ### 安装与运行
 
@@ -143,12 +144,43 @@ pnpm --filter @ai-creator/mobile dev
 
 | 变量 | 说明 |
 |------|------|
-| `MONGODB_URI` | MongoDB 连接字符串（必填） |
+| `MONGODB_URI` | MongoDB 连接字符串（必填，启用语义检索需 Atlas 版本） |
 | `JWT_SECRET` | JWT 签名密钥（必填） |
 | `LLM_API_KEY` | 通用 API Key，或 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY`（至少填一个） |
 | `AVAILABLE_MODELS` | 可选模型列表，格式 `provider:modelId`，逗号分隔 |
 | `DEFAULT_MODEL` | 默认模型，格式 `provider:modelId` |
 | `EMBEDDING_*` | Embedding 服务配置（可选，启用语义搜索） |
+
+---
+
+## 🔍 语义检索
+
+关键字检索只能匹配字面，遇到换了个说法、用了同义词、或叫法不一致的内容就会漏召回。语义检索通过向量匹配，让 AI 在续写、查设定、写新章节时**按语义而不是字面**召回相关内容，是保证长篇前后一致的关键能力。
+
+### 好处
+
+- **跨表全库召回** —— 一次查询同时覆盖角色、世界观设定、草稿、章节内容
+- **理解同义改写** —— "黑袍法师"和"穿着深色长袍的术士"能被关联起来
+- **对抗 LLM 失忆** —— AI Agent 在创作前主动检索相关设定与历史，避免人物 / 设定 / 伏笔前后矛盾
+- **优雅降级** —— 未配置时自动回退到正则匹配，功能不会崩，但召回质量有限
+
+### 启用要求
+
+1. **MongoDB 必须使用 Atlas 版本**（提供 `$vectorSearch`），普通社区版不支持。两种方式任选：
+   - **官方 Docker 镜像**（本地零成本）：[`mongodb/mongodb-atlas-local`](https://hub.docker.com/r/mongodb/mongodb-atlas-local)
+     ```bash
+     docker run -d --name mongo-atlas -p 27017:27017 mongodb/mongodb-atlas-local
+     # 连接串：mongodb://localhost:27017/?directConnection=true
+     ```
+   - **MongoDB Atlas 云服务**：直接使用官方 [Atlas](https://www.mongodb.com/atlas) 提供的连接串
+2. **配置 Embedding 服务**（任意 OpenAI 兼容的向量化接口均可）：
+   ```env
+   EMBEDDING_API_KEY=sk-...
+   EMBEDDING_BASE_URL=https://api.openai.com/v1
+   EMBEDDING_MODEL=text-embedding-3-small
+   EMBEDDING_DIMENSIONS=1536
+   ```
+   服务端会自动在文档增改时生成 / 更新向量（带 3s 防抖与差异检测）。
 
 ---
 
