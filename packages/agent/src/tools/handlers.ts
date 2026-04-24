@@ -1,5 +1,6 @@
 import { Db, ObjectId } from "mongodb";
 import { computeChapterSynopsisSourceHash } from "../chapterSynopsis.js";
+import { draftScopeFilter } from "../draftScope.js";
 
 // Helper to convert string ID to ObjectId safely
 function toObjectId(id: string): ObjectId {
@@ -110,21 +111,11 @@ export async function semanticSearch(
   }
 
   if (scope.includes("draft")) {
-    const draftFilter: Record<string, any> = {};
-    if (args.projectId && args.worldId) {
-      draftFilter.$or = [
-        { projectId: { $in: [args.projectId, new ObjectId(args.projectId)] } },
-        { worldId: { $in: [args.worldId, new ObjectId(args.worldId)] } },
-      ];
-    } else if (args.projectId) {
-      draftFilter.projectId = { $in: [args.projectId, new ObjectId(args.projectId)] };
-    } else if (args.worldId) {
-      draftFilter.worldId = { $in: [args.worldId, new ObjectId(args.worldId)] };
-    }
-    const textMatch = { $or: [{ title: regex }, { content: regex }, { tags: regex }] };
-    const draftQuery = draftFilter.$or
-      ? { $and: [draftFilter, textMatch] }
-      : { ...draftFilter, ...textMatch };
+    const draftFilter = draftScopeFilter({ projectId: args.projectId, worldId: args.worldId });
+    const draftQuery = {
+      ...draftFilter,
+      $or: [{ title: regex }, { content: regex }, { tags: regex }],
+    };
     const drafts = await db
       .collection("drafts")
       .find(draftQuery)
@@ -613,11 +604,12 @@ export async function createDraft(
     tags: args.tags ?? [],
     linkedCharacters: (args.linkedCharacters ?? []).map((id) => new ObjectId(id)),
     linkedWorldSettings: (args.linkedWorldSettings ?? []).map((id) => new ObjectId(id)),
+    // Explicit null for world-level so Atlas Vector Search filter ($in with null) works.
+    projectId: args.projectId ? new ObjectId(args.projectId) : null,
     createdAt: now,
     updatedAt: now,
   };
   if (userId) doc.userId = userId;
-  if (args.projectId) doc.projectId = new ObjectId(args.projectId);
   if (args.worldId) doc.worldId = new ObjectId(args.worldId);
   const result = await db.collection("drafts").insertOne(doc);
   return serialize({ ...doc, _id: result.insertedId });

@@ -18,25 +18,38 @@ interface Props {
   searchResultIds?: Set<string>;
 }
 
+type ScopeFilter = "all" | "world" | string;
+
 export default function DraftsTab({ worldId, searchResultIds }: Props) {
   const { t } = useTranslation();
   const { colors, baseStyles: base } = useTheme();
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [newScopeChoice, setNewScopeChoice] = useState<"world" | string>("world");
+  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("all");
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
 
-  const query = trpc.draft.list.useQuery({ worldId });
+  const projectsQuery = trpc.project.listByWorld.useQuery({ worldId });
+  const projects = (projectsQuery.data ?? []) as Array<{ _id: string; name: string }>;
+  const projectNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of projects) map.set(p._id, p.name);
+    return map;
+  }, [projects]);
+
+  const query = trpc.draft.list.useQuery({ worldId, includeAllProjectsUnderWorld: true });
   const createMut = trpc.draft.create.useMutation({
     onSuccess: () => {
       query.refetch();
       setShowForm(false);
       setTitle("");
       setContent("");
+      setNewScopeChoice("world");
     },
   });
   const updateMut = trpc.draft.update.useMutation({
@@ -50,10 +63,54 @@ export default function DraftsTab({ worldId, searchResultIds }: Props) {
   });
 
   const allDrafts = (query.data ?? []) as any[];
+  const filteredByScope = useMemo(() => {
+    if (scopeFilter === "all") return allDrafts;
+    if (scopeFilter === "world") return allDrafts.filter((d: any) => !d.projectId);
+    return allDrafts.filter((d: any) => d.projectId && String(d.projectId) === scopeFilter);
+  }, [allDrafts, scopeFilter]);
   const drafts = useMemo(() => {
-    if (!searchResultIds) return allDrafts;
-    return allDrafts.filter((d: any) => searchResultIds.has(d._id));
-  }, [allDrafts, searchResultIds]);
+    if (!searchResultIds) return filteredByScope;
+    return filteredByScope.filter((d: any) => searchResultIds.has(d._id));
+  }, [filteredByScope, searchResultIds]);
+
+  // Cycle filter: all -> world -> each project -> all
+  const cycleFilter = useCallback(() => {
+    setScopeFilter((current) => {
+      if (current === "all") return "world";
+      if (current === "world") {
+        if (projects.length === 0) return "all";
+        return projects[0]._id;
+      }
+      const idx = projects.findIndex((p) => p._id === current);
+      if (idx === -1 || idx === projects.length - 1) return "all";
+      return projects[idx + 1]._id;
+    });
+  }, [projects]);
+
+  const cycleNewScopeChoice = useCallback(() => {
+    setNewScopeChoice((current) => {
+      if (current === "world") {
+        if (projects.length === 0) return "world";
+        return projects[0]._id;
+      }
+      const idx = projects.findIndex((p) => p._id === current);
+      if (idx === -1 || idx === projects.length - 1) return "world";
+      return projects[idx + 1]._id;
+    });
+  }, [projects]);
+
+  const filterLabel = useMemo(() => {
+    if (scopeFilter === "all") return t("draft.scopeFilterAll");
+    if (scopeFilter === "world") return t("draft.scopeFilterWorld");
+    return projectNameById.get(scopeFilter) ?? scopeFilter;
+  }, [scopeFilter, projectNameById, t]);
+
+  const newScopeLabel = useMemo(() => {
+    if (newScopeChoice === "world") return t("draft.scopePickerWorld");
+    return t("draft.scopePickerProject", {
+      name: projectNameById.get(newScopeChoice) ?? newScopeChoice,
+    });
+  }, [newScopeChoice, projectNameById, t]);
 
   const openEditMode = useCallback((draft: any) => {
     setExpandedId(draft._id);
@@ -82,6 +139,14 @@ export default function DraftsTab({ worldId, searchResultIds }: Props) {
 
   return (
     <View>
+      {!searchResultIds && (
+        <TouchableOpacity onPress={cycleFilter} style={s.filterChip}>
+          <Text style={s.filterChipText}>
+            {t("draft.scope")}: {filterLabel}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity
         onPress={() => setShowForm(true)}
         style={s.addBtn}
@@ -94,6 +159,11 @@ export default function DraftsTab({ worldId, searchResultIds }: Props) {
           <Text style={[s.formTitle, base.mb3]}>
             {t("draft.newDraft")}
           </Text>
+          <TouchableOpacity onPress={cycleNewScopeChoice} style={s.scopePickerBtn}>
+            <Text style={s.scopePickerLabel}>{t("draft.scopePickerLabel")}</Text>
+            <Text style={s.scopePickerValue}>{newScopeLabel}</Text>
+          </TouchableOpacity>
+          <Text style={s.scopeHint}>{t("draft.scopeHint")}</Text>
           <TextInput
             value={title}
             onChangeText={setTitle}
@@ -115,6 +185,7 @@ export default function DraftsTab({ worldId, searchResultIds }: Props) {
                 setShowForm(false);
                 setTitle("");
                 setContent("");
+                setNewScopeChoice("world");
               }}
               style={[base.btnOutline, base.flex1]}
             >
@@ -125,8 +196,11 @@ export default function DraftsTab({ worldId, searchResultIds }: Props) {
             <TouchableOpacity
               onPress={() => {
                 if (!title.trim()) return;
+                const isProject = newScopeChoice !== "world";
                 createMut.mutate({
                   worldId,
+                  ...(isProject ? { projectId: newScopeChoice } : {}),
+                  scope: isProject ? ("project" as const) : ("world" as const),
                   title: title.trim(),
                   content: content.trim() || undefined,
                 });
@@ -171,9 +245,27 @@ export default function DraftsTab({ worldId, searchResultIds }: Props) {
                 onLongPress={() => handleDelete(draft)}
                 style={base.p4}
               >
-                <Text style={s.draftTitle}>
-                  {draft.title}
-                </Text>
+                <View style={s.titleRow}>
+                  <Text style={s.draftTitle}>{draft.title}</Text>
+                  <View
+                    style={[
+                      s.scopeBadge,
+                      draft.projectId ? s.scopeBadgeProject : s.scopeBadgeWorld,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        s.scopeBadgeText,
+                        draft.projectId ? s.scopeBadgeProjectText : s.scopeBadgeWorldText,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {draft.projectId
+                        ? projectNameById.get(String(draft.projectId)) ?? t("draft.scopeProject")
+                        : t("draft.scopeWorld")}
+                    </Text>
+                  </View>
+                </View>
                 {!isExpanded && draft.content ? (
                   <Text
                     style={[base.textXs, base.mt1, { color: colors.muted }]}
@@ -349,6 +441,71 @@ function createStyles(colors: any) {
       color: colors.teal,
       fontSize: 11,
       fontWeight: "500",
+    },
+    filterChip: {
+      alignSelf: "flex-start",
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 999,
+      paddingVertical: 4,
+      paddingHorizontal: 10,
+      marginBottom: 8,
+    },
+    filterChipText: {
+      color: colors.muted,
+      fontSize: 12,
+    },
+    scopePickerBtn: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      marginBottom: 4,
+    },
+    scopePickerLabel: {
+      fontSize: 11,
+      color: colors.muted,
+      marginBottom: 2,
+    },
+    scopePickerValue: {
+      fontSize: 13,
+      color: colors.text,
+    },
+    scopeHint: {
+      fontSize: 11,
+      color: colors.muted,
+      marginBottom: 12,
+    },
+    titleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    scopeBadge: {
+      borderWidth: 1,
+      borderRadius: 6,
+      paddingVertical: 2,
+      paddingHorizontal: 6,
+      maxWidth: 140,
+    },
+    scopeBadgeWorld: {
+      borderColor: "rgba(56,189,248,0.4)",
+      backgroundColor: "rgba(56,189,248,0.1)",
+    },
+    scopeBadgeProject: {
+      borderColor: "rgba(251,191,36,0.4)",
+      backgroundColor: "rgba(251,191,36,0.1)",
+    },
+    scopeBadgeText: {
+      fontSize: 10,
+      fontWeight: "500",
+    },
+    scopeBadgeWorldText: {
+      color: "rgb(125,211,252)",
+    },
+    scopeBadgeProjectText: {
+      color: "rgb(252,211,77)",
     },
   });
 }

@@ -172,12 +172,13 @@ const zh = {
     update_chapter_prepend: "设为 true 时，将 new_string 插入到字段开头，无需 old_string",
 
 
-    create_draft: "创建草稿，用于保存创作过程中的想法、灵感、决策等。projectId 和 worldId 已自动注入。",
+    create_draft: "创建草稿，用于保存创作过程中的想法、灵感、决策等。projectId 和 worldId 已自动注入；通过 scope 参数选择草稿归属（默认 world）。",
     create_draft_title: "草稿标题",
     create_draft_content: "草稿内容",
     create_draft_tags: "标签",
     create_draft_linkedCharacters: "关联角色ID列表",
     create_draft_linkedWorldSettings: "关联世界观设定ID列表",
+    create_draft_scope: "草稿归属范围（默认 world）。所有草稿都会自动绑定当前 world。scope=world 时不写 projectId，对该世界下的所有小说可见，适合写设定补充、世界观背景等共享信息；scope=project 时同时写入当前 projectId，仅当前小说可见，适合写本小说独有的伏笔、剧情转折、人物弧光等不希望污染同世界其他小说的内容。",
 
     update_draft: "更新草稿内容、标题、标签或关联信息。",
     update_draft_id: "草稿ID",
@@ -503,12 +504,13 @@ const en: typeof zh = {
     update_chapter_prepend: "Set to true to prepend new_string to the start of the field. No old_string needed.",
 
 
-    create_draft: "Create a draft to save ideas, inspirations, and decisions during the creative process. projectId and worldId are auto-injected.",
+    create_draft: "Create a draft to save ideas, inspirations, and decisions during the creative process. projectId and worldId are auto-injected; the optional scope parameter chooses ownership (defaults to world).",
     create_draft_title: "Draft title",
     create_draft_content: "Draft content",
     create_draft_tags: "Tags",
     create_draft_linkedCharacters: "Linked character ID list",
     create_draft_linkedWorldSettings: "Linked world setting ID list",
+    create_draft_scope: "Draft ownership scope (defaults to world). Every draft is bound to the current world automatically. scope=world stores no projectId and is visible to every novel under this world — use for shared lore, background, or settings that apply to all stories. scope=project also writes the current projectId so the draft is visible only to the current novel — use for plot beats, foreshadowing, or character arcs that should not bleed into sibling novels in the same world.",
 
     update_draft: "Update draft content, title, tags, or linked items.",
     update_draft_id: "Draft ID",

@@ -1,6 +1,7 @@
 import { Db, ObjectId } from "mongodb";
 import { EmbeddingService } from "@ai-creator/core";
 import type { EmbeddingConfig } from "@ai-creator/core";
+import { draftScopeFilter } from "@ai-creator/agent";
 
 /** Supported collections for embedding */
 const EMBEDDABLE_COLLECTIONS = [
@@ -353,7 +354,7 @@ export class ServerEmbeddingService {
     const searches = collections.map(async (collName) => {
       try {
         // characters/world_settings belong to worldId; chapters belong to projectId;
-        // drafts can have either; skills are global (no filter)
+        // drafts honor scope isolation; skills are global (no filter)
         const filter: Record<string, any> = {};
         if (collName === "characters" || collName === "world_settings") {
           if (ids.worldId) filter.worldId = new ObjectId(ids.worldId);
@@ -362,9 +363,12 @@ export class ServerEmbeddingService {
         } else if (collName === "skills" || collName === "skill_drafts") {
           // Skills and skill_drafts are global — no worldId/projectId filter
         } else {
-          // drafts: prefer worldId, fall back to projectId
-          if (ids.worldId) filter.worldId = new ObjectId(ids.worldId);
-          else if (ids.projectId) filter.projectId = ids.projectId;
+          // drafts: scope-isolated visibility. Filter at the index level so the
+          // candidate pool isn't diluted by sibling-project drafts.
+          // Requires the Atlas vector index to include `projectId` as a filter
+          // field, and every draft to store an explicit projectId (null for
+          // world-level) — see drafts.backfillProjectIdNull script.
+          Object.assign(filter, draftScopeFilter(ids));
         }
 
         const col = this.db.collection(collName);

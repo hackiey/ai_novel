@@ -216,9 +216,13 @@ export const draftSchema = z.object({
   ...timestampsSchema.shape,
 });
 
+export const draftScopeSchema = z.enum(["world", "project"]);
+export type DraftScope = z.infer<typeof draftScopeSchema>;
+
 export const createDraftSchema = z.object({
   projectId: objectIdSchema.optional(),
   worldId: objectIdSchema.optional(),
+  scope: draftScopeSchema.optional(),
   title: z.string().min(1).max(200),
   content: z.string().max(50000).optional(),
   tags: z.array(z.string().max(100)).optional(),
@@ -226,7 +230,7 @@ export const createDraftSchema = z.object({
   linkedWorldSettings: z.array(objectIdSchema).optional(),
 });
 
-export const updateDraftSchema = createDraftSchema.omit({ projectId: true }).partial();
+export const updateDraftSchema = createDraftSchema.omit({ projectId: true, scope: true }).partial();
 
 export type Draft = z.infer<typeof draftSchema>;
 export type CreateDraft = z.infer<typeof createDraftSchema>;

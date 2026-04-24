@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ObjectId, Filter } from "mongodb";
 import { createDraftSchema, updateDraftSchema, objectIdSchema } from "@ai-creator/types";
+import { draftScopeFilter } from "@ai-creator/agent";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 
@@ -15,11 +16,28 @@ export const draftRouter = router({
     .input(z.object({
       projectId: objectIdSchema.optional(),
       worldId: objectIdSchema.optional(),
+      // When true, return every draft under this world (world-level + every
+      // project's drafts) — for the World page's DraftsTab. Otherwise apply
+      // the chat-isolation view (world-level + current project only).
+      includeAllProjectsUnderWorld: z.boolean().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const filter: Filter<any> = { userId: userIdFilter(ctx.user.userId) };
-      if (input.projectId) filter.projectId = { $in: [input.projectId, new ObjectId(input.projectId)] };
-      if (input.worldId) filter.worldId = { $in: [input.worldId, new ObjectId(input.worldId)] };
+      const userFilter = { userId: userIdFilter(ctx.user.userId) };
+
+      let filter: Filter<any>;
+      if (input.includeAllProjectsUnderWorld && input.worldId) {
+        // Every draft (world-level + project-level) under this world.
+        filter = {
+          ...userFilter,
+          worldId: { $in: [input.worldId, new ObjectId(input.worldId)] },
+        };
+      } else {
+        filter = {
+          ...userFilter,
+          ...draftScopeFilter({ projectId: input.projectId, worldId: input.worldId }),
+        };
+      }
+
       const docs = await ctx.db
         .collection("drafts")
         .find(filter)
@@ -41,6 +59,30 @@ export const draftRouter = router({
     .input(createDraftSchema)
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
+      // Resolve worldId: every draft must carry it. If only projectId is given,
+      // derive worldId from the project.
+      let worldIdHex = input.worldId;
+      if (!worldIdHex && input.projectId) {
+        const project = await ctx.db.collection("projects").findOne(
+          { _id: new ObjectId(input.projectId), userId: userIdFilter(ctx.user.userId) },
+          { projection: { worldId: 1 } } as any,
+        );
+        if (!project) {
+          throw new Error(`Project not found: ${input.projectId}`);
+        }
+        if (!project.worldId) {
+          throw new Error(`Project ${input.projectId} has no worldId — cannot create a draft under it.`);
+        }
+        worldIdHex = project.worldId instanceof ObjectId ? project.worldId.toHexString() : String(project.worldId);
+      }
+      if (!worldIdHex) {
+        throw new Error("worldId or projectId is required");
+      }
+
+      const scope = input.scope ?? (input.projectId ? "project" : "world");
+      // World-level drafts get an explicit projectId: null so Atlas Vector
+      // Search can filter on it via $in: [<pid>, null] (the index can't
+      // express $exists).
       const doc: Record<string, any> = {
         userId: ctx.user.userId,
         title: input.title,
@@ -48,11 +90,14 @@ export const draftRouter = router({
         tags: input.tags ?? [],
         linkedCharacters: input.linkedCharacters ?? [],
         linkedWorldSettings: input.linkedWorldSettings ?? [],
+        worldId: new ObjectId(worldIdHex),
+        projectId: scope === "project" ? new ObjectId(input.projectId!) : null,
         createdAt: now,
         updatedAt: now,
       };
-      if (input.projectId) doc.projectId = new ObjectId(input.projectId);
-      if (input.worldId) doc.worldId = new ObjectId(input.worldId);
+      if (scope === "project" && !input.projectId) {
+        throw new Error("projectId is required when scope is 'project'");
+      }
       const result = await ctx.db.collection("drafts").insertOne(doc);
       getEmbeddingService()?.enqueue("drafts", result.insertedId.toHexString());
       return serializeDoc({ _id: result.insertedId, ...doc });

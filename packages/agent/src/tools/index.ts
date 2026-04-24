@@ -307,9 +307,20 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         tags: Type.Optional(Type.Array(Type.String(), { description: d.create_draft_tags })),
         linkedCharacters: Type.Optional(Type.Array(Type.String(), { description: d.create_draft_linkedCharacters })),
         linkedWorldSettings: Type.Optional(Type.Array(Type.String(), { description: d.create_draft_linkedWorldSettings })),
+        scope: Type.Optional(StringEnum(["world", "project"] as const, { description: d.create_draft_scope })),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.createDraft({ ...args, projectId, worldId }, db, userId);
+        const scope = args.scope ?? "world";
+        if (!worldId) {
+          return textResult({ error: "Cannot create a draft: no world context." });
+        }
+        if (scope === "project" && !projectId) {
+          return textResult({ error: "Cannot create a project-scoped draft: no project context. Use scope=\"world\" or open the chat under a specific project." });
+        }
+        const { scope: _scope, ...rest } = args;
+        // Every draft carries worldId; projectId is set only for project-scoped drafts.
+        const ownerIds = scope === "project" ? { worldId, projectId } : { worldId };
+        const result = await handlers.createDraft({ ...rest, ...ownerIds }, db, userId);
         if ((result as any)?._id) onDocumentChanged?.("drafts", String((result as any)._id));
         return textResult(result);
       },

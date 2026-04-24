@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { objectIdSchema } from "@ai-creator/types";
+import { draftScopeFilter } from "@ai-creator/agent";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 
@@ -75,16 +76,15 @@ export const searchRouter = router({
           } else if (collName === "chapters") {
             if (input.projectId) collFilter.projectId = input.projectId;
           } else {
-            // drafts can have either
-            if (input.projectId) collFilter.projectId = input.projectId;
-            if (input.worldId) collFilter.worldId = input.worldId;
+            // drafts: enforce scope isolation (world-level + current project, hide sibling-project drafts)
+            Object.assign(collFilter, draftScopeFilter({
+              projectId: input.projectId,
+              worldId: input.worldId,
+            }));
           }
 
           const docs = await col
-            .find({
-              ...collFilter,
-              $or: orConditions,
-            })
+            .find({ ...collFilter, $or: orConditions })
             .limit(input.limit)
             .toArray();
 

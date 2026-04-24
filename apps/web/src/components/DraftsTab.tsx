@@ -25,6 +25,8 @@ interface DraftsTabProps {
   isSearching?: boolean;
 }
 
+type ScopeFilter = "all" | "world" | string; // string = a projectId
+
 export default function DraftsTab({
   worldId,
   createRequestKey = 0,
@@ -37,6 +39,9 @@ export default function DraftsTab({
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  // Scope picker in the create form. "world" = world-level draft, otherwise a projectId.
+  const [newScopeChoice, setNewScopeChoice] = useState<"world" | string>("world");
+  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("all");
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -45,9 +50,17 @@ export default function DraftsTab({
 
   const editContentTextarea = useAutoResizeTextarea(editContent);
 
-  const draftsQuery = trpc.draft.list.useQuery({ worldId });
+  const projectsQuery = trpc.project.listByWorld.useQuery({ worldId });
+  const projects = (projectsQuery.data ?? []) as Array<{ _id: string; name: string }>;
+  const projectNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of projects) map.set(p._id, p.name);
+    return map;
+  }, [projects]);
+
+  const draftsQuery = trpc.draft.list.useQuery({ worldId, includeAllProjectsUnderWorld: true });
   const createMut = trpc.draft.create.useMutation({
-    onSuccess: () => { draftsQuery.refetch(); setShowForm(false); setTitle(""); setContent(""); },
+    onSuccess: () => { draftsQuery.refetch(); setShowForm(false); setTitle(""); setContent(""); setNewScopeChoice("world"); },
   });
   const updateMut = trpc.draft.update.useMutation({
     onSuccess: () => { draftsQuery.refetch(); setEditingId(null); },
@@ -58,13 +71,18 @@ export default function DraftsTab({
 
   const drafts = (draftsQuery.data ?? []) as any[];
   const hasSearch = searchQuery.length > 0;
+  const filteredByScope = useMemo(() => {
+    if (scopeFilter === "all") return drafts;
+    if (scopeFilter === "world") return drafts.filter((d) => !d.projectId);
+    return drafts.filter((d) => d.projectId && String(d.projectId) === scopeFilter);
+  }, [drafts, scopeFilter]);
   const visibleDrafts = useMemo(() => {
-    if (!hasSearch) return drafts;
-    const byId = new Map(drafts.map((draft) => [draft._id, draft]));
+    if (!hasSearch) return filteredByScope;
+    const byId = new Map(filteredByScope.map((draft) => [draft._id, draft]));
     return searchResultIds
       .map((id) => byId.get(id))
       .filter((draft): draft is any => Boolean(draft));
-  }, [drafts, hasSearch, searchResultIds]);
+  }, [filteredByScope, hasSearch, searchResultIds]);
 
   useEffect(() => {
     if (createRequestKey > 0) {
@@ -81,6 +99,23 @@ export default function DraftsTab({
 
   return (
     <div>
+      {!hasSearch && (
+        <div className="mb-3 flex items-center gap-2 text-xs">
+          <span className="text-white/50">{t("draft.scope")}:</span>
+          <select
+            value={scopeFilter}
+            onChange={(e) => setScopeFilter(e.target.value as ScopeFilter)}
+            className="rounded-md bg-white/5 border border-white/15 px-2 py-1 text-white/80 focus:outline-none focus:ring-1 focus:ring-teal-500"
+          >
+            <option value="all">{t("draft.scopeFilterAll")}</option>
+            <option value="world">{t("draft.scopeFilterWorld")}</option>
+            {projects.map((p) => (
+              <option key={p._id} value={p._id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {hasSearch && (
         <div className="mb-4 flex items-center gap-2 text-xs text-white/50">
           <span className="rounded-full border border-teal-500/20 bg-teal-500/10 px-2 py-1 text-teal-400">
@@ -101,14 +136,33 @@ export default function DraftsTab({
             onSubmit={(e) => {
               e.preventDefault();
               if (!title.trim()) return;
+              const isProject = newScopeChoice !== "world";
               createMut.mutate({
                 worldId,
+                ...(isProject ? { projectId: newScopeChoice } : {}),
+                scope: isProject ? "project" : "world",
                 title: title.trim(),
                 content: content.trim() || undefined,
               });
             }}
             className="space-y-3"
           >
+            <div>
+              <label className="block text-xs font-medium text-white/50 mb-1.5">{t("draft.scopePickerLabel")}</label>
+              <select
+                value={newScopeChoice}
+                onChange={(e) => setNewScopeChoice(e.target.value)}
+                className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="world">{t("draft.scopePickerWorld")}</option>
+                {projects.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {t("draft.scopePickerProject", { name: p.name })}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-white/40">{t("draft.scopeHint")}</p>
+            </div>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -178,6 +232,15 @@ export default function DraftsTab({
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-xs transition-transform inline-block ${isExpanded ? "rotate-90" : ""}`}>▶</span>
                       <h4 className="text-sm font-medium text-white/80">{draft.title}</h4>
+                      {draft.projectId ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border border-amber-400/30 bg-amber-400/10 text-amber-300">
+                          {projectNameById.get(String(draft.projectId)) ?? t("draft.scopeProject")}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border border-sky-400/30 bg-sky-400/10 text-sky-300">
+                          {t("draft.scopeWorld")}
+                        </span>
+                      )}
                     </div>
                     {!isExpanded && draft.content && (
                       <p className="text-xs text-white/50 line-clamp-2 ml-5">{draft.content}</p>
