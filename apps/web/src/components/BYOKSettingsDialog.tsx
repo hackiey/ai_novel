@@ -8,6 +8,7 @@ import { trpc } from "../lib/trpc.js";
 const PROVIDERS: { key: BYOKProvider; label: string; showBaseURL: boolean; defaultModels: string }[] = [
   { key: "openai", label: "OpenAI", showBaseURL: false, defaultModels: "gpt-4o" },
   { key: "anthropic", label: "Anthropic", showBaseURL: false, defaultModels: "claude-sonnet-4-6" },
+  { key: "google", label: "Google", showBaseURL: false, defaultModels: "gemini-2.5-flash" },
   { key: "openrouter", label: "OpenRouter", showBaseURL: false, defaultModels: "anthropic/claude-sonnet-4.6" },
   { key: "custom", label: "OpenAI Compatible", showBaseURL: true, defaultModels: "" },
 ];

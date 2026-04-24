@@ -1,6 +1,6 @@
 const STORAGE_KEY = "ai_creator_byok";
 
-export type BYOKProvider = "openai" | "anthropic" | "openrouter" | "custom";
+export type BYOKProvider = "openai" | "anthropic" | "google" | "openrouter" | "custom";
 
 export interface BYOKConfig {
   provider: BYOKProvider;
