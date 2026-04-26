@@ -164,7 +164,7 @@
   "tool.list_world_settings": "列出设定",
   "tool.update_world_setting": "更新设定",
   "tool.create_world_setting": "创建设定",
-  "tool.list_chapters": "列出章节",
+  "tool.list": "列出实体",
   "tool.create_chapter": "创建章节",
   "tool.update_chapter": "编辑章节",
   "tool.continue_writing": "续写",

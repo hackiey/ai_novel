@@ -11,7 +11,7 @@ export type ToolName =
   | "update_world_setting"
   | "create_world_setting"
   | "create_chapter"
-  | "list_chapters"
+  | "list"
   | "update_chapter"
   | "create_draft"
   | "update_draft"

@@ -266,12 +266,25 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
     },
 
     {
-      name: "list_chapters",
-      label: "List Chapters",
-      description: d.list_chapters,
-      parameters: Type.Object({}),
-      async execute() {
-        const result = await handlers.listChapters({ projectId: projectId! }, db);
+      name: "list",
+      label: "List",
+      description: d.list,
+      parameters: Type.Object({
+        type: StringEnum(["character", "world_setting", "draft", "chapter"] as const, { description: d.list_type }),
+        projectId: Type.Optional(Type.String({ description: d.list_projectId })),
+        worldId: Type.Optional(Type.String({ description: d.list_worldId })),
+        limit: Type.Optional(Type.Number({ description: d.list_limit })),
+      }),
+      async execute(_toolCallId, args) {
+        const result = await handlers.listEntities(
+          {
+            type: args.type,
+            projectId: args.projectId ?? projectId,
+            worldId: args.worldId ?? worldId,
+            limit: args.limit,
+          },
+          db,
+        );
         return textResult(result);
       },
     },

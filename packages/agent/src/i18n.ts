@@ -160,7 +160,11 @@ const zh = {
     create_chapter_synopsis: "章节梗概",
     create_chapter_order: "章节排序，不指定则自动排在最后",
 
-    list_chapters: "列出当前项目的章节信息：最近5万字范围内的章节返回完整正文，更早的章节仅返回摘要。每项都包含章节ID，便于后续通过 get_entity 获取全文。projectId 已自动注入。",
+    list: "按类型列出实体。type=chapter 时列出当前项目的章节（最近5万字内返回完整正文，更早返回摘要）；type=character / world_setting 时列出当前 world 的全部条目；type=draft 时按 scope 隔离规则列出（world-level + 当前项目的草稿）。projectId 和 worldId 默认从当前会话上下文注入，必要时可显式覆盖。",
+    list_type: "实体类型：character（角色）、world_setting（世界观设定）、draft（草稿）、chapter（章节）。",
+    list_projectId: "可选。覆盖默认的当前项目 ID。chapter 必需 projectId；draft 用于 scope 过滤；character/world_setting 忽略。",
+    list_worldId: "可选。覆盖默认的当前 world ID。character/world_setting 必需 worldId；draft 用于 scope 过滤；chapter 忽略。",
+    list_limit: "返回上限，默认 50，最大 200。chapter 不受此参数影响。",
 
 
     update_chapter: "编辑章节内容。三种模式：1) 查找替换：传 old_string + new_string；2) 追加到末尾：传 append: true + new_string；3) 插入到开头：传 prepend: true + new_string。field 默认为 content。",
@@ -492,7 +496,11 @@ const en: typeof zh = {
     create_chapter_synopsis: "Chapter synopsis",
     create_chapter_order: "Chapter order; auto-placed at end if not specified",
 
-    list_chapters: "List chapter information for the current project: chapters covering the most recent 50,000 words return full content, while older chapters return only synopses. Every item includes the chapter ID so the agent can call get_entity later for full text. projectId is auto-injected.",
+    list: "List entities by type. type=chapter lists the current project's chapters (the most recent 50,000 words return full text, older ones return synopses only). type=character / world_setting lists every entry under the current world. type=draft applies scope isolation (world-level + current project drafts). projectId and worldId default to the current session context; pass them explicitly to override.",
+    list_type: "Entity type: character, world_setting, draft, or chapter.",
+    list_projectId: "Optional override for the current project ID. Required when type=chapter; used for scope filtering when type=draft; ignored for character/world_setting.",
+    list_worldId: "Optional override for the current world ID. Required when type=character or world_setting; used for scope filtering when type=draft; ignored for chapter.",
+    list_limit: "Result cap, default 50, max 200. Has no effect when type=chapter.",
 
 
     update_chapter: "Edit chapter content. Three modes: 1) Find-replace: pass old_string + new_string; 2) Append to end: pass append: true + new_string; 3) Prepend to start: pass prepend: true + new_string. Field defaults to content.",

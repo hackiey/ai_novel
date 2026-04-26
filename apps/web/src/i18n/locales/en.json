@@ -158,7 +158,7 @@
   "tool.list_world_settings": "List Settings",
   "tool.update_world_setting": "Update Setting",
   "tool.create_world_setting": "Create Setting",
-  "tool.list_chapters": "List Chapters",
+  "tool.list": "List",
   "tool.create_chapter": "Create Chapter",
   "tool.update_chapter": "Update Chapter",
   "tool.continue_writing": "Continue Writing",

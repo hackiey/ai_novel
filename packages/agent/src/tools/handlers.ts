@@ -364,6 +364,87 @@ export async function getChapter(
   return serialize(chapter);
 }
 
+/**
+ * Generic list dispatch by entity type.
+ * - character / world_setting: filter by worldId
+ * - chapter: delegate to listChapters (recent/historical word-budget split)
+ * - draft: scope-isolated via draftScopeFilter (world-level + current project)
+ */
+export async function listEntities(
+  args: {
+    type: "character" | "world_setting" | "draft" | "chapter";
+    projectId?: string;
+    worldId?: string;
+    limit?: number;
+  },
+  db: Db,
+): Promise<unknown> {
+  const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
+
+  if (args.type === "chapter") {
+    if (!args.projectId) return { error: "projectId is required for type='chapter'" };
+    return listChapters({ projectId: args.projectId }, db);
+  }
+
+  if (args.type === "draft") {
+    const filter = draftScopeFilter({ projectId: args.projectId, worldId: args.worldId });
+    if (Object.keys(filter).length === 0) {
+      return { error: "projectId or worldId is required for type='draft'" };
+    }
+    const docs = await db
+      .collection("drafts")
+      .find(filter)
+      .sort({ updatedAt: -1 })
+      .limit(limit)
+      .toArray();
+    return {
+      total: docs.length,
+      items: docs.map((d) => ({
+        id: d._id.toHexString(),
+        title: d.title,
+        scope: d.projectId ? "project" : "world",
+        tags: d.tags ?? [],
+        excerpt: (d.content ?? "").slice(0, 160),
+        updatedAt: d.updatedAt instanceof Date ? d.updatedAt.toISOString() : d.updatedAt,
+      })),
+    };
+  }
+
+  // character / world_setting — both belong to a world
+  if (!args.worldId) return { error: `worldId is required for type='${args.type}'` };
+  const collection = args.type === "character" ? "characters" : "world_settings";
+  const docs = await db
+    .collection(collection)
+    .find({ worldId: { $in: [args.worldId, new ObjectId(args.worldId)] } })
+    .sort({ updatedAt: -1 })
+    .limit(limit)
+    .toArray();
+
+  return {
+    total: docs.length,
+    items: docs.map((d) => {
+      if (args.type === "character") {
+        return {
+          id: d._id.toHexString(),
+          name: d.name,
+          importance: d.importance,
+          summary: d.summary ?? "",
+          aliases: d.aliases ?? [],
+          tags: d.tags ?? [],
+        };
+      }
+      return {
+        id: d._id.toHexString(),
+        title: d.title,
+        category: d.category,
+        importance: d.importance,
+        summary: d.summary ?? "",
+        tags: d.tags ?? [],
+      };
+    }),
+  };
+}
+
 export async function listChapters(
   args: { projectId: string },
   db: Db
