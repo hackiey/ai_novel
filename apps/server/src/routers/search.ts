@@ -22,7 +22,7 @@ export const searchRouter = router({
       if (embeddingService && (input.projectId || input.worldId)) {
         try {
           const results = await embeddingService.vectorSearch(
-            { projectId: input.projectId, worldId: input.worldId },
+            { projectId: input.projectId, worldId: input.worldId, userId: ctx.user.userId },
             input.query,
             { scope: input.scope, limit: input.limit }
           );

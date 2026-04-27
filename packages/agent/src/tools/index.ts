@@ -12,6 +12,12 @@ export type VectorSearchFn = (args: {
   query: string;
   scope?: string[];
   limit?: number;
+  /**
+   * Restrict results to documents owned by this user. Implementations should
+   * post-filter (or filter at the index level if userId is in the vector index)
+   * to enforce tenant isolation.
+   */
+  userId?: string;
 }) => Promise<{ results: Array<{ collection: string; id: string; title: string; excerpt: string; score: number }>; total: number }>;
 
 export type OnDocumentChangedFn = (collection: string, id: string) => void;
@@ -72,7 +78,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       async execute(_toolCallId, args) {
         const queries: string[] = (typeof args.query === "string" ? [args.query] : args.query).slice(0, 5);
         const limit = args.limit ?? 15;
-        const baseArgs = { scope: args.scope, limit, projectId, worldId };
+        const baseArgs = { scope: args.scope, limit, projectId, worldId, userId };
 
         console.log("[semantic_search] called with", queries.length, "queries:", JSON.stringify(queries));
 
@@ -87,7 +93,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
                 console.error("[semantic_search] Vector search failed for query, falling back to regex:", q, err);
               }
             }
-            const result = await handlers.semanticSearch(fullArgs, db) as { results: SearchResult[]; total: number };
+            const result = await handlers.semanticSearch(fullArgs, db, userId) as { results: SearchResult[]; total: number };
             return result.results.map((r, i) => ({ ...r, score: r.score ?? (1 - i * 0.01) }));
           })
         );
@@ -120,7 +126,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         content: Type.Optional(Type.String({ description: d.update_character_content })),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.updateCharacter(args, db);
+        const result = await handlers.updateCharacter(args, db, userId);
         onDocumentChanged?.("characters", args.id);
         const charDoc = await db.collection("characters").findOne({ _id: new ObjectId(args.id) });
         if (charDoc?.worldId) onWorldSummaryStale?.(charDoc.worldId.toHexString());
@@ -171,10 +177,10 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       }),
       async execute(_toolCallId, args) {
         switch (args.type) {
-          case "character": return textResult(await handlers.getCharacter(args, db));
-          case "world_setting": return textResult(await handlers.getWorldSetting(args, db));
-          case "draft": return textResult(await handlers.getDraft(args, db));
-          default: return textResult(await handlers.getChapter(args, db));
+          case "character": return textResult(await handlers.getCharacter(args, db, userId));
+          case "world_setting": return textResult(await handlers.getWorldSetting(args, db, userId));
+          case "draft": return textResult(await handlers.getDraft(args, db, userId));
+          default: return textResult(await handlers.getChapter(args, db, userId));
         }
       },
     },
@@ -191,20 +197,20 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         switch (args.type) {
           case "character": {
             const charDoc = await db.collection("characters").findOne({ _id: new ObjectId(args.id) });
-            const result = await handlers.deleteCharacter(args, db);
+            const result = await handlers.deleteCharacter(args, db, userId);
             if (charDoc?.worldId) onWorldSummaryStale?.(charDoc.worldId.toHexString());
             return textResult(result);
           }
           case "world_setting": {
             const wsDoc = await db.collection("world_settings").findOne({ _id: new ObjectId(args.id) });
-            const result = await handlers.deleteWorldSetting(args, db);
+            const result = await handlers.deleteWorldSetting(args, db, userId);
             if (wsDoc?.worldId) onWorldSummaryStale?.(wsDoc.worldId.toHexString());
             return textResult(result);
           }
           case "draft":
-            return textResult(await handlers.deleteDraft(args, db));
+            return textResult(await handlers.deleteDraft(args, db, userId));
           default:
-            return textResult(await handlers.deleteChapter(args, db));
+            return textResult(await handlers.deleteChapter(args, db, userId));
         }
       },
     },
@@ -226,7 +232,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         summary: Type.Optional(Type.String({ description: d.update_world_setting_summary })),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.updateWorldSetting(args, db);
+        const result = await handlers.updateWorldSetting(args, db, userId);
         onDocumentChanged?.("world_settings", args.id);
         const wsDoc = await db.collection("world_settings").findOne({ _id: new ObjectId(args.id) });
         if (wsDoc?.worldId) onWorldSummaryStale?.(wsDoc.worldId.toHexString());
@@ -304,6 +310,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
             limit: args.limit,
           },
           db,
+          userId,
         );
         return textResult(result);
       },
@@ -322,7 +329,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         prepend: Type.Optional(Type.Boolean({ description: d.update_chapter_prepend })),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.updateChapter(args, db);
+        const result = await handlers.updateChapter(args, db, userId);
         onDocumentChanged?.("chapters", args.id);
         return textResult(result);
       },
@@ -372,7 +379,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         linkedWorldSettings: Type.Optional(Type.Array(Type.String(), { description: d.update_draft_linkedWorldSettings })),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.updateDraft(args, db);
+        const result = await handlers.updateDraft(args, db, userId);
         onDocumentChanged?.("drafts", args.id);
         return textResult(result);
       },
@@ -392,7 +399,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       }),
       async execute(_toolCallId, args) {
         const scope = args.scope ?? (projectId ? "project" : "world");
-        const result = await handlers.updateMemory({ content: args.content, scope, worldId, projectId }, db);
+        const result = await handlers.updateMemory({ content: args.content, scope, worldId, projectId }, db, userId);
         return textResult(result);
       },
     },
@@ -405,7 +412,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         chapterId: Type.String({ description: d.generate_synopsis_chapterId }),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.generateSynopsis(args, db);
+        const result = await handlers.generateSynopsis(args, db, userId);
         return textResult(result);
       },
     },
@@ -545,7 +552,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         tags: Type.Optional(Type.Array(Type.String(), { description: d.update_skill_tags })),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.updateSkill(args, db, skillCollection);
+        const result = await handlers.updateSkill(args, db, skillCollection, userId);
         onDocumentChanged?.(skillCollection, args.id);
         return textResult(result);
       },
@@ -559,7 +566,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         id: Type.String({ description: d.delete_skill_id }),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.deleteSkill(args, db, skillCollection);
+        const result = await handlers.deleteSkill(args, db, skillCollection, userId);
         return textResult(result);
       },
     },

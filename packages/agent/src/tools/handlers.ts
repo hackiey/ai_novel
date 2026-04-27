@@ -1,10 +1,21 @@
 import { Db, ObjectId } from "mongodb";
 import { computeChapterSynopsisSourceHash } from "../chapterSynopsis.js";
-import { entityScopeFilter } from "../entityScope.js";
+import { entityScopeFilter, userIdMatcher } from "../entityScope.js";
 
 // Helper to convert string ID to ObjectId safely
 function toObjectId(id: string): ObjectId {
   return new ObjectId(id);
+}
+
+/**
+ * Build a `{ userId: ... }` clause for scoping a Mongo query to a tenant.
+ * Returns an empty object when no userId is given, so callers can spread it
+ * into existing filters unconditionally without changing behavior for the
+ * (legacy) unauthenticated paths.
+ */
+function ownerClause(userId?: string): Record<string, unknown> {
+  if (!userId) return {};
+  return { userId: userIdMatcher(userId) };
 }
 
 // Fields that should never be sent to the LLM (large embedding vectors waste tokens)
@@ -52,7 +63,8 @@ function formatWorldSettingDetail(doc: any): string {
 
 export async function semanticSearch(
   args: { projectId?: string; worldId?: string; query: string; scope?: string[]; limit?: number },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const { query, limit = 5 } = args;
   const scope = args.scope ?? ["character", "world", "draft", "chapter"];
@@ -60,8 +72,8 @@ export async function semanticSearch(
   const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const pattern = escaped.trim().split(/\s+/).join("|");
   const regex = { $regex: pattern, $options: "i" };
-  const scopeFilter = entityScopeFilter({ projectId: args.projectId, worldId: args.worldId });
-  const projectFilter: Record<string, any> = {};
+  const scopeFilter = entityScopeFilter({ projectId: args.projectId, worldId: args.worldId, userId });
+  const projectFilter: Record<string, any> = { ...ownerClause(userId) };
   if (args.projectId) projectFilter.projectId = { $in: [args.projectId, new ObjectId(args.projectId)] };
   const results: Array<{ collection: string; title: string; excerpt: string; id: string }> = [];
 
@@ -156,11 +168,12 @@ export async function semanticSearch(
 
 export async function getCharacter(
   args: { id: string },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const character = await db
     .collection("characters")
-    .findOne({ _id: toObjectId(args.id) });
+    .findOne({ _id: toObjectId(args.id), ...ownerClause(userId) });
   if (!character) return { error: `Character not found: ${args.id}` };
   return serialize(character);
 }
@@ -192,7 +205,8 @@ export async function createCharacter(
 
 export async function updateCharacter(
   args: { id: string; name?: string; aliases?: string[]; tags?: string[]; content?: string; importance?: string; summary?: string },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const { id, ...updates } = args;
   const setFields: Record<string, unknown> = { updatedAt: new Date() };
@@ -207,7 +221,7 @@ export async function updateCharacter(
   const result = await db
     .collection("characters")
     .findOneAndUpdate(
-      { _id: toObjectId(id) },
+      { _id: toObjectId(id), ...ownerClause(userId) },
       { $set: setFields },
       { returnDocument: "after" }
     );
@@ -217,11 +231,12 @@ export async function updateCharacter(
 
 export async function deleteCharacter(
   args: { id: string },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const result = await db
     .collection("characters")
-    .findOneAndDelete({ _id: toObjectId(args.id) });
+    .findOneAndDelete({ _id: toObjectId(args.id), ...ownerClause(userId) });
   if (!result) return { error: `Character not found: ${args.id}` };
   // Also clean up embedding chunks
   await db.collection("embedding_chunks").deleteMany({
@@ -235,11 +250,12 @@ export async function deleteCharacter(
 
 export async function getWorldSetting(
   args: { id: string },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const ws = await db
     .collection("world_settings")
-    .findOne({ _id: toObjectId(args.id) });
+    .findOne({ _id: toObjectId(args.id), ...ownerClause(userId) });
   if (!ws) return { error: `World setting not found: ${args.id}` };
   return serialize(ws);
 }
@@ -270,7 +286,8 @@ export async function createWorldSetting(
 
 export async function updateWorldSetting(
   args: { id: string; category?: string; title?: string; content?: string; tags?: string[]; importance?: string; summary?: string },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const { id, ...updates } = args;
   const setFields: Record<string, unknown> = { updatedAt: new Date() };
@@ -284,7 +301,7 @@ export async function updateWorldSetting(
   const result = await db
     .collection("world_settings")
     .findOneAndUpdate(
-      { _id: toObjectId(id) },
+      { _id: toObjectId(id), ...ownerClause(userId) },
       { $set: setFields },
       { returnDocument: "after" }
     );
@@ -294,11 +311,12 @@ export async function updateWorldSetting(
 
 export async function deleteWorldSetting(
   args: { id: string },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const result = await db
     .collection("world_settings")
-    .findOneAndDelete({ _id: toObjectId(args.id) });
+    .findOneAndDelete({ _id: toObjectId(args.id), ...ownerClause(userId) });
   if (!result) return { error: `World setting not found: ${args.id}` };
   await db.collection("embedding_chunks").deleteMany({
     sourceId: toObjectId(args.id),
@@ -351,11 +369,12 @@ async function markDependentChapterSynopsesPending(
 
 export async function getChapter(
   args: { id: string },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const chapter = await db
     .collection("chapters")
-    .findOne({ _id: toObjectId(args.id) });
+    .findOne({ _id: toObjectId(args.id), ...ownerClause(userId) });
   if (!chapter) return { error: `Chapter not found: ${args.id}` };
   return serialize(chapter);
 }
@@ -366,6 +385,9 @@ export async function getChapter(
  * - chapter: delegate to listChapters (recent/historical word-budget split)
  * - draft: scope-isolated via entityScopeFilter (world-level + current project)
  * - character / world_setting: scope-isolated via entityScopeFilter
+ *
+ * `userId`, when provided, is enforced on every collection so the agent cannot
+ * cross tenants by passing a fabricated projectId/worldId.
  */
 export async function listEntities(
   args: {
@@ -375,17 +397,20 @@ export async function listEntities(
     limit?: number;
   },
   db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
 
   if (args.type === "chapter") {
     if (!args.projectId) return { error: "projectId is required for type='chapter'" };
-    return listChapters({ projectId: args.projectId }, db);
+    return listChapters({ projectId: args.projectId }, db, userId);
   }
 
   if (args.type === "draft") {
-    const filter = entityScopeFilter({ projectId: args.projectId, worldId: args.worldId });
-    if (Object.keys(filter).length === 0) {
+    const filter = entityScopeFilter({ projectId: args.projectId, worldId: args.worldId, userId });
+    // userId alone is not enough to constrain a list, so check the caller still
+    // provided a project or world scope. ownerClause is appended below for parity.
+    if (!args.projectId && !args.worldId) {
       return { error: "projectId or worldId is required for type='draft'" };
     }
     const docs = await db
@@ -410,7 +435,7 @@ export async function listEntities(
   // character / world_setting — both honor the same scope-isolation rule as drafts.
   if (!args.worldId) return { error: `worldId is required for type='${args.type}'` };
   const collection = args.type === "character" ? "characters" : "world_settings";
-  const filter = entityScopeFilter({ projectId: args.projectId, worldId: args.worldId });
+  const filter = entityScopeFilter({ projectId: args.projectId, worldId: args.worldId, userId });
   const docs = await db
     .collection(collection)
     .find(filter)
@@ -448,11 +473,15 @@ export async function listEntities(
 
 export async function listChapters(
   args: { projectId: string },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const chapters = await db
     .collection("chapters")
-    .find({ projectId: { $in: [args.projectId, new ObjectId(args.projectId)] } })
+    .find({
+      projectId: { $in: [args.projectId, new ObjectId(args.projectId)] },
+      ...ownerClause(userId),
+    })
     .sort({ order: 1 })
     .toArray();
 
@@ -547,7 +576,8 @@ const CHAPTER_EDITABLE_FIELDS = ["title", "content", "synopsis"];
 
 export async function updateChapter(
   args: { id: string; old_string?: string; new_string: string; field?: string; append?: boolean; prepend?: boolean },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const { id, old_string, new_string, append, prepend } = args;
   const field = args.field ?? "content";
@@ -556,7 +586,7 @@ export async function updateChapter(
     return { error: `Invalid field "${field}" for chapter. Allowed: ${CHAPTER_EDITABLE_FIELDS.join(", ")}` };
   }
 
-  const doc = await db.collection("chapters").findOne({ _id: toObjectId(id) });
+  const doc = await db.collection("chapters").findOne({ _id: toObjectId(id), ...ownerClause(userId) });
   if (!doc) return { error: `Chapter not found: ${id}` };
 
   const currentValue = typeof doc[field] === "string" ? doc[field] : "";
@@ -618,7 +648,7 @@ export async function updateChapter(
     setFields.synopsisUpdatedAt = setFields.updatedAt;
   }
   const result = await db.collection("chapters").findOneAndUpdate(
-    { _id: toObjectId(id) },
+    { _id: toObjectId(id), ...ownerClause(userId) },
     Object.keys(unsetFields).length > 0
       ? { $set: setFields, $unset: unsetFields }
       : { $set: setFields },
@@ -636,11 +666,12 @@ export async function updateChapter(
 
 export async function deleteChapter(
   args: { id: string },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const result = await db
     .collection("chapters")
-    .findOneAndDelete({ _id: toObjectId(args.id) });
+    .findOneAndDelete({ _id: toObjectId(args.id), ...ownerClause(userId) });
   if (!result) return { error: `Chapter not found: ${args.id}` };
   await markDependentChapterSynopsesPending(db, {
     projectId: result.projectId as ObjectId,
@@ -657,11 +688,12 @@ export async function deleteChapter(
 
 export async function getDraft(
   args: { id: string },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const draft = await db
     .collection("drafts")
-    .findOne({ _id: toObjectId(args.id) });
+    .findOne({ _id: toObjectId(args.id), ...ownerClause(userId) });
   if (!draft) return { error: `Draft not found: ${args.id}` };
   return serialize(draft);
 }
@@ -699,7 +731,8 @@ export async function createDraft(
 
 export async function updateDraft(
   args: { id: string; title?: string; content?: string; tags?: string[]; linkedCharacters?: string[]; linkedWorldSettings?: string[] },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const { id, ...updates } = args;
   const setFields: Record<string, unknown> = { updatedAt: new Date() };
@@ -712,7 +745,7 @@ export async function updateDraft(
   const result = await db
     .collection("drafts")
     .findOneAndUpdate(
-      { _id: toObjectId(id) },
+      { _id: toObjectId(id), ...ownerClause(userId) },
       { $set: setFields },
       { returnDocument: "after" }
     );
@@ -722,11 +755,12 @@ export async function updateDraft(
 
 export async function deleteDraft(
   args: { id: string },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const result = await db
     .collection("drafts")
-    .findOneAndDelete({ _id: toObjectId(args.id) });
+    .findOneAndDelete({ _id: toObjectId(args.id), ...ownerClause(userId) });
   if (!result) return { error: `Draft not found: ${args.id}` };
   await db.collection("embedding_chunks").deleteMany({
     sourceId: toObjectId(args.id),
@@ -739,19 +773,20 @@ export async function deleteDraft(
 
 export async function getMemory(
   args: { worldId?: string; projectId?: string },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   if (args.projectId) {
     const doc = await db
       .collection("agent_memory")
-      .findOne({ projectId: new ObjectId(args.projectId) });
+      .findOne({ projectId: new ObjectId(args.projectId), ...ownerClause(userId) });
     if (!doc) return { content: "" };
     return { content: doc.content ?? "" };
   }
   if (args.worldId) {
     const doc = await db
       .collection("agent_memory")
-      .findOne({ worldId: new ObjectId(args.worldId) });
+      .findOne({ worldId: new ObjectId(args.worldId), ...ownerClause(userId) });
     if (!doc) return { content: "" };
     return { content: doc.content ?? "" };
   }
@@ -760,19 +795,23 @@ export async function getMemory(
 
 export async function updateMemory(
   args: { worldId?: string; projectId?: string; content: string; scope?: "world" | "project" },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const now = new Date();
+  // Memory documents are tenant-scoped: include userId in the upsert filter
+  // and persist it on insert so future reads stay isolated.
+  const ownerSet = userId ? { userId } : {};
   if (args.scope === "project" && args.projectId) {
     await db.collection("agent_memory").updateOne(
-      { projectId: new ObjectId(args.projectId) },
-      { $set: { content: args.content, updatedAt: now } },
+      { projectId: new ObjectId(args.projectId), ...ownerClause(userId) },
+      { $set: { content: args.content, updatedAt: now }, $setOnInsert: ownerSet },
       { upsert: true }
     );
   } else if (args.worldId) {
     await db.collection("agent_memory").updateOne(
-      { worldId: new ObjectId(args.worldId) },
-      { $set: { content: args.content, updatedAt: now } },
+      { worldId: new ObjectId(args.worldId), ...ownerClause(userId) },
+      { $set: { content: args.content, updatedAt: now }, $setOnInsert: ownerSet },
       { upsert: true }
     );
   } else {
@@ -854,6 +893,11 @@ export async function createSkill(
   return serialize({ ...doc, _id: result.insertedId });
 }
 
+function authorClause(userId?: string): Record<string, unknown> {
+  if (!userId) return {};
+  return { authorId: userIdMatcher(userId) };
+}
+
 export async function updateSkill(
   args: {
     id: string;
@@ -864,7 +908,8 @@ export async function updateSkill(
     tags?: string[];
   },
   db: Db,
-  collection: string = "skills"
+  collection: string = "skills",
+  userId?: string,
 ): Promise<unknown> {
   const { id, ...updates } = args;
   if (updates.slug !== undefined && !/^[a-z0-9-]+$/.test(updates.slug)) {
@@ -886,23 +931,24 @@ export async function updateSkill(
   const result = await db
     .collection(collection)
     .findOneAndUpdate(
-      { _id: toObjectId(id) },
+      { _id: toObjectId(id), ...authorClause(userId) },
       { $set: setFields },
       { returnDocument: "after" }
     );
-  if (!result) return { error: `Skill not found: ${id}` };
+  if (!result) return { error: `Skill not found or not owned by you: ${id}` };
   return serialize(result);
 }
 
 export async function deleteSkill(
   args: { id: string },
   db: Db,
-  collection: string = "skills"
+  collection: string = "skills",
+  userId?: string,
 ): Promise<unknown> {
-  const skill = await db.collection(collection).findOne({ _id: toObjectId(args.id) });
-  if (!skill) return { error: `Skill not found: ${args.id}` };
+  const skill = await db.collection(collection).findOne({ _id: toObjectId(args.id), ...authorClause(userId) });
+  if (!skill) return { error: `Skill not found or not owned by you: ${args.id}` };
   if (skill.isBuiltin) return { error: `Cannot delete builtin skill: ${skill.name || skill.slug}` };
-  await db.collection(collection).deleteOne({ _id: toObjectId(args.id) });
+  await db.collection(collection).deleteOne({ _id: toObjectId(args.id), ...authorClause(userId) });
   return { success: true, deleted: serialize(skill) };
 }
 
@@ -910,11 +956,12 @@ export async function deleteSkill(
 
 export async function generateSynopsis(
   args: { chapterId: string },
-  db: Db
+  db: Db,
+  userId?: string,
 ): Promise<unknown> {
   const chapter = await db
     .collection("chapters")
-    .findOne({ _id: toObjectId(args.chapterId) });
+    .findOne({ _id: toObjectId(args.chapterId), ...ownerClause(userId) });
   if (!chapter) return { error: `Chapter not found: ${args.chapterId}` };
   return {
     chapterId: chapter._id.toHexString(),

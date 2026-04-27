@@ -123,7 +123,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     if (embeddingService) {
       vectorSearchFn = async (args) => {
         const results = await embeddingService.vectorSearch(
-          { projectId: args.projectId, worldId: args.worldId },
+          { projectId: args.projectId, worldId: args.worldId, userId: args.userId ?? user.userId },
           args.query,
           { scope: args.scope, limit: args.limit }
         );

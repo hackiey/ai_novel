@@ -306,7 +306,7 @@ export class ServerEmbeddingService {
    * Perform vector search using MongoDB Atlas Vector Search.
    */
   async vectorSearch(
-    ids: { projectId?: string; worldId?: string },
+    ids: { projectId?: string; worldId?: string; userId?: string },
     queryText: string,
     options: { scope?: string[]; limit?: number } = {}
   ): Promise<
@@ -319,6 +319,7 @@ export class ServerEmbeddingService {
     }>
   > {
     const { scope, limit = 10 } = options;
+    const { userId } = ids;
     // Map agent tool scope names to MongoDB collection names
     const scopeToCollection: Record<string, EmbeddableCollection> = {
       character: "characters",
@@ -359,13 +360,20 @@ export class ServerEmbeddingService {
         // `projectId` as a filter field and every doc to store an explicit
         // `projectId` (null for world-level). chapters belong to a single
         // project; skills and skill_drafts are global.
+        //
+        // userId enforcement: Atlas vector indexes typically don't include
+        // userId as a filter field, so we apply the userId clause as a JS
+        // post-filter on the returned candidates rather than at the index
+        // stage. This is safe because the project/world filter already
+        // narrows the candidate pool down to a small set.
         const filter: Record<string, any> = {};
         if (collName === "chapters") {
           if (ids.projectId) filter.projectId = ids.projectId;
         } else if (collName === "skills" || collName === "skill_drafts") {
-          // Global — no worldId/projectId filter
+          // Global — no worldId/projectId filter, and no per-user filter
+          // either (skills are intentionally cross-tenant for discovery).
         } else {
-          Object.assign(filter, entityScopeFilter(ids));
+          Object.assign(filter, entityScopeFilter({ projectId: ids.projectId, worldId: ids.worldId }));
         }
 
         const col = this.db.collection(collName);
@@ -383,6 +391,7 @@ export class ServerEmbeddingService {
           {
             $project: {
               _id: 1,
+              userId: 1,
               name: 1,
               slug: 1,
               title: 1,
@@ -401,7 +410,16 @@ export class ServerEmbeddingService {
           },
         ];
 
-        const docs = await col.aggregate(pipeline).toArray();
+        const rawDocs = await col.aggregate(pipeline).toArray();
+        const isCrossUser = collName === "skills" || collName === "skill_drafts";
+        const docs = userId && !isCrossUser
+          ? rawDocs.filter((doc) => {
+              const docUserId = doc.userId;
+              if (docUserId === undefined || docUserId === null) return false;
+              const asString = typeof docUserId === "string" ? docUserId : docUserId.toString();
+              return asString === userId;
+            })
+          : rawDocs;
 
         return docs.map((doc) => ({
           collection: collName,
