@@ -1,7 +1,36 @@
 import { Db, ObjectId } from "mongodb";
 import { EmbeddingService } from "@ai-creator/core";
 import type { EmbeddingConfig } from "@ai-creator/core";
-import { entityScopeFilter } from "@ai-creator/agent";
+
+/**
+ * Build a $vectorSearch.filter for world+project-scoped collections.
+ *
+ * Atlas Vector Search rejects `$in` arrays whose elements differ in BSON
+ * type ("must have elements of the same type"), so we cannot reuse the
+ * generic `entityScopeFilter` (which mixes string + ObjectId for legacy-data
+ * compatibility on plain finds). Instead we coerce ids to ObjectId only.
+ * This matches the storage convention enforced by handlers.ts (every entity
+ * is written with `worldId`/`projectId` as ObjectId or explicit `null`).
+ */
+function vectorScopeFilter(ids: { projectId?: string; worldId?: string }): Record<string, unknown> {
+  const { projectId, worldId } = ids;
+  if (projectId && worldId) {
+    return {
+      worldId: new ObjectId(worldId),
+      // ObjectId + null is allowed (Atlas treats null as a separate atomic
+      // value, not a heterogeneous-array element) and lets world-level
+      // entities (projectId === null) appear alongside the current project.
+      projectId: { $in: [new ObjectId(projectId), null] },
+    };
+  }
+  if (projectId) {
+    return { projectId: new ObjectId(projectId) };
+  }
+  if (worldId) {
+    return { worldId: new ObjectId(worldId), projectId: null };
+  }
+  return {};
+}
 
 /** Supported collections for embedding */
 const EMBEDDABLE_COLLECTIONS = [
@@ -368,12 +397,12 @@ export class ServerEmbeddingService {
         // narrows the candidate pool down to a small set.
         const filter: Record<string, any> = {};
         if (collName === "chapters") {
-          if (ids.projectId) filter.projectId = ids.projectId;
+          if (ids.projectId) filter.projectId = new ObjectId(ids.projectId);
         } else if (collName === "skills" || collName === "skill_drafts") {
           // Global — no worldId/projectId filter, and no per-user filter
           // either (skills are intentionally cross-tenant for discovery).
         } else {
-          Object.assign(filter, entityScopeFilter({ projectId: ids.projectId, worldId: ids.worldId }));
+          Object.assign(filter, vectorScopeFilter({ projectId: ids.projectId, worldId: ids.worldId }));
         }
 
         const col = this.db.collection(collName);
