@@ -146,10 +146,37 @@ Configure in `apps/server/.env`:
 |----------|-------------|
 | `MONGODB_URI` | MongoDB connection string (required — Atlas edition needed to enable semantic search) |
 | `JWT_SECRET` | JWT signing secret (required) |
-| `LLM_API_KEY` | Generic API key, or `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY` (at least one required) |
+| `LLM_API_KEY` | Generic API key, or `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY` (at least one required, see below) |
 | `AVAILABLE_MODELS` | Allowed models, format `provider:modelId`, comma-separated |
 | `DEFAULT_MODEL` | Default model, format `provider:modelId` |
 | `EMBEDDING_*` | Embedding service config (optional, enables semantic search) |
+
+#### LLM API Key Notes
+
+Model format: `provider:modelId`. The server resolves env vars by `provider`:
+
+- **API Key**: looks up `<PROVIDER>_API_KEY`, falls back to `LLM_API_KEY`
+- **Base URL**: optional `<PROVIDER>_BASE_URL` overrides the default endpoint
+
+**Official providers** (`openai` / `anthropic` / `google`, etc.) usually only need a key:
+
+```env
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+AVAILABLE_MODELS=openai:gpt-4o,anthropic:claude-sonnet-4-6
+```
+
+**Third-party / OpenAI-compatible providers** (OpenRouter, DashScope, SiliconFlow, Ollama, self-hosted gateways…) require **both** key and base URL. Use the `custom:` prefix (auto-mapped to OpenAI-compatible protocol):
+
+```env
+# Example: DashScope
+CUSTOM_API_KEY=sk-...
+CUSTOM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+AVAILABLE_MODELS=custom:qwen-max,custom:qwen-plus
+DEFAULT_MODEL=custom:qwen-max
+```
+
+> You can also reuse `OPENAI_API_KEY` + `OPENAI_BASE_URL` to redirect the official OpenAI endpoint to a third-party — same effect.
 
 ---
 

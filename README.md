@@ -146,10 +146,37 @@ pnpm --filter @ai-creator/mobile dev
 |------|------|
 | `MONGODB_URI` | MongoDB 连接字符串（必填，启用语义检索需 Atlas 版本） |
 | `JWT_SECRET` | JWT 签名密钥（必填） |
-| `LLM_API_KEY` | 通用 API Key，或 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY`（至少填一个） |
+| `LLM_API_KEY` | 通用 API Key，或 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY`（至少填一个，详见下方） |
 | `AVAILABLE_MODELS` | 可选模型列表，格式 `provider:modelId`，逗号分隔 |
 | `DEFAULT_MODEL` | 默认模型，格式 `provider:modelId` |
 | `EMBEDDING_*` | Embedding 服务配置（可选，启用语义搜索） |
+
+#### LLM API Key 配置说明
+
+模型格式 `provider:modelId`。服务端按 `provider` 解析对应的环境变量：
+
+- **API Key**：先查 `<PROVIDER>_API_KEY`，没有则回退 `LLM_API_KEY`
+- **Base URL**：可选，配 `<PROVIDER>_BASE_URL` 覆盖默认接入地址
+
+**官方供应商**（`openai` / `anthropic` / `google` 等）通常只需配 Key：
+
+```env
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+AVAILABLE_MODELS=openai:gpt-4o,anthropic:claude-sonnet-4-6
+```
+
+**第三方/OpenAI 兼容供应商**（OpenRouter、DashScope、硅基流动、Ollama、自建网关等）必须同时配 Key 和 Base URL。用 `custom:` 前缀（自动映射为 openai 兼容协议）：
+
+```env
+# 例：DashScope
+CUSTOM_API_KEY=sk-...
+CUSTOM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+AVAILABLE_MODELS=custom:qwen-max,custom:qwen-plus
+DEFAULT_MODEL=custom:qwen-max
+```
+
+> 也可以直接复用 `OPENAI_API_KEY` + `OPENAI_BASE_URL` 把官方 OpenAI 接入地址改成第三方，效果等价。
 
 ---
 
