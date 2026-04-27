@@ -18,13 +18,20 @@ export const searchRouter = router({
     .query(async ({ ctx, input }) => {
       const embeddingService = getEmbeddingService();
 
+      // Default scope for the user-facing search panel: novel content only.
+      // Skills/skill_drafts have their own dedicated UI; including them here
+      // would surface unrelated entries (and other authors' published skills).
+      const scope = input.scope?.length
+        ? input.scope
+        : ["characters", "world_settings", "drafts", "chapters"];
+
       // If embedding service is available, use vector search
       if (embeddingService && (input.projectId || input.worldId)) {
         try {
           const results = await embeddingService.vectorSearch(
             { projectId: input.projectId, worldId: input.worldId, userId: ctx.user.userId },
             input.query,
-            { scope: input.scope, limit: input.limit }
+            { scope, limit: input.limit }
           );
           return { results, method: "vector" as const };
         } catch (err) {
@@ -34,9 +41,7 @@ export const searchRouter = router({
       }
 
       // Fallback: regex-based search across collections
-      const collections = input.scope?.length
-        ? input.scope
-        : ["characters", "world_settings", "drafts", "chapters"];
+      const collections = scope;
 
       const escapedQuery = input.query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const regex = new RegExp(escapedQuery, "i");

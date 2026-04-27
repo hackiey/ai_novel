@@ -78,7 +78,13 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       async execute(_toolCallId, args) {
         const queries: string[] = (typeof args.query === "string" ? [args.query] : args.query).slice(0, 5);
         const limit = args.limit ?? 15;
-        const baseArgs = { scope: args.scope, limit, projectId, worldId, userId };
+        // Default scope must be applied here (not deeper) because the vector
+        // path forwards `scope` straight to embeddingService.vectorSearch,
+        // which falls back to ALL embeddable collections (including skills /
+        // skill_drafts) when scope is undefined. semantic_search is for novel
+        // content; skills have their own search_skills tool.
+        const scope = args.scope ?? ["character", "world", "draft", "chapter"];
+        const baseArgs = { scope, limit, projectId, worldId, userId };
 
         console.log("[semantic_search] called with", queries.length, "queries:", JSON.stringify(queries));
 
