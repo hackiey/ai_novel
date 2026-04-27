@@ -1,7 +1,7 @@
 import { Db, ObjectId } from "mongodb";
 import { EmbeddingService } from "@ai-creator/core";
 import type { EmbeddingConfig } from "@ai-creator/core";
-import { draftScopeFilter } from "@ai-creator/agent";
+import { entityScopeFilter } from "@ai-creator/agent";
 
 /** Supported collections for embedding */
 const EMBEDDABLE_COLLECTIONS = [
@@ -353,22 +353,19 @@ export class ServerEmbeddingService {
     // Search each collection in parallel
     const searches = collections.map(async (collName) => {
       try {
-        // characters/world_settings belong to worldId; chapters belong to projectId;
-        // drafts honor scope isolation; skills are global (no filter)
+        // characters / world_settings / drafts honor world+project scope isolation
+        // (filter at the index level so the candidate pool isn't diluted by
+        // sibling-project entries). Requires the Atlas vector index to include
+        // `projectId` as a filter field and every doc to store an explicit
+        // `projectId` (null for world-level). chapters belong to a single
+        // project; skills and skill_drafts are global.
         const filter: Record<string, any> = {};
-        if (collName === "characters" || collName === "world_settings") {
-          if (ids.worldId) filter.worldId = new ObjectId(ids.worldId);
-        } else if (collName === "chapters") {
+        if (collName === "chapters") {
           if (ids.projectId) filter.projectId = ids.projectId;
         } else if (collName === "skills" || collName === "skill_drafts") {
-          // Skills and skill_drafts are global — no worldId/projectId filter
+          // Global — no worldId/projectId filter
         } else {
-          // drafts: scope-isolated visibility. Filter at the index level so the
-          // candidate pool isn't diluted by sibling-project drafts.
-          // Requires the Atlas vector index to include `projectId` as a filter
-          // field, and every draft to store an explicit projectId (null for
-          // world-level) — see drafts.backfillProjectIdNull script.
-          Object.assign(filter, draftScopeFilter(ids));
+          Object.assign(filter, entityScopeFilter(ids));
         }
 
         const col = this.db.collection(collName);

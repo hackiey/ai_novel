@@ -25,8 +25,8 @@ export type {
 } from "./chapterSynopsis.js";
 export { resolveLocale, t } from "./i18n.js";
 export type { Locale } from "./i18n.js";
-export { draftScopeFilter } from "./draftScope.js";
-export type { DraftScopeFilterIds } from "./draftScope.js";
+export { entityScopeFilter } from "./entityScope.js";
+export type { EntityScopeFilterIds } from "./entityScope.js";
 export type { SkillData } from "./skills.js";
 export { getAgentDefinition, getAgentTypes } from "./agents/index.js";
 export type { AgentDefinition, ToolName, SystemPromptContext } from "./agents/index.js";

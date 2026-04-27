@@ -135,10 +135,18 @@ export type UpdateProject = z.infer<typeof updateProjectSchema>;
 
 export const importanceSchema = z.enum(["core", "major", "minor"]);
 
+// Scope for entities that can live at world level or under a specific project.
+// Storage convention: every scoped entity carries `worldId`; `projectId` is
+// either null (world-level, visible to all novels under W) or a project's
+// ObjectId (visible only to that novel). See packages/agent/src/entityScope.ts.
+export const entityScopeSchema = z.enum(["world", "project"]);
+export type EntityScope = z.infer<typeof entityScopeSchema>;
+
 export const characterSchema = z.object({
   _id: objectIdSchema,
   userId: objectIdSchema,
   worldId: objectIdSchema,
+  projectId: objectIdSchema.nullable().optional(),
   name: z.string().min(1).max(200),
   aliases: z.array(z.string().max(200)).default([]),
   tags: z.array(z.string().max(100)).default([]),
@@ -151,7 +159,9 @@ export const characterSchema = z.object({
 });
 
 export const createCharacterSchema = z.object({
-  worldId: objectIdSchema,
+  worldId: objectIdSchema.optional(),
+  projectId: objectIdSchema.optional(),
+  scope: entityScopeSchema.optional(),
   name: z.string().min(1).max(200),
   aliases: z.array(z.string().max(200)).optional(),
   tags: z.array(z.string().max(100)).optional(),
@@ -160,7 +170,9 @@ export const createCharacterSchema = z.object({
   content: z.string().max(20000).optional(),
 });
 
-export const updateCharacterSchema = createCharacterSchema.omit({ worldId: true }).partial();
+export const updateCharacterSchema = createCharacterSchema
+  .omit({ worldId: true, projectId: true, scope: true })
+  .partial();
 
 export type Character = z.infer<typeof characterSchema>;
 export type CreateCharacter = z.infer<typeof createCharacterSchema>;
@@ -172,6 +184,7 @@ export const worldSettingSchema = z.object({
   _id: objectIdSchema,
   userId: objectIdSchema,
   worldId: objectIdSchema,
+  projectId: objectIdSchema.nullable().optional(),
   category: z.string().min(1).max(100),
   title: z.string().min(1).max(200),
   content: z.string().max(50000).default(""),
@@ -184,7 +197,9 @@ export const worldSettingSchema = z.object({
 });
 
 export const createWorldSettingSchema = z.object({
-  worldId: objectIdSchema,
+  worldId: objectIdSchema.optional(),
+  projectId: objectIdSchema.optional(),
+  scope: entityScopeSchema.optional(),
   category: z.string().min(1).max(100),
   title: z.string().min(1).max(200),
   content: z.string().max(50000).optional(),
@@ -193,7 +208,9 @@ export const createWorldSettingSchema = z.object({
   summary: z.string().max(100).optional(),
 });
 
-export const updateWorldSettingSchema = createWorldSettingSchema.omit({ worldId: true }).partial();
+export const updateWorldSettingSchema = createWorldSettingSchema
+  .omit({ worldId: true, projectId: true, scope: true })
+  .partial();
 
 export type WorldSetting = z.infer<typeof worldSettingSchema>;
 export type CreateWorldSetting = z.infer<typeof createWorldSettingSchema>;
@@ -216,13 +233,10 @@ export const draftSchema = z.object({
   ...timestampsSchema.shape,
 });
 
-export const draftScopeSchema = z.enum(["world", "project"]);
-export type DraftScope = z.infer<typeof draftScopeSchema>;
-
 export const createDraftSchema = z.object({
   projectId: objectIdSchema.optional(),
   worldId: objectIdSchema.optional(),
-  scope: draftScopeSchema.optional(),
+  scope: entityScopeSchema.optional(),
   title: z.string().min(1).max(200),
   content: z.string().max(50000).optional(),
   tags: z.array(z.string().max(100)).optional(),

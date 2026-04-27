@@ -127,6 +127,7 @@ const zh = {
     create_character_aliases: "角色别名",
     create_character_tags: "角色标签，如：反派、魔法师、皇族等",
     create_character_content: "角色的详细描述（自然语言）。建议涵盖以下维度：外貌特征、性格特点、背景故事、目标动机、与其他角色的关系等。",
+    create_character_scope: "角色归属范围（默认 world）。所有角色都会自动绑定当前 world。scope=world 时不写 projectId，对该世界下的所有小说可见，适合主角、共享反派、世界观核心人物等；scope=project 时同时写入当前 projectId，仅当前小说可见，适合本小说独有的配角、临时人物等不希望污染同世界其他小说的角色。",
 
     get_entity: "根据类型和ID获取实体的完整详情。可获取角色、世界观设定、草稿或章节。",
     get_entity_type: "实体类型：character（角色）、world_setting（世界观设定）、draft（草稿）、chapter（章节）",
@@ -145,13 +146,14 @@ const zh = {
     update_world_setting_importance: "重要性级别",
     update_world_setting_summary: "一句话简介，不超过50字",
 
-    create_world_setting: "创建新的世界观设定。worldId 和 projectId 已自动注入。",
+    create_world_setting: "创建新的世界观设定。worldId 和 projectId 已自动注入；通过 scope 参数选择归属（默认 world）。",
     create_world_setting_category: "分类，如: 地理、历史、魔法体系",
     create_world_setting_title: "标题",
     create_world_setting_content: "内容",
     create_world_setting_tags: "标签",
     create_world_setting_importance: "重要性级别，默认 minor",
     create_world_setting_summary: "一句话简介，不超过50字",
+    create_world_setting_scope: "设定归属范围（默认 world）。scope=world 时对该世界下的所有小说可见，适合通用世界观、共享背景；scope=project 时仅当前小说可见，适合本小说独有的设定细节、临时设定等。",
 
 
     create_chapter: "创建新章节。如果不指定 order，会自动排在最后。projectId 已自动注入。",
@@ -463,6 +465,7 @@ const en: typeof zh = {
     create_character_aliases: "Character aliases",
     create_character_tags: "Character tags, e.g.: villain, mage, royalty",
     create_character_content: "Detailed character description in natural language. Recommended dimensions: appearance, personality, background story, goals/motivations, relationships with other characters.",
+    create_character_scope: "Character ownership scope (defaults to world). Every character is bound to the current world automatically. scope=world stores no projectId and is visible to every novel under this world — use for protagonists, shared villains, or core world figures. scope=project also writes the current projectId so the character is visible only to the current novel — use for novel-specific side characters or transient figures that should not bleed into sibling novels.",
 
     get_entity: "Get full details of an entity by type and ID. Supports character, world_setting, draft, and chapter.",
     get_entity_type: "Entity type: character, world_setting, draft, or chapter",
@@ -481,13 +484,14 @@ const en: typeof zh = {
     update_world_setting_importance: "Importance level",
     update_world_setting_summary: "One-line summary, max 50 characters",
 
-    create_world_setting: "Create a new world setting. worldId and projectId are auto-injected.",
+    create_world_setting: "Create a new world setting. worldId and projectId are auto-injected; the optional scope parameter chooses ownership (defaults to world).",
     create_world_setting_category: "Category, e.g.: Geography, History, Magic System",
     create_world_setting_title: "Title",
     create_world_setting_content: "Content",
     create_world_setting_tags: "Tags",
     create_world_setting_importance: "Importance level, default: minor",
     create_world_setting_summary: "One-line summary, max 50 characters",
+    create_world_setting_scope: "Setting ownership scope (defaults to world). scope=world is visible to every novel under this world — use for shared lore, common background. scope=project is visible only to the current novel — use for novel-specific setting details or transient context that should not pollute sibling novels.",
 
 
     create_chapter: "Create a new chapter. If order is not specified, it will be placed at the end. projectId is auto-injected.",

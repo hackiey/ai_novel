@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { objectIdSchema } from "@ai-creator/types";
-import { draftScopeFilter } from "@ai-creator/agent";
+import { entityScopeFilter } from "@ai-creator/agent";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 
@@ -69,15 +69,13 @@ export const searchRouter = router({
           const fields = textFields[collName] || ["title", "content"];
           const orConditions = fields.map((field) => ({ [field]: regex }));
 
-          // Characters and world_settings use worldId, chapters use projectId
+          // characters / world_settings / drafts honor world+project scope isolation;
+          // chapters belong to a single project.
           const collFilter: Record<string, any> = { userId: userIdFilter(ctx.user.userId) };
-          if (collName === "characters" || collName === "world_settings") {
-            if (input.worldId) collFilter.worldId = input.worldId;
-          } else if (collName === "chapters") {
+          if (collName === "chapters") {
             if (input.projectId) collFilter.projectId = input.projectId;
           } else {
-            // drafts: enforce scope isolation (world-level + current project, hide sibling-project drafts)
-            Object.assign(collFilter, draftScopeFilter({
+            Object.assign(collFilter, entityScopeFilter({
               projectId: input.projectId,
               worldId: input.worldId,
             }));

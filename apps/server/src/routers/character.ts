@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { ObjectId } from "mongodb";
+import { ObjectId, Filter } from "mongodb";
 import { createCharacterSchema, updateCharacterSchema, objectIdSchema } from "@ai-creator/types";
+import { entityScopeFilter } from "@ai-creator/agent";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 
@@ -25,11 +26,25 @@ function computeCharacterWordCount(content: string): number {
 
 export const characterRouter = router({
   list: protectedProcedure
-    .input(z.object({ worldId: objectIdSchema }))
+    .input(z.object({
+      worldId: objectIdSchema,
+      projectId: objectIdSchema.optional(),
+      // Browse-mode (used by the World page tab): return every character under
+      // this world (world-level + every project's). Otherwise apply scope
+      // isolation (world-level + current project only).
+      includeAllProjectsUnderWorld: z.boolean().optional(),
+    }))
     .query(async ({ ctx, input }) => {
+      const userFilter = { userId: userIdFilter(ctx.user.userId) };
+      let filter: Filter<any>;
+      if (input.includeAllProjectsUnderWorld && !input.projectId) {
+        filter = { ...userFilter, worldId: { $in: [input.worldId, new ObjectId(input.worldId)] } };
+      } else {
+        filter = { ...userFilter, ...entityScopeFilter({ projectId: input.projectId, worldId: input.worldId }) };
+      }
       const docs = await ctx.db
         .collection("characters")
-        .find({ worldId: { $in: [input.worldId, new ObjectId(input.worldId)] }, userId: userIdFilter(ctx.user.userId) })
+        .find(filter)
         .sort({ updatedAt: -1 })
         .toArray();
       const importanceOrder: Record<string, number> = { core: 0, major: 1, minor: 2 };
@@ -50,10 +65,32 @@ export const characterRouter = router({
     .input(createCharacterSchema)
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
+
+      // Resolve worldId (every character must carry it). If only projectId was
+      // supplied, derive worldId from the project document.
+      let worldIdHex = input.worldId;
+      if (!worldIdHex && input.projectId) {
+        const project = await ctx.db.collection("projects").findOne(
+          { _id: new ObjectId(input.projectId), userId: userIdFilter(ctx.user.userId) },
+          { projection: { worldId: 1 } } as any,
+        );
+        if (!project) throw new Error(`Project not found: ${input.projectId}`);
+        if (!project.worldId) throw new Error(`Project ${input.projectId} has no worldId`);
+        worldIdHex = project.worldId instanceof ObjectId ? project.worldId.toHexString() : String(project.worldId);
+      }
+      if (!worldIdHex) throw new Error("worldId or projectId is required");
+
+      const scope = input.scope ?? (input.projectId ? "project" : "world");
+      if (scope === "project" && !input.projectId) {
+        throw new Error("projectId is required when scope is 'project'");
+      }
+
       const content = input.content ?? "";
       const doc = {
         userId: ctx.user.userId,
-        worldId: new ObjectId(input.worldId),
+        worldId: new ObjectId(worldIdHex),
+        // Explicit null for world-level so Atlas Vector Search can use $in: [pid, null].
+        projectId: scope === "project" ? new ObjectId(input.projectId!) : null,
         name: input.name,
         aliases: input.aliases ?? [],
         tags: input.tags ?? [],
@@ -66,9 +103,9 @@ export const characterRouter = router({
       };
       const result = await ctx.db.collection("characters").insertOne(doc);
       getEmbeddingService()?.enqueue("characters", result.insertedId.toHexString());
-      // Mark world summary as stale
+      // Mark world summary as stale (project layer is uncached so no separate flag needed)
       await ctx.db.collection("worlds").updateOne(
-        { _id: new ObjectId(input.worldId) },
+        { _id: new ObjectId(worldIdHex) },
         { $set: { summaryStale: true } }
       );
       return serializeDoc({ _id: result.insertedId, ...doc });

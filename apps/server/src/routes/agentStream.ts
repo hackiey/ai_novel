@@ -238,7 +238,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     let worldSummary: string | undefined;
     if (worldId) {
       try {
-        worldSummary = await getOrRefreshWorldSummary(db, worldId, locale);
+        worldSummary = await getOrRefreshWorldSummary(db, worldId, locale, projectId);
       } catch (err) {
         console.error("[WorldSummary] Failed to get summary:", err);
       }

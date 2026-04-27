@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ObjectId, Filter } from "mongodb";
 import { createWorldSettingSchema, updateWorldSettingSchema, objectIdSchema } from "@ai-creator/types";
+import { entityScopeFilter } from "@ai-creator/agent";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 
@@ -14,13 +15,18 @@ export const worldSettingRouter = router({
   list: protectedProcedure
     .input(z.object({
       worldId: objectIdSchema,
+      projectId: objectIdSchema.optional(),
+      includeAllProjectsUnderWorld: z.boolean().optional(),
       category: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const filter: Filter<any> = {
-        worldId: { $in: [input.worldId, new ObjectId(input.worldId)] },
-        userId: userIdFilter(ctx.user.userId),
-      };
+      const userFilter = { userId: userIdFilter(ctx.user.userId) };
+      let filter: Filter<any>;
+      if (input.includeAllProjectsUnderWorld && !input.projectId) {
+        filter = { ...userFilter, worldId: { $in: [input.worldId, new ObjectId(input.worldId)] } };
+      } else {
+        filter = { ...userFilter, ...entityScopeFilter({ projectId: input.projectId, worldId: input.worldId }) };
+      }
       if (input.category) {
         filter.category = input.category;
       }
@@ -47,9 +53,28 @@ export const worldSettingRouter = router({
     .input(createWorldSettingSchema)
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
+
+      let worldIdHex = input.worldId;
+      if (!worldIdHex && input.projectId) {
+        const project = await ctx.db.collection("projects").findOne(
+          { _id: new ObjectId(input.projectId), userId: userIdFilter(ctx.user.userId) },
+          { projection: { worldId: 1 } } as any,
+        );
+        if (!project) throw new Error(`Project not found: ${input.projectId}`);
+        if (!project.worldId) throw new Error(`Project ${input.projectId} has no worldId`);
+        worldIdHex = project.worldId instanceof ObjectId ? project.worldId.toHexString() : String(project.worldId);
+      }
+      if (!worldIdHex) throw new Error("worldId or projectId is required");
+
+      const scope = input.scope ?? (input.projectId ? "project" : "world");
+      if (scope === "project" && !input.projectId) {
+        throw new Error("projectId is required when scope is 'project'");
+      }
+
       const doc = {
         userId: ctx.user.userId,
-        worldId: new ObjectId(input.worldId),
+        worldId: new ObjectId(worldIdHex),
+        projectId: scope === "project" ? new ObjectId(input.projectId!) : null,
         category: input.category,
         title: input.title,
         content: input.content ?? "",
@@ -61,9 +86,8 @@ export const worldSettingRouter = router({
       };
       const result = await ctx.db.collection("world_settings").insertOne(doc);
       getEmbeddingService()?.enqueue("world_settings", result.insertedId.toHexString());
-      // Mark world summary as stale
       await ctx.db.collection("worlds").updateOne(
-        { _id: new ObjectId(input.worldId) },
+        { _id: new ObjectId(worldIdHex) },
         { $set: { summaryStale: true } }
       );
       return serializeDoc({ _id: result.insertedId, ...doc });

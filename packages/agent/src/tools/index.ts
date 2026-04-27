@@ -142,9 +142,19 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         aliases: Type.Optional(Type.Array(Type.String(), { description: d.create_character_aliases })),
         tags: Type.Optional(Type.Array(Type.String(), { description: d.create_character_tags })),
         content: Type.Optional(Type.String({ description: d.create_character_content })),
+        scope: Type.Optional(StringEnum(["world", "project"] as const, { description: d.create_character_scope })),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.createCharacter({ ...args, worldId, projectId }, db, userId);
+        const scope = args.scope ?? "world";
+        if (!worldId) {
+          return textResult({ error: "Cannot create a character: no world context." });
+        }
+        if (scope === "project" && !projectId) {
+          return textResult({ error: "Cannot create a project-scoped character: no project context. Use scope=\"world\" or open the chat under a specific project." });
+        }
+        const { scope: _scope, ...rest } = args;
+        const ownerProjectId = scope === "project" ? projectId : undefined;
+        const result = await handlers.createCharacter({ ...rest, worldId, projectId: ownerProjectId }, db, userId);
         if ((result as any)?._id) onDocumentChanged?.("characters", String((result as any)._id));
         if (worldId) onWorldSummaryStale?.(worldId);
         return textResult(result);
@@ -238,9 +248,19 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
           { description: d.create_world_setting_importance },
         )),
         summary: Type.Optional(Type.String({ description: d.create_world_setting_summary })),
+        scope: Type.Optional(StringEnum(["world", "project"] as const, { description: d.create_world_setting_scope })),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.createWorldSetting({ ...args, worldId, projectId }, db, userId);
+        const scope = args.scope ?? "world";
+        if (!worldId) {
+          return textResult({ error: "Cannot create a world setting: no world context." });
+        }
+        if (scope === "project" && !projectId) {
+          return textResult({ error: "Cannot create a project-scoped world setting: no project context. Use scope=\"world\" or open the chat under a specific project." });
+        }
+        const { scope: _scope, ...rest } = args;
+        const ownerProjectId = scope === "project" ? projectId : undefined;
+        const result = await handlers.createWorldSetting({ ...rest, worldId, projectId: ownerProjectId }, db, userId);
         if ((result as any)?._id) onDocumentChanged?.("world_settings", String((result as any)._id));
         if (worldId) onWorldSummaryStale?.(worldId);
         return textResult(result);

@@ -25,6 +25,8 @@ interface WorldSettingsTabProps {
   isSearching?: boolean;
 }
 
+type ScopeFilter = "all" | "world" | string;
+
 export default function WorldSettingsTab({
   worldId,
   createRequestKey = 0,
@@ -38,6 +40,8 @@ export default function WorldSettingsTab({
   const [worldCategory, setWorldCategory] = useState("");
   const [worldTitle, setWorldTitle] = useState("");
   const [worldContent, setWorldContent] = useState("");
+  const [newScopeChoice, setNewScopeChoice] = useState<"world" | string>("world");
+  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("all");
 
   const [expandedWorldSettingId, setExpandedWorldSettingId] = useState<string | null>(null);
   const [editingWorldSettingId, setEditingWorldSettingId] = useState<string | null>(null);
@@ -47,9 +51,17 @@ export default function WorldSettingsTab({
 
   const editContentTextarea = useAutoResizeTextarea(editWorldContent);
 
-  const worldSettingsQuery = trpc.worldSetting.list.useQuery({ worldId });
+  const projectsQuery = trpc.project.listByWorld.useQuery({ worldId });
+  const projects = (projectsQuery.data ?? []) as Array<{ _id: string; name: string }>;
+  const projectNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of projects) m.set(p._id, p.name);
+    return m;
+  }, [projects]);
+
+  const worldSettingsQuery = trpc.worldSetting.list.useQuery({ worldId, includeAllProjectsUnderWorld: true });
   const createWorldSettingMut = trpc.worldSetting.create.useMutation({
-    onSuccess: () => { worldSettingsQuery.refetch(); setShowWorldForm(false); setWorldCategory(""); setWorldTitle(""); setWorldContent(""); },
+    onSuccess: () => { worldSettingsQuery.refetch(); setShowWorldForm(false); setWorldCategory(""); setWorldTitle(""); setWorldContent(""); setNewScopeChoice("world"); },
   });
   const updateWorldSettingMut = trpc.worldSetting.update.useMutation({
     onSuccess: () => { worldSettingsQuery.refetch(); setEditingWorldSettingId(null); },
@@ -60,13 +72,18 @@ export default function WorldSettingsTab({
 
   const worldSettings = (worldSettingsQuery.data ?? []) as any[];
   const hasSearch = searchQuery.length > 0;
+  const filteredByScope = useMemo(() => {
+    if (scopeFilter === "all") return worldSettings;
+    if (scopeFilter === "world") return worldSettings.filter((w) => !w.projectId);
+    return worldSettings.filter((w) => w.projectId && String(w.projectId) === scopeFilter);
+  }, [worldSettings, scopeFilter]);
   const visibleWorldSettings = useMemo(() => {
-    if (!hasSearch) return worldSettings;
-    const byId = new Map(worldSettings.map((ws) => [ws._id, ws]));
+    if (!hasSearch) return filteredByScope;
+    const byId = new Map(filteredByScope.map((ws) => [ws._id, ws]));
     return searchResultIds
       .map((id) => byId.get(id))
       .filter((ws): ws is any => Boolean(ws));
-  }, [worldSettings, hasSearch, searchResultIds]);
+  }, [filteredByScope, hasSearch, searchResultIds]);
 
   useEffect(() => {
     if (createRequestKey > 0) {
@@ -84,6 +101,23 @@ export default function WorldSettingsTab({
 
   return (
     <div>
+      {!hasSearch && (
+        <div className="mb-3 flex items-center gap-2 text-xs">
+          <span className="text-white/50">{t("worldSetting.scope")}:</span>
+          <select
+            value={scopeFilter}
+            onChange={(e) => setScopeFilter(e.target.value as ScopeFilter)}
+            className="rounded-md bg-white/5 border border-white/15 px-2 py-1 text-white/80 focus:outline-none focus:ring-1 focus:ring-teal-500"
+          >
+            <option value="all">{t("worldSetting.scopeFilterAll")}</option>
+            <option value="world">{t("worldSetting.scopeFilterWorld")}</option>
+            {projects.map((p) => (
+              <option key={p._id} value={p._id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {hasSearch && (
         <div className="mb-4 flex items-center gap-2 text-xs text-white/50">
           <span className="rounded-full border border-teal-500/20 bg-teal-500/10 px-2 py-1 text-teal-400">
@@ -104,8 +138,11 @@ export default function WorldSettingsTab({
             onSubmit={(e) => {
               e.preventDefault();
               if (!worldCategory.trim() || !worldTitle.trim()) return;
+              const isProject = newScopeChoice !== "world";
               createWorldSettingMut.mutate({
                 worldId,
+                ...(isProject ? { projectId: newScopeChoice } : {}),
+                scope: isProject ? "project" : "world",
                 category: worldCategory.trim(),
                 title: worldTitle.trim(),
                 content: worldContent.trim() || undefined,
@@ -113,6 +150,22 @@ export default function WorldSettingsTab({
             }}
             className="space-y-3"
           >
+            <div>
+              <label className="block text-xs font-medium text-white/50 mb-1.5">{t("worldSetting.scopePickerLabel")}</label>
+              <select
+                value={newScopeChoice}
+                onChange={(e) => setNewScopeChoice(e.target.value)}
+                className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="world">{t("worldSetting.scopePickerWorld")}</option>
+                {projects.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {t("worldSetting.scopePickerProject", { name: p.name })}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-white/40">{t("worldSetting.scopeHint")}</p>
+            </div>
             <div className="flex gap-3">
               <input
                 value={worldCategory}
@@ -196,6 +249,15 @@ export default function WorldSettingsTab({
                         {ws.category}
                       </span>
                       <h4 className="text-sm font-medium text-white/80">{ws.title}</h4>
+                      {ws.projectId ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border border-amber-400/30 bg-amber-400/10 text-amber-300">
+                          {projectNameById.get(String(ws.projectId)) ?? t("worldSetting.scopeProject")}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border border-sky-400/30 bg-sky-400/10 text-sky-300">
+                          {t("worldSetting.scopeWorld")}
+                        </span>
+                      )}
                     </div>
                     {!isExpanded && ws.content && (
                       <p className="text-xs text-white/50 line-clamp-2 ml-5">{ws.content}</p>

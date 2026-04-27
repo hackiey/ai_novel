@@ -82,12 +82,18 @@ export function buildWorldSummary(
 
 /**
  * Get or refresh the world summary.
- * summaryStale controls whether to re-query DB; formatting is always done per locale.
+ *
+ * Cache stores world-level entries only (characters/settings with projectId
+ * unset/null). When a project context is provided, additionally fetch that
+ * project's entries (uncached, small dataset) and merge before formatting so
+ * the summary reflects current scope: world-level + current project, never
+ * sibling projects.
  */
 export async function getOrRefreshWorldSummary(
   db: Db,
   worldId: string,
-  locale: Locale = "zh"
+  locale: Locale = "zh",
+  projectId?: string,
 ): Promise<string> {
   const worlds = db.collection("worlds");
   const world = await worlds.findOne({ _id: new ObjectId(worldId) });
@@ -98,50 +104,84 @@ export async function getOrRefreshWorldSummary(
     fullSummaryMaxItems: (world.summaryConfig as any)?.fullSummaryMaxItems ?? 500,
   };
 
-  // If not stale and we have cached raw data, rebuild formatted text from cache
+  let worldChars: SummaryItem[];
+  let worldSettings: SummaryItem[];
+
   if (!world.summaryStale && world.summaryCharacters && world.summarySettings) {
-    return buildWorldSummary(
-      world.summaryCharacters as SummaryItem[],
-      world.summarySettings as SummaryItem[],
-      config,
-      locale
+    worldChars = world.summaryCharacters as SummaryItem[];
+    worldSettings = world.summarySettings as SummaryItem[];
+  } else {
+    const wid = new ObjectId(worldId);
+    const worldIdMatch = { $in: [worldId, wid] };
+    const [chars, settings] = await Promise.all([
+      db.collection("characters")
+        // World-level only: projectId null OR missing.
+        .find({ worldId: worldIdMatch, projectId: null })
+        .project({ name: 1, importance: 1, summary: 1 })
+        .sort({ name: 1 })
+        .toArray(),
+      db.collection("world_settings")
+        .find({ worldId: worldIdMatch, projectId: null })
+        .project({ title: 1, category: 1, importance: 1, summary: 1 })
+        .sort({ category: 1, title: 1 })
+        .toArray(),
+    ]);
+
+    worldChars = chars.map((c) => ({
+      name: c.name as string,
+      importance: (c.importance as "core" | "major" | "minor") || "minor",
+      summary: (c.summary as string) || "",
+    }));
+    worldSettings = settings.map((ws) => ({
+      name: ws.title as string,
+      category: ws.category as string | undefined,
+      importance: (ws.importance as "core" | "major" | "minor") || "minor",
+      summary: (ws.summary as string) || "",
+    }));
+
+    await worlds.updateOne(
+      { _id: new ObjectId(worldId) },
+      { $set: { summaryCharacters: worldChars, summarySettings: worldSettings, summaryStale: false } }
     );
   }
 
-  // Fetch characters and world settings
+  // No project context: just return world-level summary.
+  if (!projectId) {
+    return buildWorldSummary(worldChars, worldSettings, config, locale);
+  }
+
+  // Fetch project-level overlay (uncached). Small dataset per project.
   const wid = new ObjectId(worldId);
-  const worldIdFilter = { $in: [worldId, wid] };
-  const [characters, settings] = await Promise.all([
+  const pid = new ObjectId(projectId);
+  const [projChars, projSettings] = await Promise.all([
     db.collection("characters")
-      .find({ worldId: worldIdFilter })
+      .find({ worldId: { $in: [worldId, wid] }, projectId: { $in: [projectId, pid] } })
       .project({ name: 1, importance: 1, summary: 1 })
       .sort({ name: 1 })
       .toArray(),
     db.collection("world_settings")
-      .find({ worldId: worldIdFilter })
+      .find({ worldId: { $in: [worldId, wid] }, projectId: { $in: [projectId, pid] } })
       .project({ title: 1, category: 1, importance: 1, summary: 1 })
       .sort({ category: 1, title: 1 })
       .toArray(),
   ]);
 
-  const charItems: SummaryItem[] = characters.map((c) => ({
+  const projCharItems: SummaryItem[] = projChars.map((c) => ({
     name: c.name as string,
     importance: (c.importance as "core" | "major" | "minor") || "minor",
     summary: (c.summary as string) || "",
   }));
-
-  const settingItems: SummaryItem[] = settings.map((ws) => ({
+  const projSettingItems: SummaryItem[] = projSettings.map((ws) => ({
     name: ws.title as string,
     category: ws.category as string | undefined,
     importance: (ws.importance as "core" | "major" | "minor") || "minor",
     summary: (ws.summary as string) || "",
   }));
 
-  // Cache raw data (not formatted text) so we can re-format per locale
-  await worlds.updateOne(
-    { _id: new ObjectId(worldId) },
-    { $set: { summaryCharacters: charItems, summarySettings: settingItems, summaryStale: false } }
+  return buildWorldSummary(
+    [...worldChars, ...projCharItems],
+    [...worldSettings, ...projSettingItems],
+    config,
+    locale,
   );
-
-  return buildWorldSummary(charItems, settingItems, config, locale);
 }

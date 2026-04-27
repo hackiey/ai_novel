@@ -70,8 +70,8 @@ async function main() {
   if (embeddingApiKey) {
     const dimensions = process.env.EMBEDDING_DIMENSIONS ? Number(process.env.EMBEDDING_DIMENSIONS) : 1536;
     const vectorCollections = [
-      { name: "characters", filters: ["worldId"] },
-      { name: "world_settings", filters: ["worldId"] },
+      { name: "characters", filters: ["worldId", "projectId"] },
+      { name: "world_settings", filters: ["worldId", "projectId"] },
       { name: "drafts", filters: ["worldId", "projectId"] },
       { name: "chapters", filters: ["projectId"] },
       { name: "skills", filters: [] },

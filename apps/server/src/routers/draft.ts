@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ObjectId, Filter } from "mongodb";
 import { createDraftSchema, updateDraftSchema, objectIdSchema } from "@ai-creator/types";
-import { draftScopeFilter } from "@ai-creator/agent";
+import { entityScopeFilter } from "@ai-creator/agent";
 import { router, protectedProcedure, userIdFilter } from "../trpc.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 
@@ -34,7 +34,7 @@ export const draftRouter = router({
       } else {
         filter = {
           ...userFilter,
-          ...draftScopeFilter({ projectId: input.projectId, worldId: input.worldId }),
+          ...entityScopeFilter({ projectId: input.projectId, worldId: input.worldId }),
         };
       }
 

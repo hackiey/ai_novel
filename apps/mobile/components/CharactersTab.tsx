@@ -24,23 +24,36 @@ interface Props {
   searchResultIds?: Set<string>;
 }
 
+type ScopeFilter = "all" | "world" | string;
+
 export default function CharactersTab({ worldId, searchResultIds }: Props) {
   const { t } = useTranslation();
   const { colors, baseStyles: base } = useTheme();
   const [showForm, setShowForm] = useState(false);
   const [charName, setCharName] = useState("");
+  const [newScopeChoice, setNewScopeChoice] = useState<"world" | string>("world");
+  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("all");
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editContent, setEditContent] = useState("");
 
-  const charactersQuery = trpc.character.list.useQuery({ worldId });
+  const projectsQuery = trpc.project.listByWorld.useQuery({ worldId });
+  const projects = (projectsQuery.data ?? []) as Array<{ _id: string; name: string }>;
+  const projectNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of projects) m.set(p._id, p.name);
+    return m;
+  }, [projects]);
+
+  const charactersQuery = trpc.character.list.useQuery({ worldId, includeAllProjectsUnderWorld: true });
   const createMut = trpc.character.create.useMutation({
     onSuccess: () => {
       charactersQuery.refetch();
       setShowForm(false);
       setCharName("");
+      setNewScopeChoice("world");
     },
   });
   const updateMut = trpc.character.update.useMutation({
@@ -54,10 +67,45 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
   });
 
   const allCharacters = (charactersQuery.data ?? []) as any[];
+  const filteredByScope = useMemo(() => {
+    if (scopeFilter === "all") return allCharacters;
+    if (scopeFilter === "world") return allCharacters.filter((c: any) => !c.projectId);
+    return allCharacters.filter((c: any) => c.projectId && String(c.projectId) === scopeFilter);
+  }, [allCharacters, scopeFilter]);
   const characters = useMemo(() => {
-    if (!searchResultIds) return allCharacters;
-    return allCharacters.filter((c: any) => searchResultIds.has(c._id));
-  }, [allCharacters, searchResultIds]);
+    if (!searchResultIds) return filteredByScope;
+    return filteredByScope.filter((c: any) => searchResultIds.has(c._id));
+  }, [filteredByScope, searchResultIds]);
+
+  const cycleFilter = useCallback(() => {
+    setScopeFilter((cur) => {
+      if (cur === "all") return "world";
+      if (cur === "world") return projects.length === 0 ? "all" : projects[0]._id;
+      const idx = projects.findIndex((p) => p._id === cur);
+      if (idx === -1 || idx === projects.length - 1) return "all";
+      return projects[idx + 1]._id;
+    });
+  }, [projects]);
+
+  const cycleNewScopeChoice = useCallback(() => {
+    setNewScopeChoice((cur) => {
+      if (cur === "world") return projects.length === 0 ? "world" : projects[0]._id;
+      const idx = projects.findIndex((p) => p._id === cur);
+      if (idx === -1 || idx === projects.length - 1) return "world";
+      return projects[idx + 1]._id;
+    });
+  }, [projects]);
+
+  const filterLabel = useMemo(() => {
+    if (scopeFilter === "all") return t("character.scopeFilterAll");
+    if (scopeFilter === "world") return t("character.scopeFilterWorld");
+    return projectNameById.get(scopeFilter) ?? scopeFilter;
+  }, [scopeFilter, projectNameById, t]);
+
+  const newScopeLabel = useMemo(() => {
+    if (newScopeChoice === "world") return t("character.scopePickerWorld");
+    return t("character.scopePickerProject", { name: projectNameById.get(newScopeChoice) ?? newScopeChoice });
+  }, [newScopeChoice, projectNameById, t]);
 
   const openEditMode = useCallback((char: any) => {
     setExpandedId(char._id);
@@ -86,6 +134,14 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
 
   return (
     <View>
+      {!searchResultIds && (
+        <TouchableOpacity onPress={cycleFilter} style={s.filterChip}>
+          <Text style={s.filterChipText}>
+            {t("character.scope")}: {filterLabel}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity
         onPress={() => setShowForm(true)}
         style={s.addBtn}
@@ -98,6 +154,11 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
           <Text style={[s.formTitle, base.mb3]}>
             {t("character.newCharacter")}
           </Text>
+          <TouchableOpacity onPress={cycleNewScopeChoice} style={s.scopePickerBtn}>
+            <Text style={s.scopePickerLabel}>{t("character.scopePickerLabel")}</Text>
+            <Text style={s.scopePickerValue}>{newScopeLabel}</Text>
+          </TouchableOpacity>
+          <Text style={s.scopeHint}>{t("character.scopeHint")}</Text>
           <TextInput
             value={charName}
             onChangeText={setCharName}
@@ -110,6 +171,7 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
               onPress={() => {
                 setShowForm(false);
                 setCharName("");
+                setNewScopeChoice("world");
               }}
               style={[base.btnOutline, base.flex1]}
             >
@@ -120,8 +182,11 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
             <TouchableOpacity
               onPress={() => {
                 if (!charName.trim()) return;
+                const isProject = newScopeChoice !== "world";
                 createMut.mutate({
                   worldId,
+                  ...(isProject ? { projectId: newScopeChoice } : {}),
+                  scope: isProject ? ("project" as const) : ("world" as const),
                   name: charName.trim(),
                 });
               }}
@@ -179,9 +244,19 @@ export default function CharactersTab({ worldId, searchResultIds }: Props) {
                       {t(`character.importance_${char.importance ?? "minor"}`)}
                     </Text>
                   </View>
-                  <Text style={[s.charName, base.flex1]}>
+                  <Text style={[s.charName, base.flex1]} numberOfLines={1}>
                     {char.name}
                   </Text>
+                  <View style={[s.scopeBadge, char.projectId ? s.scopeBadgeProject : s.scopeBadgeWorld]}>
+                    <Text
+                      style={[s.scopeBadgeText, char.projectId ? s.scopeBadgeProjectText : s.scopeBadgeWorldText]}
+                      numberOfLines={1}
+                    >
+                      {char.projectId
+                        ? projectNameById.get(String(char.projectId)) ?? t("character.scopeProject")
+                        : t("character.scopeWorld")}
+                    </Text>
+                  </View>
                 </View>
                 {!isExpanded && summary ? (
                   <Text
@@ -387,6 +462,66 @@ function createStyles(colors: any) {
       color: colors.teal,
       fontSize: 11,
       fontWeight: "500",
+    },
+    filterChip: {
+      alignSelf: "flex-start",
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 999,
+      paddingVertical: 4,
+      paddingHorizontal: 10,
+      marginBottom: 8,
+    },
+    filterChipText: {
+      color: colors.muted,
+      fontSize: 12,
+    },
+    scopePickerBtn: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      marginBottom: 4,
+    },
+    scopePickerLabel: {
+      fontSize: 11,
+      color: colors.muted,
+      marginBottom: 2,
+    },
+    scopePickerValue: {
+      fontSize: 13,
+      color: colors.text,
+    },
+    scopeHint: {
+      fontSize: 11,
+      color: colors.muted,
+      marginBottom: 12,
+    },
+    scopeBadge: {
+      borderWidth: 1,
+      borderRadius: 6,
+      paddingVertical: 2,
+      paddingHorizontal: 6,
+      maxWidth: 120,
+    },
+    scopeBadgeWorld: {
+      borderColor: "rgba(56,189,248,0.4)",
+      backgroundColor: "rgba(56,189,248,0.1)",
+    },
+    scopeBadgeProject: {
+      borderColor: "rgba(251,191,36,0.4)",
+      backgroundColor: "rgba(251,191,36,0.1)",
+    },
+    scopeBadgeText: {
+      fontSize: 10,
+      fontWeight: "500",
+    },
+    scopeBadgeWorldText: {
+      color: "rgb(125,211,252)",
+    },
+    scopeBadgeProjectText: {
+      color: "rgb(252,211,77)",
     },
   });
 }

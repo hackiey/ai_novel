@@ -1,6 +1,6 @@
 import { Db, ObjectId } from "mongodb";
 import { computeChapterSynopsisSourceHash } from "../chapterSynopsis.js";
-import { draftScopeFilter } from "../draftScope.js";
+import { entityScopeFilter } from "../entityScope.js";
 
 // Helper to convert string ID to ObjectId safely
 function toObjectId(id: string): ObjectId {
@@ -60,8 +60,7 @@ export async function semanticSearch(
   const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const pattern = escaped.trim().split(/\s+/).join("|");
   const regex = { $regex: pattern, $options: "i" };
-  const worldFilter: Record<string, any> = {};
-  if (args.worldId) worldFilter.worldId = { $in: [args.worldId, new ObjectId(args.worldId)] };
+  const scopeFilter = entityScopeFilter({ projectId: args.projectId, worldId: args.worldId });
   const projectFilter: Record<string, any> = {};
   if (args.projectId) projectFilter.projectId = { $in: [args.projectId, new ObjectId(args.projectId)] };
   const results: Array<{ collection: string; title: string; excerpt: string; id: string }> = [];
@@ -70,7 +69,7 @@ export async function semanticSearch(
     const characters = await db
       .collection("characters")
       .find({
-        ...worldFilter,
+        ...scopeFilter,
         $or: [
           { name: regex },
           { content: regex },
@@ -94,7 +93,7 @@ export async function semanticSearch(
     const settings = await db
       .collection("world_settings")
       .find({
-        ...worldFilter,
+        ...scopeFilter,
         $or: [{ title: regex }, { content: regex }, { category: regex }, { tags: regex }],
       })
       .limit(limit)
@@ -111,14 +110,12 @@ export async function semanticSearch(
   }
 
   if (scope.includes("draft")) {
-    const draftFilter = draftScopeFilter({ projectId: args.projectId, worldId: args.worldId });
-    const draftQuery = {
-      ...draftFilter,
-      $or: [{ title: regex }, { content: regex }, { tags: regex }],
-    };
     const drafts = await db
       .collection("drafts")
-      .find(draftQuery)
+      .find({
+        ...scopeFilter,
+        $or: [{ title: regex }, { content: regex }, { tags: regex }],
+      })
       .limit(limit)
       .toArray();
 
@@ -174,11 +171,11 @@ export async function createCharacter(
   userId?: string
 ): Promise<unknown> {
   const now = new Date();
-  const ownerId = args.worldId || args.projectId;
-  if (!ownerId) return { error: "worldId or projectId is required" };
-  const ownerField = args.worldId ? "worldId" : "projectId";
+  if (!args.worldId) return { error: "worldId is required" };
   const doc: Record<string, unknown> = {
-    [ownerField]: new ObjectId(ownerId),
+    worldId: new ObjectId(args.worldId),
+    // Explicit null for world-level so Atlas Vector Search can use $in: [pid, null].
+    projectId: args.projectId ? new ObjectId(args.projectId) : null,
     name: args.name,
     aliases: args.aliases ?? [],
     tags: args.tags ?? [],
@@ -253,11 +250,10 @@ export async function createWorldSetting(
   userId?: string
 ): Promise<unknown> {
   const now = new Date();
-  const ownerId = args.worldId || args.projectId;
-  if (!ownerId) return { error: "worldId or projectId is required" };
-  const ownerField = args.worldId ? "worldId" : "projectId";
+  if (!args.worldId) return { error: "worldId is required" };
   const doc: Record<string, unknown> = {
-    [ownerField]: new ObjectId(ownerId),
+    worldId: new ObjectId(args.worldId),
+    projectId: args.projectId ? new ObjectId(args.projectId) : null,
     category: args.category,
     title: args.title,
     content: args.content ?? "",
@@ -368,7 +364,8 @@ export async function getChapter(
  * Generic list dispatch by entity type.
  * - character / world_setting: filter by worldId
  * - chapter: delegate to listChapters (recent/historical word-budget split)
- * - draft: scope-isolated via draftScopeFilter (world-level + current project)
+ * - draft: scope-isolated via entityScopeFilter (world-level + current project)
+ * - character / world_setting: scope-isolated via entityScopeFilter
  */
 export async function listEntities(
   args: {
@@ -387,7 +384,7 @@ export async function listEntities(
   }
 
   if (args.type === "draft") {
-    const filter = draftScopeFilter({ projectId: args.projectId, worldId: args.worldId });
+    const filter = entityScopeFilter({ projectId: args.projectId, worldId: args.worldId });
     if (Object.keys(filter).length === 0) {
       return { error: "projectId or worldId is required for type='draft'" };
     }
@@ -410,12 +407,13 @@ export async function listEntities(
     };
   }
 
-  // character / world_setting — both belong to a world
+  // character / world_setting — both honor the same scope-isolation rule as drafts.
   if (!args.worldId) return { error: `worldId is required for type='${args.type}'` };
   const collection = args.type === "character" ? "characters" : "world_settings";
+  const filter = entityScopeFilter({ projectId: args.projectId, worldId: args.worldId });
   const docs = await db
     .collection(collection)
-    .find({ worldId: { $in: [args.worldId, new ObjectId(args.worldId)] } })
+    .find(filter)
     .sort({ updatedAt: -1 })
     .limit(limit)
     .toArray();
@@ -423,10 +421,12 @@ export async function listEntities(
   return {
     total: docs.length,
     items: docs.map((d) => {
+      const scope = d.projectId ? "project" : "world";
       if (args.type === "character") {
         return {
           id: d._id.toHexString(),
           name: d.name,
+          scope,
           importance: d.importance,
           summary: d.summary ?? "",
           aliases: d.aliases ?? [],
@@ -436,6 +436,7 @@ export async function listEntities(
       return {
         id: d._id.toHexString(),
         title: d.title,
+        scope,
         category: d.category,
         importance: d.importance,
         summary: d.summary ?? "",

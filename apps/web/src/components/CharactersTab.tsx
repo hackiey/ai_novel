@@ -31,6 +31,8 @@ interface CharactersTabProps {
   isSearching?: boolean;
 }
 
+type ScopeFilter = "all" | "world" | string;
+
 export default function CharactersTab({
   worldId,
   createRequestKey = 0,
@@ -42,6 +44,8 @@ export default function CharactersTab({
   const { t } = useTranslation();
   const [showCharForm, setShowCharForm] = useState(false);
   const [charName, setCharName] = useState("");
+  const [newScopeChoice, setNewScopeChoice] = useState<"world" | string>("world");
+  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("all");
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -52,9 +56,17 @@ export default function CharactersTab({
 
   const editTextarea = useAutoResizeTextarea(editContent);
 
-  const charactersQuery = trpc.character.list.useQuery({ worldId });
+  const projectsQuery = trpc.project.listByWorld.useQuery({ worldId });
+  const projects = (projectsQuery.data ?? []) as Array<{ _id: string; name: string }>;
+  const projectNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of projects) m.set(p._id, p.name);
+    return m;
+  }, [projects]);
+
+  const charactersQuery = trpc.character.list.useQuery({ worldId, includeAllProjectsUnderWorld: true });
   const createCharMut = trpc.character.create.useMutation({
-    onSuccess: () => { charactersQuery.refetch(); setShowCharForm(false); setCharName(""); },
+    onSuccess: () => { charactersQuery.refetch(); setShowCharForm(false); setCharName(""); setNewScopeChoice("world"); },
   });
   const updateCharMut = trpc.character.update.useMutation({
     onSuccess: () => { charactersQuery.refetch(); setEditingId(null); },
@@ -68,13 +80,18 @@ export default function CharactersTab({
 
   const characters = (charactersQuery.data ?? []) as any[];
   const hasSearch = searchQuery.length > 0;
+  const filteredByScope = useMemo(() => {
+    if (scopeFilter === "all") return characters;
+    if (scopeFilter === "world") return characters.filter((c) => !c.projectId);
+    return characters.filter((c) => c.projectId && String(c.projectId) === scopeFilter);
+  }, [characters, scopeFilter]);
   const visibleCharacters = useMemo(() => {
-    if (!hasSearch) return characters;
-    const byId = new Map(characters.map((char) => [char._id, char]));
+    if (!hasSearch) return filteredByScope;
+    const byId = new Map(filteredByScope.map((char) => [char._id, char]));
     return searchResultIds
       .map((id) => byId.get(id))
       .filter((char): char is any => Boolean(char));
-  }, [characters, hasSearch, searchResultIds]);
+  }, [filteredByScope, hasSearch, searchResultIds]);
 
   useEffect(() => {
     if (createRequestKey > 0) {
@@ -111,6 +128,23 @@ export default function CharactersTab({
 
   return (
     <div>
+      {!hasSearch && (
+        <div className="mb-3 flex items-center gap-2 text-xs">
+          <span className="text-white/50">{t("character.scope")}:</span>
+          <select
+            value={scopeFilter}
+            onChange={(e) => setScopeFilter(e.target.value as ScopeFilter)}
+            className="rounded-md bg-white/5 border border-white/15 px-2 py-1 text-white/80 focus:outline-none focus:ring-1 focus:ring-teal-500"
+          >
+            <option value="all">{t("character.scopeFilterAll")}</option>
+            <option value="world">{t("character.scopeFilterWorld")}</option>
+            {projects.map((p) => (
+              <option key={p._id} value={p._id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {hasSearch && (
         <div className="mb-4 flex items-center gap-2 text-xs text-white/50">
           <span className="rounded-full border border-teal-500/20 bg-teal-500/10 px-2 py-1 text-teal-400">
@@ -131,33 +165,54 @@ export default function CharactersTab({
             onSubmit={(e) => {
               e.preventDefault();
               if (!charName.trim()) return;
+              const isProject = newScopeChoice !== "world";
               createCharMut.mutate({
                 worldId,
+                ...(isProject ? { projectId: newScopeChoice } : {}),
+                scope: isProject ? "project" : "world",
                 name: charName.trim(),
               });
             }}
-            className="flex gap-3 flex-wrap"
+            className="space-y-3"
           >
-            <input
-              value={charName}
-              onChange={(e) => setCharName(e.target.value)}
-              placeholder={t("character.namePlaceholder")}
-              className="flex-1 min-w-[200px] rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-            />
-            <button
-              type="submit"
-              disabled={createCharMut.isPending}
-              className="px-4 py-2 text-sm rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 disabled:opacity-50 transition-colors"
-            >
-              {createCharMut.isPending ? t("character.adding") : t("character.add")}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setShowCharForm(false); setCharName(""); }}
-              className="px-3 py-2 text-sm rounded-lg border border-white/20 text-white/60 hover:bg-white/5 transition-colors"
-            >
-              {t("character.cancel")}
-            </button>
+            <div>
+              <label className="block text-xs font-medium text-white/50 mb-1.5">{t("character.scopePickerLabel")}</label>
+              <select
+                value={newScopeChoice}
+                onChange={(e) => setNewScopeChoice(e.target.value)}
+                className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="world">{t("character.scopePickerWorld")}</option>
+                {projects.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {t("character.scopePickerProject", { name: p.name })}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-white/40">{t("character.scopeHint")}</p>
+            </div>
+            <div className="flex gap-3 flex-wrap">
+              <input
+                value={charName}
+                onChange={(e) => setCharName(e.target.value)}
+                placeholder={t("character.namePlaceholder")}
+                className="flex-1 min-w-[200px] rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              />
+              <button
+                type="submit"
+                disabled={createCharMut.isPending}
+                className="px-4 py-2 text-sm rounded-lg bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 disabled:opacity-50 transition-colors"
+              >
+                {createCharMut.isPending ? t("character.adding") : t("character.add")}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowCharForm(false); setCharName(""); setNewScopeChoice("world"); }}
+                className="px-3 py-2 text-sm rounded-lg border border-white/20 text-white/60 hover:bg-white/5 transition-colors"
+              >
+                {t("character.cancel")}
+              </button>
+            </div>
           </form>
         </div>
       )}
@@ -235,6 +290,15 @@ export default function CharactersTab({
                         )}
                       </div>
                       <h4 className="text-sm font-medium text-white/80">{char.name}</h4>
+                      {char.projectId ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border border-amber-400/30 bg-amber-400/10 text-amber-300">
+                          {projectNameById.get(String(char.projectId)) ?? t("character.scopeProject")}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border border-sky-400/30 bg-sky-400/10 text-sky-300">
+                          {t("character.scopeWorld")}
+                        </span>
+                      )}
                       {char.aliases && char.aliases.length > 0 && (
                         <span className="text-xs text-white/40">({char.aliases.join(", ")})</span>
                       )}

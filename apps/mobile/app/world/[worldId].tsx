@@ -43,9 +43,10 @@ export default function WorldDetailScreen() {
   const projectsQuery = trpc.project.listByWorld.useQuery({
     worldId: worldId!,
   });
-  const charactersQuery = trpc.character.list.useQuery({ worldId: worldId! });
+  const charactersQuery = trpc.character.list.useQuery({ worldId: worldId!, includeAllProjectsUnderWorld: true });
   const worldSettingsQuery = trpc.worldSetting.list.useQuery({
     worldId: worldId!,
+    includeAllProjectsUnderWorld: true,
   });
   const draftsQuery = trpc.draft.list.useQuery({ worldId: worldId!, includeAllProjectsUnderWorld: true });
 
