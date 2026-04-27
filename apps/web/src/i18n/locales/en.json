@@ -197,6 +197,9 @@
   "draft.scopePickerWorld": "World (shared with all novels)",
   "draft.scopePickerProject": "Novel: {{name}}",
   "draft.scopeNoProjects": "No novels yet. Create a novel before you can scope a draft to it.",
+  "draft.tagsLabel": "Tags",
+  "draft.tagsAddPlaceholder": "Type and press Enter to add",
+  "draft.tagsEmpty": "No tags",
 
   "character.count": "Characters ({{count}})",
   "character.fromWorld": "(from world)",
@@ -234,6 +237,9 @@
   "character.scopePickerLabel": "Character scope",
   "character.scopePickerWorld": "World (shared with all novels)",
   "character.scopePickerProject": "Novel: {{name}}",
+  "character.tagsLabel": "Tags",
+  "character.tagsAddPlaceholder": "Type and press Enter to add",
+  "character.tagsEmpty": "No tags",
 
   "worldSetting.count": "World Settings ({{count}})",
   "worldSetting.fromWorld": "(from world)",
@@ -269,6 +275,9 @@
   "worldSetting.scopePickerLabel": "Setting scope",
   "worldSetting.scopePickerWorld": "World (shared with all novels)",
   "worldSetting.scopePickerProject": "Novel: {{name}}",
+  "worldSetting.tagsLabel": "Tags",
+  "worldSetting.tagsAddPlaceholder": "Type and press Enter to add",
+  "worldSetting.tagsEmpty": "No tags",
 
   "chapter.count": "Chapters ({{count}})",
   "chapter.addChapter": "+ Add Chapter",

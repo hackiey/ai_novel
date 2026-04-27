@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { trpc } from "../lib/trpc.js";
+import TagsEditor from "./TagsEditor.js";
 
 function useAutoResizeTextarea(value: string) {
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -51,6 +52,9 @@ export default function CharactersTab({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editContent, setEditContent] = useState("");
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editScopeChoice, setEditScopeChoice] = useState<"world" | string>("world");
+  const [editOriginalScope, setEditOriginalScope] = useState<"world" | string>("world");
   const [importanceDropdownId, setImportanceDropdownId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -116,6 +120,10 @@ export default function CharactersTab({
     setEditingId(char._id);
     setEditName(char.name || "");
     setEditContent(char.content || "");
+    setEditTags(Array.isArray(char.tags) ? char.tags : []);
+    const scope = char.projectId ? String(char.projectId) : "world";
+    setEditScopeChoice(scope);
+    setEditOriginalScope(scope);
   }, []);
 
   const getSummary = (char: any) => {
@@ -329,16 +337,34 @@ export default function CharactersTab({
                         onSubmit={(e) => {
                           e.preventDefault();
                           if (!editName.trim()) return;
-                          updateCharMut.mutate({
-                            id: char._id,
-                            data: {
-                              name: editName.trim(),
-                              content: editContent,
-                            },
-                          });
+                          const data: any = {
+                            name: editName.trim(),
+                            content: editContent,
+                            tags: editTags,
+                          };
+                          if (editScopeChoice !== editOriginalScope) {
+                            data.projectId = editScopeChoice === "world" ? null : editScopeChoice;
+                          }
+                          updateCharMut.mutate({ id: char._id, data });
                         }}
                         className="space-y-4 pt-4"
                       >
+                        <div>
+                          <label className="block text-xs font-medium text-white/50 mb-1.5">{t("character.scopePickerLabel")}</label>
+                          <select
+                            value={editScopeChoice}
+                            onChange={(e) => setEditScopeChoice(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          >
+                            <option value="world">{t("character.scopePickerWorld")}</option>
+                            {projects.map((p) => (
+                              <option key={p._id} value={p._id}>
+                                {t("character.scopePickerProject", { name: p.name })}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <div>
                           <label className="block text-xs font-medium text-white/50 mb-1.5">{t("character.name")}</label>
                           <input
@@ -347,6 +373,14 @@ export default function CharactersTab({
                             placeholder={t("character.namePlaceholder")}
                             onClick={(e) => e.stopPropagation()}
                             className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-white/50 mb-1.5">{t("character.tagsLabel")}</label>
+                          <TagsEditor
+                            value={editTags}
+                            onChange={setEditTags}
+                            placeholder={t("character.tagsAddPlaceholder") as string}
                           />
                         </div>
                         <div>

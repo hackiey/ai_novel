@@ -122,6 +122,9 @@ export const characterRouter = router({
       if (input.data.tags !== undefined) updateFields.tags = input.data.tags;
       if (input.data.importance !== undefined) updateFields.importance = input.data.importance;
       if (input.data.summary !== undefined) updateFields.summary = input.data.summary;
+      if (input.data.projectId !== undefined) {
+        updateFields.projectId = input.data.projectId === null ? null : new ObjectId(input.data.projectId);
+      }
       if (input.data.content !== undefined) {
         updateFields.content = input.data.content;
         updateFields.wordCount = computeCharacterWordCount(input.data.content);

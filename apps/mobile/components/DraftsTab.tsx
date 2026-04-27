@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import Markdown from "react-native-markdown-display";
 import { getMarkdownStyles } from "../lib/markdownStyles";
 import { useTheme } from "../contexts/ThemeContext";
+import TagsEditor from "./TagsEditor";
 
 interface Props {
   worldId: string;
@@ -33,6 +34,9 @@ export default function DraftsTab({ worldId, searchResultIds }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editScopeChoice, setEditScopeChoice] = useState<"world" | string>("world");
+  const [editOriginalScope, setEditOriginalScope] = useState<"world" | string>("world");
 
   const projectsQuery = trpc.project.listByWorld.useQuery({ worldId });
   const projects = (projectsQuery.data ?? []) as Array<{ _id: string; name: string }>;
@@ -117,7 +121,25 @@ export default function DraftsTab({ worldId, searchResultIds }: Props) {
     setEditingId(draft._id);
     setEditTitle(draft.title || "");
     setEditContent(draft.content || "");
+    setEditTags(Array.isArray(draft.tags) ? draft.tags : []);
+    const scope = draft.projectId ? String(draft.projectId) : "world";
+    setEditScopeChoice(scope);
+    setEditOriginalScope(scope);
   }, []);
+
+  const cycleEditScopeChoice = useCallback(() => {
+    setEditScopeChoice((cur) => {
+      if (cur === "world") return projects.length === 0 ? "world" : projects[0]._id;
+      const idx = projects.findIndex((p) => p._id === cur);
+      if (idx === -1 || idx === projects.length - 1) return "world";
+      return projects[idx + 1]._id;
+    });
+  }, [projects]);
+
+  const editScopeLabel = useMemo(() => {
+    if (editScopeChoice === "world") return t("draft.scopePickerWorld");
+    return t("draft.scopePickerProject", { name: projectNameById.get(editScopeChoice) ?? editScopeChoice });
+  }, [editScopeChoice, projectNameById, t]);
 
   function handleDelete(draft: any) {
     Alert.alert(
@@ -280,6 +302,10 @@ export default function DraftsTab({ worldId, searchResultIds }: Props) {
                 <View style={s.expandedSection}>
                   {isEditing ? (
                     <View style={s.editContainer}>
+                      <TouchableOpacity onPress={cycleEditScopeChoice} style={[s.scopePickerBtn, base.mb3]}>
+                        <Text style={s.scopePickerLabel}>{t("draft.scopePickerLabel")}</Text>
+                        <Text style={s.scopePickerValue}>{editScopeLabel}</Text>
+                      </TouchableOpacity>
                       <TextInput
                         value={editTitle}
                         onChangeText={setEditTitle}
@@ -287,6 +313,14 @@ export default function DraftsTab({ worldId, searchResultIds }: Props) {
                         placeholderTextColor={colors.slate500}
                         style={[base.input, base.mb3, { fontSize: 13 }]}
                       />
+                      <View style={base.mb3}>
+                        <Text style={s.fieldLabel}>{t("draft.tagsLabel")}</Text>
+                        <TagsEditor
+                          value={editTags}
+                          onChange={setEditTags}
+                          placeholder={t("draft.tagsAddPlaceholder")}
+                        />
+                      </View>
                       <TextInput
                         value={editContent}
                         onChangeText={setEditContent}
@@ -307,13 +341,15 @@ export default function DraftsTab({ worldId, searchResultIds }: Props) {
                         <TouchableOpacity
                           onPress={() => {
                             if (!editTitle.trim()) return;
-                            updateMut.mutate({
-                              id: draft._id,
-                              data: {
-                                title: editTitle.trim(),
-                                content: editContent.trim(),
-                              },
-                            });
+                            const data: any = {
+                              title: editTitle.trim(),
+                              content: editContent.trim(),
+                              tags: editTags,
+                            };
+                            if (editScopeChoice !== editOriginalScope) {
+                              data.projectId = editScopeChoice === "world" ? null : editScopeChoice;
+                            }
+                            updateMut.mutate({ id: draft._id, data });
                           }}
                           disabled={updateMut.isPending}
                           style={[
@@ -417,6 +453,11 @@ function createStyles(colors: any) {
     },
     editContainer: {
       paddingTop: 16,
+    },
+    fieldLabel: {
+      fontSize: 11,
+      color: colors.muted,
+      marginBottom: 6,
     },
     contentBox: {
       backgroundColor: colors.bg,

@@ -105,6 +105,9 @@ export const worldSettingRouter = router({
       if (input.data.tags !== undefined) updateFields.tags = input.data.tags;
       if (input.data.importance !== undefined) updateFields.importance = input.data.importance;
       if (input.data.summary !== undefined) updateFields.summary = input.data.summary;
+      if (input.data.projectId !== undefined) {
+        updateFields.projectId = input.data.projectId === null ? null : new ObjectId(input.data.projectId);
+      }
 
       const result = await ctx.db
         .collection("world_settings")

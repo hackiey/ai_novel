@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { trpc } from "../lib/trpc.js";
+import TagsEditor from "./TagsEditor.js";
 
 function useAutoResizeTextarea(value: string) {
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -48,6 +49,9 @@ export default function WorldSettingsTab({
   const [editWorldCategory, setEditWorldCategory] = useState("");
   const [editWorldTitle, setEditWorldTitle] = useState("");
   const [editWorldContent, setEditWorldContent] = useState("");
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editScopeChoice, setEditScopeChoice] = useState<"world" | string>("world");
+  const [editOriginalScope, setEditOriginalScope] = useState<"world" | string>("world");
 
   const editContentTextarea = useAutoResizeTextarea(editWorldContent);
 
@@ -97,6 +101,10 @@ export default function WorldSettingsTab({
     setEditWorldCategory(ws.category || "");
     setEditWorldTitle(ws.title || "");
     setEditWorldContent(ws.content || "");
+    setEditTags(Array.isArray(ws.tags) ? ws.tags : []);
+    const scope = ws.projectId ? String(ws.projectId) : "world";
+    setEditScopeChoice(scope);
+    setEditOriginalScope(scope);
   }, []);
 
   return (
@@ -294,17 +302,35 @@ export default function WorldSettingsTab({
                         onSubmit={(e) => {
                           e.preventDefault();
                           if (!editWorldCategory.trim() || !editWorldTitle.trim()) return;
-                          updateWorldSettingMut.mutate({
-                            id: ws._id,
-                            data: {
-                              category: editWorldCategory.trim(),
-                              title: editWorldTitle.trim(),
-                              content: editWorldContent.trim(),
-                            },
-                          });
+                          const data: any = {
+                            category: editWorldCategory.trim(),
+                            title: editWorldTitle.trim(),
+                            content: editWorldContent.trim(),
+                            tags: editTags,
+                          };
+                          if (editScopeChoice !== editOriginalScope) {
+                            data.projectId = editScopeChoice === "world" ? null : editScopeChoice;
+                          }
+                          updateWorldSettingMut.mutate({ id: ws._id, data });
                         }}
                         className="space-y-4 pt-4"
                       >
+                        <div>
+                          <label className="block text-xs font-medium text-white/50 mb-1.5">{t("worldSetting.scopePickerLabel")}</label>
+                          <select
+                            value={editScopeChoice}
+                            onChange={(e) => setEditScopeChoice(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          >
+                            <option value="world">{t("worldSetting.scopePickerWorld")}</option>
+                            {projects.map((p) => (
+                              <option key={p._id} value={p._id}>
+                                {t("worldSetting.scopePickerProject", { name: p.name })}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <div className="flex gap-3">
                           <div className="flex-1">
                             <label className="block text-xs font-medium text-white/50 mb-1.5">{t("worldSetting.category")}</label>
@@ -343,15 +369,14 @@ export default function WorldSettingsTab({
                             style={{ minHeight: "160px" }}
                           />
                         </div>
-                        {ws.tags && ws.tags.length > 0 && (
-                          <div className="flex gap-1">
-                            {ws.tags.map((tag: string) => (
-                              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50">
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                        <div>
+                          <label className="block text-xs font-medium text-white/50 mb-1.5">{t("worldSetting.tagsLabel")}</label>
+                          <TagsEditor
+                            value={editTags}
+                            onChange={setEditTags}
+                            placeholder={t("worldSetting.tagsAddPlaceholder") as string}
+                          />
+                        </div>
                         <div className="flex gap-2 justify-end">
                           <button
                             type="button"

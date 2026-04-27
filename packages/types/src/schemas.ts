@@ -172,7 +172,8 @@ export const createCharacterSchema = z.object({
 
 export const updateCharacterSchema = createCharacterSchema
   .omit({ worldId: true, projectId: true, scope: true })
-  .partial();
+  .partial()
+  .extend({ projectId: objectIdSchema.nullable().optional() });
 
 export type Character = z.infer<typeof characterSchema>;
 export type CreateCharacter = z.infer<typeof createCharacterSchema>;
@@ -210,7 +211,8 @@ export const createWorldSettingSchema = z.object({
 
 export const updateWorldSettingSchema = createWorldSettingSchema
   .omit({ worldId: true, projectId: true, scope: true })
-  .partial();
+  .partial()
+  .extend({ projectId: objectIdSchema.nullable().optional() });
 
 export type WorldSetting = z.infer<typeof worldSettingSchema>;
 export type CreateWorldSetting = z.infer<typeof createWorldSettingSchema>;
@@ -244,7 +246,10 @@ export const createDraftSchema = z.object({
   linkedWorldSettings: z.array(objectIdSchema).optional(),
 });
 
-export const updateDraftSchema = createDraftSchema.omit({ projectId: true, scope: true }).partial();
+export const updateDraftSchema = createDraftSchema
+  .omit({ projectId: true, scope: true })
+  .partial()
+  .extend({ projectId: objectIdSchema.nullable().optional() });
 
 export type Draft = z.infer<typeof draftSchema>;
 export type CreateDraft = z.infer<typeof createDraftSchema>;

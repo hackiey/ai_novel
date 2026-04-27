@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { trpc } from "../lib/trpc.js";
+import TagsEditor from "./TagsEditor.js";
 
 function useAutoResizeTextarea(value: string) {
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -47,6 +48,9 @@ export default function DraftsTab({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editScopeChoice, setEditScopeChoice] = useState<"world" | string>("world");
+  const [editOriginalScope, setEditOriginalScope] = useState<"world" | string>("world");
 
   const editContentTextarea = useAutoResizeTextarea(editContent);
 
@@ -95,6 +99,10 @@ export default function DraftsTab({
     setEditingId(draft._id);
     setEditTitle(draft.title || "");
     setEditContent(draft.content || "");
+    setEditTags(Array.isArray(draft.tags) ? draft.tags : []);
+    const scope = draft.projectId ? String(draft.projectId) : "world";
+    setEditScopeChoice(scope);
+    setEditOriginalScope(scope);
   }, []);
 
   return (
@@ -277,16 +285,34 @@ export default function DraftsTab({
                         onSubmit={(e) => {
                           e.preventDefault();
                           if (!editTitle.trim()) return;
-                          updateMut.mutate({
-                            id: draft._id,
-                            data: {
-                              title: editTitle.trim(),
-                              content: editContent.trim(),
-                            },
-                          });
+                          const data: any = {
+                            title: editTitle.trim(),
+                            content: editContent.trim(),
+                            tags: editTags,
+                          };
+                          if (editScopeChoice !== editOriginalScope) {
+                            data.projectId = editScopeChoice === "world" ? null : editScopeChoice;
+                          }
+                          updateMut.mutate({ id: draft._id, data });
                         }}
                         className="space-y-4 pt-4"
                       >
+                        <div>
+                          <label className="block text-xs font-medium text-white/50 mb-1.5">{t("draft.scopePickerLabel")}</label>
+                          <select
+                            value={editScopeChoice}
+                            onChange={(e) => setEditScopeChoice(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          >
+                            <option value="world">{t("draft.scopePickerWorld")}</option>
+                            {projects.map((p) => (
+                              <option key={p._id} value={p._id}>
+                                {t("draft.scopePickerProject", { name: p.name })}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <div>
                           <label className="block text-xs font-medium text-white/50 mb-1.5">{t("draft.title")}</label>
                           <input
@@ -295,6 +321,14 @@ export default function DraftsTab({
                             placeholder={t("draft.titlePlaceholder")}
                             onClick={(e) => e.stopPropagation()}
                             className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-white/50 mb-1.5">{t("draft.tagsLabel")}</label>
+                          <TagsEditor
+                            value={editTags}
+                            onChange={setEditTags}
+                            placeholder={t("draft.tagsAddPlaceholder") as string}
                           />
                         </div>
                         <div>
@@ -313,15 +347,6 @@ export default function DraftsTab({
                             style={{ minHeight: "160px" }}
                           />
                         </div>
-                        {draft.tags && draft.tags.length > 0 && (
-                          <div className="flex gap-1">
-                            {draft.tags.map((tag: string) => (
-                              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50">
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                         <div className="flex gap-2 justify-end">
                           <button
                             type="button"

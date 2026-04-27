@@ -137,6 +137,9 @@
   "draft.scopePickerWorld": "世界观（共享给所有小说）",
   "draft.scopePickerProject": "归属到小说：{{name}}",
   "draft.scopeNoProjects": "暂无小说，新建一个小说后才能创建小说级草稿。",
+  "draft.tagsLabel": "标签",
+  "draft.tagsAddPlaceholder": "输入后回车添加",
+  "draft.tagsEmpty": "暂无标签",
 
   "character.count": "角色 ({{count}})",
   "character.addCharacter": "+ 添加角色",
@@ -168,6 +171,9 @@
   "character.scopePickerLabel": "角色归属",
   "character.scopePickerWorld": "世界观（共享给所有小说）",
   "character.scopePickerProject": "归属到小说：{{name}}",
+  "character.tagsLabel": "标签",
+  "character.tagsAddPlaceholder": "输入后回车添加",
+  "character.tagsEmpty": "暂无标签",
 
   "worldSetting.count": "世界设定 ({{count}})",
   "worldSetting.addSetting": "+ 添加设定",
@@ -199,6 +205,9 @@
   "worldSetting.scopePickerLabel": "设定归属",
   "worldSetting.scopePickerWorld": "世界观（共享给所有小说）",
   "worldSetting.scopePickerProject": "归属到小说：{{name}}",
+  "worldSetting.tagsLabel": "标签",
+  "worldSetting.tagsAddPlaceholder": "输入后回车添加",
+  "worldSetting.tagsEmpty": "暂无标签",
 
   "editor.newChapter": "新章节",
   "editor.createFirst": "创建第一个章节",

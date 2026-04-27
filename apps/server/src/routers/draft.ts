@@ -114,6 +114,9 @@ export const draftRouter = router({
       if (input.data.tags !== undefined) updateFields.tags = input.data.tags;
       if (input.data.linkedCharacters !== undefined) updateFields.linkedCharacters = input.data.linkedCharacters;
       if (input.data.linkedWorldSettings !== undefined) updateFields.linkedWorldSettings = input.data.linkedWorldSettings;
+      if (input.data.projectId !== undefined) {
+        updateFields.projectId = input.data.projectId === null ? null : new ObjectId(input.data.projectId);
+      }
 
       const result = await ctx.db
         .collection("drafts")
