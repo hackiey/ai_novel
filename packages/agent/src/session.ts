@@ -8,6 +8,21 @@ import type { Locale } from "./i18n.js";
 import type { SkillData } from "./skills.js";
 import { getAgentDefinition } from "./agents/index.js";
 
+function logLLMError(prefix: string, err: unknown): void {
+  const e = err as any;
+  const status = e?.status ?? e?.response?.status;
+  const reqId = e?.request_id ?? e?.requestID ?? e?.headers?.["request-id"] ?? e?.response?.headers?.["request-id"];
+  const body = e?.error ?? e?.response?.data ?? e?.response?.body;
+  console.error(prefix, {
+    name: e?.name,
+    message: e?.message ?? String(err),
+    status,
+    requestId: reqId,
+    body,
+  });
+  if (e instanceof Error && e.stack) console.error(e.stack);
+}
+
 export interface TokenUsage {
   model: string;
   input: number;
@@ -337,7 +352,7 @@ export class CreatorAgentSession {
 
       if (loopError) {
         const err = loopError as Error;
-        console.error("[AgentSession] chat error:", err.message);
+        logLLMError("[AgentSession] chat error (loop):", err);
         yield { type: "error", error: err.message };
       }
 
@@ -349,7 +364,7 @@ export class CreatorAgentSession {
     } catch (err) {
       this.abortController = undefined;
       const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error("[AgentSession] chat error:", errorMessage);
+      logLLMError("[AgentSession] chat error (yield loop):", err);
       yield { type: "error", error: errorMessage };
     }
   }

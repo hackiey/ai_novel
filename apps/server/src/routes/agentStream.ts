@@ -372,8 +372,28 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
         if (event.type === "text") {
           fullText += event.text;
         }
+        if (event.type === "error") {
+          console.error("[agentStream] LLM error event:", {
+            sessionId,
+            userId: user.userId,
+            model: selectedModel,
+            error: (event as any).error,
+          });
+        }
       }
     } catch (err) {
+      const e = err as any;
+      console.error("[agentStream] caught exception:", {
+        sessionId,
+        userId: user.userId,
+        model: selectedModel,
+        name: e?.name,
+        message: e?.message ?? String(err),
+        status: e?.status ?? e?.response?.status,
+        requestId: e?.request_id ?? e?.requestID,
+        body: e?.error ?? e?.response?.data ?? e?.response?.body,
+      });
+      if (err instanceof Error && err.stack) console.error(err.stack);
       const errorMsg = err instanceof Error ? err.message : String(err);
       reply.raw.write(`data: ${JSON.stringify({ type: "error", error: errorMsg })}\n\n`);
     }
