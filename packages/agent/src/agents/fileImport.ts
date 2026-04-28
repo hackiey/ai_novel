@@ -7,10 +7,9 @@ export const fileImportAgent: AgentDefinition = {
   tools: [
     "semantic_search",
     "write",
-    "update_character",
+    "update",
     "get_entity",
     "delete_entity",
-    "update_world_setting",
   ],
   buildSystemPrompt(ctx) {
     const locale = ctx.locale ?? "zh";

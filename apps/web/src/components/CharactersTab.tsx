@@ -307,9 +307,6 @@ export default function CharactersTab({
                           {t("character.scopeWorld")}
                         </span>
                       )}
-                      {char.aliases && char.aliases.length > 0 && (
-                        <span className="text-xs text-white/40">({char.aliases.join(", ")})</span>
-                      )}
                     </div>
                     {!isExpanded && summary && (
                       <p className="text-xs text-white/50 line-clamp-2 ml-5">{summary}</p>

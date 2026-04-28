@@ -4,7 +4,6 @@ import { t, type Locale } from "./i18n.js";
 
 interface SummaryItem {
   name: string;
-  category?: string;
   importance: "core" | "major" | "minor";
   summary: string;
 }
@@ -15,7 +14,7 @@ interface SummaryConfig {
 
 /**
  * Build a structured world summary text from characters and world settings.
- * Groups characters by importance, world settings by category.
+ * Groups both by importance.
  */
 export function buildWorldSummary(
   characters: SummaryItem[],
@@ -30,15 +29,17 @@ export function buildWorldSummary(
   const compress = totalItems > config.fullSummaryMaxItems;
   const lines: string[] = [];
 
-  // Characters grouped by importance
-  const charGroups: Record<string, SummaryItem[]> = { core: [], major: [], minor: [] };
-  for (const c of characters) {
-    const imp = c.importance || "minor";
-    charGroups[imp].push(c);
-  }
+  const groupByImportance = (items: SummaryItem[]) => {
+    const groups: Record<string, SummaryItem[]> = { core: [], major: [], minor: [] };
+    for (const it of items) {
+      const imp = it.importance || "minor";
+      groups[imp].push(it);
+    }
+    return groups;
+  };
 
-  const hasChars = characters.length > 0;
-  if (hasChars) {
+  if (characters.length > 0) {
+    const charGroups = groupByImportance(characters);
     lines.push(texts.charactersHeading);
     for (const imp of ["core", "major", "minor"] as const) {
       const group = charGroups[imp];
@@ -54,22 +55,17 @@ export function buildWorldSummary(
     }
   }
 
-  // World settings grouped by category
-  const settingsByCategory: Record<string, SummaryItem[]> = {};
-  for (const ws of worldSettings) {
-    const cat = ws.category || texts.uncategorized;
-    if (!settingsByCategory[cat]) settingsByCategory[cat] = [];
-    settingsByCategory[cat].push(ws);
-  }
-
-  const hasSettings = worldSettings.length > 0;
-  if (hasSettings) {
+  if (worldSettings.length > 0) {
+    const settingGroups = groupByImportance(worldSettings);
     lines.push("");
     lines.push(texts.worldSettingsHeading);
-    for (const [cat, items] of Object.entries(settingsByCategory)) {
-      lines.push(`**${cat}：**`);
-      for (const ws of items) {
-        const summary = compress && ws.importance === "minor"
+    for (const imp of ["core", "major", "minor"] as const) {
+      const group = settingGroups[imp];
+      if (group.length === 0) continue;
+      const label = texts.importanceLabel[imp] || imp;
+      lines.push(`**${label}${locale === "zh" ? "设定" : " Settings"}：**`);
+      for (const ws of group) {
+        const summary = compress && imp === "minor"
           ? (ws.summary || "").slice(0, 30)
           : (ws.summary || "").slice(0, 50);
         lines.push(`- ${ws.name}${summary ? ": " + summary : ""}`);
@@ -122,8 +118,8 @@ export async function getOrRefreshWorldSummary(
         .toArray(),
       db.collection("world_settings")
         .find({ worldId: worldIdMatch, projectId: null })
-        .project({ title: 1, category: 1, importance: 1, summary: 1 })
-        .sort({ category: 1, title: 1 })
+        .project({ title: 1, importance: 1, summary: 1 })
+        .sort({ title: 1 })
         .toArray(),
     ]);
 
@@ -134,7 +130,6 @@ export async function getOrRefreshWorldSummary(
     }));
     worldSettings = settings.map((ws) => ({
       name: ws.title as string,
-      category: ws.category as string | undefined,
       importance: (ws.importance as "core" | "major" | "minor") || "minor",
       summary: (ws.summary as string) || "",
     }));
@@ -161,8 +156,8 @@ export async function getOrRefreshWorldSummary(
       .toArray(),
     db.collection("world_settings")
       .find({ worldId: { $in: [worldId, wid] }, projectId: { $in: [projectId, pid] } })
-      .project({ title: 1, category: 1, importance: 1, summary: 1 })
-      .sort({ category: 1, title: 1 })
+      .project({ title: 1, importance: 1, summary: 1 })
+      .sort({ title: 1 })
       .toArray(),
   ]);
 
@@ -173,7 +168,6 @@ export async function getOrRefreshWorldSummary(
   }));
   const projSettingItems: SummaryItem[] = projSettings.map((ws) => ({
     name: ws.title as string,
-    category: ws.category as string | undefined,
     importance: (ws.importance as "core" | "major" | "minor") || "minor",
     summary: (ws.summary as string) || "",
   }));

@@ -17,10 +17,7 @@ const API_BASE = "";
 // tRPC v11 query keys are double-nested: [["router", "procedure"], ...]
 const MUTATION_TOOL_INVALIDATIONS: Record<string, string[][]> = {
   write: [["character"], ["worldSetting"], ["chapter"], ["draft"]],
-  update_character: [["character"]],
-  update_world_setting: [["worldSetting"]],
-  update_chapter: [["chapter"]],
-  update_draft: [["draft"]],
+  update: [["character"], ["worldSetting"], ["chapter"], ["draft"]],
   delete_entity: [["character"], ["worldSetting"], ["chapter"], ["draft"]],
 };
 
@@ -34,8 +31,13 @@ interface ChatMessage {
   source?: "main" | "recommendation";
 }
 
-// Tools that edit chapter content — require review flow
-const CHAPTER_EDIT_TOOLS = new Set(["update_chapter"]);
+// Tool calls that edit chapter content — require review flow.
+// With the unified `update` tool, we check the type arg too.
+function isChapterEditCall(toolName: string | undefined, toolInput: unknown): boolean {
+  if (toolName !== "update") return false;
+  const input = (toolInput ?? {}) as Record<string, unknown>;
+  return input.type === "chapter";
+}
 
 interface Props {
   projectId?: string;
@@ -544,8 +546,8 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
       let chapterEditHandled = false;
       if (onChapterEdit) {
         for (const e of allEvents) {
-          if (e.type === "tool_use" && e.toolName && CHAPTER_EDIT_TOOLS.has(e.toolName) && e.toolInput) {
-            const input = e.toolInput as Record<string, unknown>;
+          if (e.type === "tool_use" && isChapterEditCall(e.toolName, e.toolInput)) {
+            const input = (e.toolInput ?? {}) as Record<string, unknown>;
             const chapterId = (input.chapter_id ?? input.id) as string | undefined;
             if (chapterId) {
               onChapterEdit(chapterId);
@@ -555,14 +557,15 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
         }
       }
 
-      // Invalidate queries for any data the agent mutated
+      // Invalidate queries for any data the agent mutated.
+      // Skip chapter invalidation if we're routing the edit through the review flow.
       const keysToInvalidate = new Set<string>();
       for (const toolName of mutatedTools) {
-        // Skip chapter invalidation if we're handling it via review flow
-        if (chapterEditHandled && CHAPTER_EDIT_TOOLS.has(toolName)) continue;
         const keys = MUTATION_TOOL_INVALIDATIONS[toolName];
-        if (keys) {
-          for (const key of keys) keysToInvalidate.add(JSON.stringify(key));
+        if (!keys) continue;
+        for (const key of keys) {
+          if (chapterEditHandled && key[0] === "chapter") continue;
+          keysToInvalidate.add(JSON.stringify(key));
         }
       }
       for (const keyStr of keysToInvalidate) {

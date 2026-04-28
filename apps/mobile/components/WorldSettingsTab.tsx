@@ -25,7 +25,6 @@ export default function WorldSettingsTab({ worldId, searchResultIds }: Props) {
   const { t } = useTranslation();
   const { colors, baseStyles: base } = useTheme();
   const [showForm, setShowForm] = useState(false);
-  const [category, setCategory] = useState("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [newScopeChoice, setNewScopeChoice] = useState<"world" | string>("world");
@@ -33,7 +32,6 @@ export default function WorldSettingsTab({ worldId, searchResultIds }: Props) {
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editCategory, setEditCategory] = useState("");
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
   const [editTags, setEditTags] = useState<string[]>([]);
@@ -53,7 +51,6 @@ export default function WorldSettingsTab({ worldId, searchResultIds }: Props) {
     onSuccess: () => {
       query.refetch();
       setShowForm(false);
-      setCategory("");
       setTitle("");
       setContent("");
       setNewScopeChoice("world");
@@ -113,7 +110,6 @@ export default function WorldSettingsTab({ worldId, searchResultIds }: Props) {
   const openEditMode = useCallback((ws: any) => {
     setExpandedId(ws._id);
     setEditingId(ws._id);
-    setEditCategory(ws.category || "");
     setEditTitle(ws.title || "");
     setEditContent(ws.content || "");
     setEditTags(Array.isArray(ws.tags) ? ws.tags : []);
@@ -181,22 +177,13 @@ export default function WorldSettingsTab({ worldId, searchResultIds }: Props) {
             <Text style={s.scopePickerValue}>{newScopeLabel}</Text>
           </TouchableOpacity>
           <Text style={s.scopeHint}>{t("worldSetting.scopeHint")}</Text>
-          <View style={[base.row, base.gap2, base.mb3]}>
-            <TextInput
-              value={category}
-              onChangeText={setCategory}
-              placeholder={t("worldSetting.categoryPlaceholder")}
-              placeholderTextColor={colors.slate500}
-              style={[base.input, base.flex1, { fontSize: 13 }]}
-            />
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder={t("worldSetting.titlePlaceholder")}
-              placeholderTextColor={colors.slate500}
-              style={[base.input, base.flex1, { fontSize: 13 }]}
-            />
-          </View>
+          <TextInput
+            value={title}
+            onChangeText={setTitle}
+            placeholder={t("worldSetting.titlePlaceholder")}
+            placeholderTextColor={colors.slate500}
+            style={[base.input, base.mb3, { fontSize: 13 }]}
+          />
           <TextInput
             value={content}
             onChangeText={setContent}
@@ -209,7 +196,6 @@ export default function WorldSettingsTab({ worldId, searchResultIds }: Props) {
             <TouchableOpacity
               onPress={() => {
                 setShowForm(false);
-                setCategory("");
                 setTitle("");
                 setContent("");
                 setNewScopeChoice("world");
@@ -222,24 +208,23 @@ export default function WorldSettingsTab({ worldId, searchResultIds }: Props) {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
-                if (!category.trim() || !title.trim()) return;
+                if (!title.trim()) return;
                 const isProject = newScopeChoice !== "world";
                 createMut.mutate({
                   worldId,
                   ...(isProject ? { projectId: newScopeChoice } : {}),
                   scope: isProject ? ("project" as const) : ("world" as const),
-                  category: category.trim(),
                   title: title.trim(),
                   content: content.trim() || undefined,
                 });
               }}
               disabled={
-                createMut.isPending || !category.trim() || !title.trim()
+                createMut.isPending || !title.trim()
               }
               style={[
                 base.btnPrimary,
                 base.flex1,
-                (createMut.isPending || !category.trim() || !title.trim()) && base.btnDisabled,
+                (createMut.isPending || !title.trim()) && base.btnDisabled,
               ]}
             >
               <Text style={s.submitText}>
@@ -280,11 +265,6 @@ export default function WorldSettingsTab({ worldId, searchResultIds }: Props) {
                 style={base.p4}
               >
                 <View style={[base.rowCenter, base.gap2, base.mb1]}>
-                  <View style={s.categoryBadge}>
-                    <Text style={s.categoryBadgeText}>
-                      {ws.category}
-                    </Text>
-                  </View>
                   <Text style={[s.itemTitle, base.flex1]} numberOfLines={1}>
                     {ws.title}
                   </Text>
@@ -317,24 +297,13 @@ export default function WorldSettingsTab({ worldId, searchResultIds }: Props) {
                         <Text style={s.scopePickerLabel}>{t("worldSetting.scopePickerLabel")}</Text>
                         <Text style={s.scopePickerValue}>{editScopeLabel}</Text>
                       </TouchableOpacity>
-                      <View style={[base.row, base.gap2, base.mb3]}>
-                        <TextInput
-                          value={editCategory}
-                          onChangeText={setEditCategory}
-                          placeholder={t(
-                            "worldSetting.editCategoryPlaceholder"
-                          )}
-                          placeholderTextColor={colors.slate500}
-                          style={[base.input, base.flex1, { fontSize: 13 }]}
-                        />
-                        <TextInput
-                          value={editTitle}
-                          onChangeText={setEditTitle}
-                          placeholder={t("worldSetting.titlePlaceholder")}
-                          placeholderTextColor={colors.slate500}
-                          style={[base.input, base.flex1, { fontSize: 13 }]}
-                        />
-                      </View>
+                      <TextInput
+                        value={editTitle}
+                        onChangeText={setEditTitle}
+                        placeholder={t("worldSetting.titlePlaceholder")}
+                        placeholderTextColor={colors.slate500}
+                        style={[base.input, base.mb3, { fontSize: 13 }]}
+                      />
                       <View style={base.mb3}>
                         <Text style={s.fieldLabel}>{t("worldSetting.tagsLabel")}</Text>
                         <TagsEditor
@@ -362,13 +331,8 @@ export default function WorldSettingsTab({ worldId, searchResultIds }: Props) {
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => {
-                            if (
-                              !editCategory.trim() ||
-                              !editTitle.trim()
-                            )
-                              return;
+                            if (!editTitle.trim()) return;
                             const data: any = {
-                              category: editCategory.trim(),
                               title: editTitle.trim(),
                               content: editContent.trim(),
                               tags: editTags,
@@ -466,16 +430,6 @@ function createStyles(colors: any) {
     },
     itemCardDefault: {
       borderColor: colors.border,
-    },
-    categoryBadge: {
-      backgroundColor: "rgba(52,211,153,0.15)",
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 999,
-    },
-    categoryBadgeText: {
-      fontSize: 11,
-      color: colors.emerald,
     },
     itemTitle: {
       fontSize: 13,

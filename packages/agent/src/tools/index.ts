@@ -116,27 +116,73 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
     },
 
     {
-      name: "update_character",
-      label: "Update Character",
-      description: d.update_character,
+      name: "update",
+      label: "Update",
+      description: d.update,
       parameters: Type.Object({
-        id: Type.String({ description: d.update_character_id }),
-        name: Type.Optional(Type.String({ description: d.update_character_name })),
-        importance: Type.Optional(StringEnum(
-          ["core", "major", "minor"] as const,
-          { description: d.update_character_importance },
-        )),
-        summary: Type.Optional(Type.String({ description: d.update_character_summary })),
-        aliases: Type.Optional(Type.Array(Type.String(), { description: d.update_character_aliases })),
-        tags: Type.Optional(Type.Array(Type.String(), { description: d.update_character_tags })),
-        content: Type.Optional(Type.String({ description: d.update_character_content })),
+        type: StringEnum(["character", "world_setting", "chapter", "draft"] as const, { description: d.update_type }),
+        id: Type.String({ description: d.update_id }),
+        new_string: Type.String({ description: d.update_new_string }),
+        old_string: Type.Optional(Type.String({ description: d.update_old_string })),
+        field: Type.Optional(StringEnum(["name", "content", "tags", "importance", "summary"] as const, { description: d.update_field })),
+        append: Type.Optional(Type.Boolean({ description: d.update_append })),
+        prepend: Type.Optional(Type.Boolean({ description: d.update_prepend })),
       }),
       async execute(_toolCallId, args) {
-        const result = await handlers.updateCharacter(args, db, userId);
-        onDocumentChanged?.("characters", args.id);
-        const charDoc = await db.collection("characters").findOne({ _id: new ObjectId(args.id) });
-        if (charDoc?.worldId) onWorldSummaryStale?.(charDoc.worldId.toHexString());
-        return textResult(result);
+        // Per-type field whitelist (LLM-facing names — `name` maps to DB `title`
+        // for ws/chapter/draft below).
+        const allowedByType: Record<string, string[]> = {
+          character: ["name", "content", "tags", "importance", "summary"],
+          world_setting: ["name", "content", "tags", "importance", "summary"],
+          chapter: ["name", "content"],
+          draft: ["name", "content", "tags"],
+        };
+        const allowed = allowedByType[args.type];
+        if (!allowed) return textResult({ error: `Unknown update type: ${args.type}` });
+        const llmField = args.field ?? "content";
+        if (!allowed.includes(llmField)) {
+          return textResult({ error: `Field "${llmField}" is not editable on type "${args.type}". Allowed: ${allowed.join(", ")}` });
+        }
+        // Map name → title for entities whose DB column is `title`.
+        const dbField =
+          llmField === "name" && args.type !== "character" ? "title" : llmField;
+        const handlerArgs = {
+          id: args.id,
+          old_string: args.old_string,
+          new_string: args.new_string,
+          field: dbField,
+          append: args.append,
+          prepend: args.prepend,
+        };
+
+        switch (args.type) {
+          case "character": {
+            const result = await handlers.updateCharacter(handlerArgs, db, userId);
+            onDocumentChanged?.("characters", args.id);
+            const charDoc = await db.collection("characters").findOne({ _id: new ObjectId(args.id) });
+            if (charDoc?.worldId) onWorldSummaryStale?.(charDoc.worldId.toHexString());
+            return textResult(result);
+          }
+          case "world_setting": {
+            const result = await handlers.updateWorldSetting(handlerArgs, db, userId);
+            onDocumentChanged?.("world_settings", args.id);
+            const wsDoc = await db.collection("world_settings").findOne({ _id: new ObjectId(args.id) });
+            if (wsDoc?.worldId) onWorldSummaryStale?.(wsDoc.worldId.toHexString());
+            return textResult(result);
+          }
+          case "chapter": {
+            const result = await handlers.updateChapter(handlerArgs, db, userId);
+            onDocumentChanged?.("chapters", args.id);
+            return textResult(result);
+          }
+          case "draft": {
+            const result = await handlers.updateDraft(handlerArgs, db, userId);
+            onDocumentChanged?.("drafts", args.id);
+            return textResult(result);
+          }
+          default:
+            return textResult({ error: `Unknown update type: ${(args as any).type}` });
+        }
       },
     },
 
@@ -147,27 +193,26 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       parameters: Type.Object({
         type: StringEnum(["character", "world_setting", "chapter", "draft"] as const, { description: d.write_type }),
         id: Type.Optional(Type.String({ description: d.write_id })),
-        name: Type.Optional(Type.String({ description: d.write_character_name })),
-        category: Type.Optional(Type.String({ description: d.write_world_setting_category })),
-        title: Type.Optional(Type.String({ description: d.write_title })),
-        content: Type.Optional(Type.String({ description: d.write_content })),
-        tags: Type.Optional(Type.Array(Type.String(), { description: d.write_tags })),
-        importance: Type.Optional(StringEnum(["core", "major", "minor"] as const, { description: d.write_importance })),
+        name: Type.Optional(Type.String({ description: d.write_name })),
         summary: Type.Optional(Type.String({ description: d.write_summary })),
-        aliases: Type.Optional(Type.Array(Type.String(), { description: d.write_character_aliases })),
-        synopsis: Type.Optional(Type.String({ description: d.write_chapter_synopsis })),
-        order: Type.Optional(Type.Number({ description: d.write_chapter_order })),
-        linkedCharacters: Type.Optional(Type.Array(Type.String(), { description: d.write_draft_linkedCharacters })),
-        linkedWorldSettings: Type.Optional(Type.Array(Type.String(), { description: d.write_draft_linkedWorldSettings })),
+        content: Type.Optional(Type.String({ description: d.write_content })),
+        tags: Type.Optional(Type.String({ description: d.write_tags })),
+        importance: Type.Optional(StringEnum(["core", "major", "minor"] as const, { description: d.write_importance })),
         scope: Type.Optional(StringEnum(["world", "project"] as const, { description: d.write_scope })),
       }),
       async execute(_toolCallId, args) {
+        // tags is exposed as a comma-joined string for symmetry with `update`;
+        // parse to string[] before handing to the handlers.
+        const tagsArr: string[] | undefined = args.tags === undefined
+          ? undefined
+          : args.tags.split(",").map((s: string) => s.trim()).filter(Boolean);
         switch (args.type) {
           case "character": {
             if (!args.name) return textResult({ error: "write(character): 'name' is required." });
+            if (!args.summary) return textResult({ error: "write(character): 'summary' is required (one-line summary, ≤50 chars). It must reflect the character's content; keep them in sync on every write." });
             if (args.id) {
               const result = await handlers.overwriteCharacter(
-                { id: args.id, name: args.name, importance: args.importance, summary: args.summary, aliases: args.aliases, tags: args.tags, content: args.content },
+                { id: args.id, name: args.name, summary: args.summary, importance: args.importance, tags: tagsArr, content: args.content },
                 db,
                 userId,
               );
@@ -185,7 +230,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
             }
             const ownerProjectId = scope === "project" ? projectId : undefined;
             const result = await handlers.createCharacter(
-              { name: args.name, importance: args.importance, summary: args.summary, aliases: args.aliases, tags: args.tags, content: args.content, worldId, projectId: ownerProjectId },
+              { name: args.name, summary: args.summary, importance: args.importance, tags: tagsArr, content: args.content, worldId, projectId: ownerProjectId },
               db,
               userId,
             );
@@ -194,11 +239,11 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
             return textResult(result);
           }
           case "world_setting": {
-            if (!args.category) return textResult({ error: "write(world_setting): 'category' is required." });
-            if (!args.title) return textResult({ error: "write(world_setting): 'title' is required." });
+            if (!args.name) return textResult({ error: "write(world_setting): 'name' is required (used as the setting title)." });
+            if (!args.summary) return textResult({ error: "write(world_setting): 'summary' is required (one-line summary, ≤50 chars). It must reflect the setting's content; keep them in sync on every write." });
             if (args.id) {
               const result = await handlers.overwriteWorldSetting(
-                { id: args.id, category: args.category, title: args.title, content: args.content, tags: args.tags, importance: args.importance, summary: args.summary },
+                { id: args.id, title: args.name, summary: args.summary, content: args.content, tags: tagsArr, importance: args.importance },
                 db,
                 userId,
               );
@@ -216,7 +261,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
             }
             const ownerProjectId = scope === "project" ? projectId : undefined;
             const result = await handlers.createWorldSetting(
-              { category: args.category, title: args.title, content: args.content, tags: args.tags, importance: args.importance, summary: args.summary, worldId, projectId: ownerProjectId },
+              { title: args.name, summary: args.summary, content: args.content, tags: tagsArr, importance: args.importance, worldId, projectId: ownerProjectId },
               db,
               userId,
             );
@@ -225,10 +270,10 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
             return textResult(result);
           }
           case "chapter": {
-            if (!args.title) return textResult({ error: "write(chapter): 'title' is required." });
+            if (!args.name) return textResult({ error: "write(chapter): 'name' is required (used as the chapter title)." });
             if (args.id) {
               const result = await handlers.overwriteChapter(
-                { id: args.id, title: args.title, content: args.content, synopsis: args.synopsis, order: args.order },
+                { id: args.id, title: args.name, content: args.content },
                 db,
                 userId,
               );
@@ -237,7 +282,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
             }
             if (!projectId) return textResult({ error: "Cannot create a chapter: no project context." });
             const result = await handlers.createChapter(
-              { title: args.title, content: args.content, synopsis: args.synopsis, order: args.order, projectId },
+              { title: args.name, content: args.content, projectId },
               db,
               userId,
             );
@@ -245,10 +290,10 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
             return textResult(result);
           }
           case "draft": {
-            if (!args.title) return textResult({ error: "write(draft): 'title' is required." });
+            if (!args.name) return textResult({ error: "write(draft): 'name' is required (used as the draft title)." });
             if (args.id) {
               const result = await handlers.overwriteDraft(
-                { id: args.id, title: args.title, content: args.content, tags: args.tags, linkedCharacters: args.linkedCharacters, linkedWorldSettings: args.linkedWorldSettings },
+                { id: args.id, title: args.name, content: args.content, tags: tagsArr },
                 db,
                 userId,
               );
@@ -264,7 +309,7 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
             }
             const ownerIds = scope === "project" ? { worldId, projectId } : { worldId };
             const result = await handlers.createDraft(
-              { title: args.title, content: args.content, tags: args.tags, linkedCharacters: args.linkedCharacters, linkedWorldSettings: args.linkedWorldSettings, ...ownerIds },
+              { title: args.name, content: args.content, tags: tagsArr, ...ownerIds },
               db,
               userId,
             );
@@ -326,31 +371,6 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
     },
 
     {
-      name: "update_world_setting",
-      label: "Update World Setting",
-      description: d.update_world_setting,
-      parameters: Type.Object({
-        id: Type.String({ description: d.update_world_setting_id }),
-        category: Type.Optional(Type.String({ description: d.update_world_setting_category })),
-        title: Type.Optional(Type.String({ description: d.update_world_setting_title })),
-        content: Type.Optional(Type.String({ description: d.update_world_setting_content })),
-        tags: Type.Optional(Type.Array(Type.String(), { description: d.update_world_setting_tags })),
-        importance: Type.Optional(StringEnum(
-          ["core", "major", "minor"] as const,
-          { description: d.update_world_setting_importance },
-        )),
-        summary: Type.Optional(Type.String({ description: d.update_world_setting_summary })),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await handlers.updateWorldSetting(args, db, userId);
-        onDocumentChanged?.("world_settings", args.id);
-        const wsDoc = await db.collection("world_settings").findOne({ _id: new ObjectId(args.id) });
-        if (wsDoc?.worldId) onWorldSummaryStale?.(wsDoc.worldId.toHexString());
-        return textResult(result);
-      },
-    },
-
-    {
       name: "list",
       label: "List",
       description: d.list,
@@ -374,47 +394,6 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
         return textResult(result);
       },
     },
-
-    {
-      name: "update_chapter",
-      label: "Update Chapter",
-      description: d.update_chapter,
-      parameters: Type.Object({
-        id: Type.String({ description: d.update_chapter_id }),
-        new_string: Type.String({ description: d.update_chapter_new_string }),
-        old_string: Type.Optional(Type.String({ description: d.update_chapter_old_string })),
-        field: Type.Optional(Type.String({ description: d.update_chapter_field })),
-        append: Type.Optional(Type.Boolean({ description: d.update_chapter_append })),
-        prepend: Type.Optional(Type.Boolean({ description: d.update_chapter_prepend })),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await handlers.updateChapter(args, db, userId);
-        onDocumentChanged?.("chapters", args.id);
-        return textResult(result);
-      },
-    },
-
-
-
-    {
-      name: "update_draft",
-      label: "Update Draft",
-      description: d.update_draft,
-      parameters: Type.Object({
-        id: Type.String({ description: d.update_draft_id }),
-        title: Type.Optional(Type.String({ description: d.update_draft_title })),
-        content: Type.Optional(Type.String({ description: d.update_draft_content })),
-        tags: Type.Optional(Type.Array(Type.String(), { description: d.update_draft_tags })),
-        linkedCharacters: Type.Optional(Type.Array(Type.String(), { description: d.update_draft_linkedCharacters })),
-        linkedWorldSettings: Type.Optional(Type.Array(Type.String(), { description: d.update_draft_linkedWorldSettings })),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await handlers.updateDraft(args, db, userId);
-        onDocumentChanged?.("drafts", args.id);
-        return textResult(result);
-      },
-    },
-
 
     {
       name: "update_memory",

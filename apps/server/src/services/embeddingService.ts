@@ -108,7 +108,6 @@ function extractExcerpt(collection: string, doc: any, maxLen = 200): string {
     case "characters": {
       const parts: string[] = [];
       if (doc.name) parts.push(`名称: ${doc.name}`);
-      if (doc.aliases?.length) parts.push(`别名: ${doc.aliases.join(", ")}`);
       if (doc.importance) parts.push(`重要性: ${doc.importance}`);
       if (doc.tags?.length) parts.push(`标签: ${doc.tags.join(", ")}`);
       if (doc.content) parts.push(doc.content);
@@ -116,7 +115,6 @@ function extractExcerpt(collection: string, doc: any, maxLen = 200): string {
     }
     case "world_settings": {
       const parts: string[] = [];
-      if (doc.category) parts.push(`分类: ${doc.category}`);
       if (doc.title) parts.push(`标题: ${doc.title}`);
       if (doc.importance) parts.push(`重要性: ${doc.importance}`);
       if (doc.tags?.length) parts.push(`标签: ${doc.tags.join(", ")}`);
@@ -430,9 +428,7 @@ export class ServerEmbeddingService {
               content: 1,
               profile: 1,
               role: 1,
-              aliases: 1,
               importance: 1,
-              category: 1,
               tags: 1,
               score: { $meta: "vectorSearchScore" },
             },

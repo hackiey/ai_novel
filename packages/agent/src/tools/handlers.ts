@@ -18,6 +18,34 @@ function ownerClause(userId?: string): Record<string, unknown> {
   return { userId: userIdMatcher(userId) };
 }
 
+/**
+ * String-edit primitive shared by every entity-level update_* path. Three modes:
+ *   - append: newValue = currentValue + new_string
+ *   - prepend: newValue = new_string + currentValue
+ *   - find-replace: requires old_string; replaces the first occurrence
+ * Returns either the new string, or an `{ error }` object that callers should
+ * surface verbatim (the error messages are tuned for LLM consumption).
+ */
+function applyStringEdit(args: {
+  currentValue: string;
+  old_string?: string;
+  new_string: string;
+  append?: boolean;
+  prepend?: boolean;
+  field: string;
+}): string | { error: string } {
+  const { currentValue, old_string, new_string, append, prepend, field } = args;
+  if (append) return currentValue + new_string;
+  if (prepend) return new_string + currentValue;
+  if (!old_string) {
+    return { error: "old_string is required for find-and-replace mode. Use append or prepend to add content without old_string." };
+  }
+  if (!currentValue.includes(old_string)) {
+    return { error: `old_string not found in field "${field}". Current value (first 200 chars): ${currentValue.slice(0, 200)}` };
+  }
+  return currentValue.replace(old_string, new_string);
+}
+
 // Fields that should never be sent to the LLM (large embedding vectors waste tokens)
 const EXCLUDED_FIELDS = new Set(["embedding", "embeddingText", "embeddingUpdatedAt"]);
 
@@ -179,7 +207,7 @@ export async function getCharacter(
 }
 
 export async function createCharacter(
-  args: { worldId?: string; projectId?: string; name: string; aliases?: string[]; tags?: string[]; content?: string; importance?: string; summary?: string },
+  args: { worldId?: string; projectId?: string; name: string; tags?: string[]; content?: string; importance?: string; summary?: string },
   db: Db,
   userId?: string
 ): Promise<unknown> {
@@ -190,7 +218,6 @@ export async function createCharacter(
     // Explicit null for world-level so Atlas Vector Search can use $in: [pid, null].
     projectId: args.projectId ? new ObjectId(args.projectId) : null,
     name: args.name,
-    aliases: args.aliases ?? [],
     tags: args.tags ?? [],
     importance: args.importance ?? "minor",
     summary: args.summary ?? "",
@@ -204,16 +231,15 @@ export async function createCharacter(
 }
 
 export async function overwriteCharacter(
-  args: { id: string; name: string; aliases?: string[]; tags?: string[]; content?: string; importance?: string; summary?: string },
+  args: { id: string; name: string; summary: string; tags?: string[]; content?: string; importance?: string },
   db: Db,
   userId?: string,
 ): Promise<unknown> {
   const setFields: Record<string, unknown> = {
     updatedAt: new Date(),
     name: args.name,
+    summary: args.summary,
     importance: args.importance ?? "minor",
-    summary: args.summary ?? "",
-    aliases: args.aliases ?? [],
     tags: args.tags ?? [],
     content: args.content ?? "",
   };
@@ -228,20 +254,35 @@ export async function overwriteCharacter(
   return serialize(result);
 }
 
+const CHARACTER_EDITABLE_FIELDS = ["name", "content", "tags", "importance", "summary"];
+
 export async function updateCharacter(
-  args: { id: string; name?: string; aliases?: string[]; tags?: string[]; content?: string; importance?: string; summary?: string },
+  args: { id: string; old_string?: string; new_string: string; field?: string; append?: boolean; prepend?: boolean },
   db: Db,
   userId?: string,
 ): Promise<unknown> {
-  const { id, ...updates } = args;
-  const setFields: Record<string, unknown> = { updatedAt: new Date() };
+  const { id, old_string, new_string, append, prepend } = args;
+  const field = args.field ?? "content";
 
-  if (updates.name !== undefined) setFields.name = updates.name;
-  if (updates.aliases !== undefined) setFields.aliases = updates.aliases;
-  if (updates.tags !== undefined) setFields.tags = updates.tags;
-  if (updates.importance !== undefined) setFields.importance = updates.importance;
-  if (updates.summary !== undefined) setFields.summary = updates.summary;
-  if (updates.content !== undefined) setFields.content = updates.content;
+  if (!CHARACTER_EDITABLE_FIELDS.includes(field)) {
+    return { error: `Invalid field "${field}" for character. Allowed: ${CHARACTER_EDITABLE_FIELDS.join(", ")}` };
+  }
+
+  const doc = await db.collection("characters").findOne({ _id: toObjectId(id), ...ownerClause(userId) });
+  if (!doc) return { error: `Character not found: ${id}` };
+
+  const currentValue = field === "tags"
+    ? (Array.isArray(doc.tags) ? (doc.tags as string[]).join(",") : "")
+    : (typeof doc[field] === "string" ? doc[field] : "");
+
+  const edited = applyStringEdit({ currentValue, old_string, new_string, append, prepend, field });
+  if (typeof edited !== "string") return edited;
+
+  const writeValue: unknown = field === "tags"
+    ? edited.split(",").map((s) => s.trim()).filter(Boolean)
+    : edited;
+
+  const setFields: Record<string, unknown> = { [field]: writeValue, updatedAt: new Date() };
 
   const result = await db
     .collection("characters")
@@ -286,7 +327,7 @@ export async function getWorldSetting(
 }
 
 export async function createWorldSetting(
-  args: { worldId?: string; projectId?: string; category: string; title: string; content?: string; tags?: string[]; importance?: string; summary?: string },
+  args: { worldId?: string; projectId?: string; title: string; content?: string; tags?: string[]; importance?: string; summary?: string },
   db: Db,
   userId?: string
 ): Promise<unknown> {
@@ -295,7 +336,6 @@ export async function createWorldSetting(
   const doc: Record<string, unknown> = {
     worldId: new ObjectId(args.worldId),
     projectId: args.projectId ? new ObjectId(args.projectId) : null,
-    category: args.category,
     title: args.title,
     content: args.content ?? "",
     tags: args.tags ?? [],
@@ -310,18 +350,17 @@ export async function createWorldSetting(
 }
 
 export async function overwriteWorldSetting(
-  args: { id: string; category: string; title: string; content?: string; tags?: string[]; importance?: string; summary?: string },
+  args: { id: string; title: string; summary: string; content?: string; tags?: string[]; importance?: string },
   db: Db,
   userId?: string,
 ): Promise<unknown> {
   const setFields: Record<string, unknown> = {
     updatedAt: new Date(),
-    category: args.category,
     title: args.title,
+    summary: args.summary,
     content: args.content ?? "",
     tags: args.tags ?? [],
     importance: args.importance ?? "minor",
-    summary: args.summary ?? "",
   };
   const result = await db
     .collection("world_settings")
@@ -334,19 +373,35 @@ export async function overwriteWorldSetting(
   return serialize(result);
 }
 
+const WORLD_SETTING_EDITABLE_FIELDS = ["title", "content", "tags", "importance", "summary"];
+
 export async function updateWorldSetting(
-  args: { id: string; category?: string; title?: string; content?: string; tags?: string[]; importance?: string; summary?: string },
+  args: { id: string; old_string?: string; new_string: string; field?: string; append?: boolean; prepend?: boolean },
   db: Db,
   userId?: string,
 ): Promise<unknown> {
-  const { id, ...updates } = args;
-  const setFields: Record<string, unknown> = { updatedAt: new Date() };
-  if (updates.category !== undefined) setFields.category = updates.category;
-  if (updates.title !== undefined) setFields.title = updates.title;
-  if (updates.content !== undefined) setFields.content = updates.content;
-  if (updates.tags !== undefined) setFields.tags = updates.tags;
-  if (updates.importance !== undefined) setFields.importance = updates.importance;
-  if (updates.summary !== undefined) setFields.summary = updates.summary;
+  const { id, old_string, new_string, append, prepend } = args;
+  const field = args.field ?? "content";
+
+  if (!WORLD_SETTING_EDITABLE_FIELDS.includes(field)) {
+    return { error: `Invalid field "${field}" for world_setting. Allowed: ${WORLD_SETTING_EDITABLE_FIELDS.join(", ")}` };
+  }
+
+  const doc = await db.collection("world_settings").findOne({ _id: toObjectId(id), ...ownerClause(userId) });
+  if (!doc) return { error: `World setting not found: ${id}` };
+
+  const currentValue = field === "tags"
+    ? (Array.isArray(doc.tags) ? (doc.tags as string[]).join(",") : "")
+    : (typeof doc[field] === "string" ? doc[field] : "");
+
+  const edited = applyStringEdit({ currentValue, old_string, new_string, append, prepend, field });
+  if (typeof edited !== "string") return edited;
+
+  const writeValue: unknown = field === "tags"
+    ? edited.split(",").map((s) => s.trim()).filter(Boolean)
+    : edited;
+
+  const setFields: Record<string, unknown> = { [field]: writeValue, updatedAt: new Date() };
 
   const result = await db
     .collection("world_settings")
@@ -623,7 +678,7 @@ export async function createChapter(
 
 
 export async function overwriteChapter(
-  args: { id: string; title: string; content?: string; synopsis?: string; order?: number },
+  args: { id: string; title: string; content?: string },
   db: Db,
   userId?: string,
 ): Promise<unknown> {
@@ -635,20 +690,17 @@ export async function overwriteChapter(
   const now = new Date();
   const title = args.title;
   const content = args.content ?? "";
-  const synopsisProvided = args.synopsis !== undefined;
-  const synopsis = args.synopsis ?? "";
-  const order = args.order ?? (typeof existing.order === "number" ? existing.order : 0);
+  const order = typeof existing.order === "number" ? existing.order : 0;
   const sourceHash = computeChapterSynopsisSourceHash({ title, content });
 
   const setFields: Record<string, unknown> = {
     title,
     content,
-    synopsis,
-    order,
     wordCount: countChapterWords(content),
     updatedAt: now,
-    ...(synopsisProvided || !content.trim()
+    ...(!content.trim()
       ? {
+          synopsis: "",
           synopsisSourceHash: sourceHash,
           synopsisStatus: "ready",
           synopsisUpdatedAt: now,
@@ -660,10 +712,9 @@ export async function overwriteChapter(
 
   const titleChanged = title !== existing.title;
   const contentChanged = content !== existing.content;
-  const orderChanged = args.order !== undefined && args.order !== existing.order;
 
   const unsetFields: Record<string, ""> = {};
-  if (titleChanged || contentChanged || synopsisProvided) {
+  if (titleChanged || contentChanged) {
     unsetFields.synopsisJobLockedAt = "";
     unsetFields.synopsisJobToken = "";
     unsetFields.synopsisError = "";
@@ -679,7 +730,7 @@ export async function overwriteChapter(
   );
   if (!result) return { error: `Chapter not found: ${args.id}` };
 
-  if (titleChanged || contentChanged || orderChanged) {
+  if (titleChanged || contentChanged) {
     await markDependentChapterSynopsesPending(db, {
       projectId: existing.projectId as ObjectId,
       fromOrder: order,
@@ -689,7 +740,7 @@ export async function overwriteChapter(
   return serialize(result);
 }
 
-const CHAPTER_EDITABLE_FIELDS = ["title", "content", "synopsis"];
+const CHAPTER_EDITABLE_FIELDS = ["title", "content"];
 
 export async function updateChapter(
   args: { id: string; old_string?: string; new_string: string; field?: string; append?: boolean; prepend?: boolean },
@@ -710,27 +761,14 @@ export async function updateChapter(
   const currentTitle = typeof doc.title === "string" ? doc.title : "";
   const currentContent = typeof doc.content === "string" ? doc.content : "";
 
-  let newValue: string;
-
-  if (append) {
-    newValue = currentValue + new_string;
-  } else if (prepend) {
-    newValue = new_string + currentValue;
-  } else {
-    // Find-and-replace mode: old_string is required
-    if (!old_string) {
-      return { error: "old_string is required for find-and-replace mode. Use append or prepend to add content without old_string." };
-    }
-    if (!currentValue.includes(old_string)) {
-      return { error: `old_string not found in field "${field}". Current value (first 200 chars): ${currentValue.slice(0, 200)}` };
-    }
-    newValue = currentValue.replace(old_string, new_string);
-  }
+  const edited = applyStringEdit({ currentValue, old_string, new_string, append, prepend, field });
+  if (typeof edited !== "string") return edited;
+  const newValue = edited;
 
   const fieldChanged = newValue !== currentValue;
   const setFields: Record<string, unknown> = { [field]: newValue, updatedAt: new Date() };
   const unsetFields: Record<string, ""> = {};
-  if (fieldChanged && (field === "title" || field === "content" || field === "synopsis")) {
+  if (fieldChanged) {
     unsetFields.synopsisJobLockedAt = "";
     unsetFields.synopsisJobToken = "";
     unsetFields.synopsisError = "";
@@ -759,11 +797,6 @@ export async function updateChapter(
       setFields.synopsisStatus = "pending";
     }
   }
-  if (field === "synopsis") {
-    setFields.synopsisSourceHash = computeChapterSynopsisSourceHash({ title: currentTitle, content: currentContent });
-    setFields.synopsisStatus = "ready";
-    setFields.synopsisUpdatedAt = setFields.updatedAt;
-  }
   const result = await db.collection("chapters").findOneAndUpdate(
     { _id: toObjectId(id), ...ownerClause(userId) },
     Object.keys(unsetFields).length > 0
@@ -771,7 +804,7 @@ export async function updateChapter(
       : { $set: setFields },
     { returnDocument: "after" }
   );
-  if (result && fieldChanged && (field === "title" || field === "content" || field === "synopsis")) {
+  if (result && fieldChanged) {
     await markDependentChapterSynopsesPending(db, {
       projectId: doc.projectId as ObjectId,
       fromOrder: typeof doc.order === "number" ? doc.order : 0,
@@ -822,8 +855,6 @@ export async function createDraft(
     title: string;
     content?: string;
     tags?: string[];
-    linkedCharacters?: string[];
-    linkedWorldSettings?: string[];
   },
   db: Db,
   userId?: string
@@ -833,8 +864,6 @@ export async function createDraft(
     title: args.title,
     content: args.content ?? "",
     tags: args.tags ?? [],
-    linkedCharacters: (args.linkedCharacters ?? []).map((id) => new ObjectId(id)),
-    linkedWorldSettings: (args.linkedWorldSettings ?? []).map((id) => new ObjectId(id)),
     // Explicit null for world-level so Atlas Vector Search filter ($in with null) works.
     projectId: args.projectId ? new ObjectId(args.projectId) : null,
     createdAt: now,
@@ -847,7 +876,7 @@ export async function createDraft(
 }
 
 export async function overwriteDraft(
-  args: { id: string; title: string; content?: string; tags?: string[]; linkedCharacters?: string[]; linkedWorldSettings?: string[] },
+  args: { id: string; title: string; content?: string; tags?: string[] },
   db: Db,
   userId?: string,
 ): Promise<unknown> {
@@ -856,8 +885,6 @@ export async function overwriteDraft(
     title: args.title,
     content: args.content ?? "",
     tags: args.tags ?? [],
-    linkedCharacters: (args.linkedCharacters ?? []).map((cid) => new ObjectId(cid)),
-    linkedWorldSettings: (args.linkedWorldSettings ?? []).map((wid) => new ObjectId(wid)),
   };
   const result = await db
     .collection("drafts")
@@ -870,18 +897,37 @@ export async function overwriteDraft(
   return serialize(result);
 }
 
+const DRAFT_EDITABLE_FIELDS = ["title", "content", "tags"];
+
 export async function updateDraft(
-  args: { id: string; title?: string; content?: string; tags?: string[]; linkedCharacters?: string[]; linkedWorldSettings?: string[] },
+  args: { id: string; old_string?: string; new_string: string; field?: string; append?: boolean; prepend?: boolean },
   db: Db,
   userId?: string,
 ): Promise<unknown> {
-  const { id, ...updates } = args;
-  const setFields: Record<string, unknown> = { updatedAt: new Date() };
-  if (updates.title !== undefined) setFields.title = updates.title;
-  if (updates.content !== undefined) setFields.content = updates.content;
-  if (updates.tags !== undefined) setFields.tags = updates.tags;
-  if (updates.linkedCharacters !== undefined) setFields.linkedCharacters = updates.linkedCharacters.map((cid) => new ObjectId(cid));
-  if (updates.linkedWorldSettings !== undefined) setFields.linkedWorldSettings = updates.linkedWorldSettings.map((wid) => new ObjectId(wid));
+  const { id, old_string, new_string, append, prepend } = args;
+  const field = args.field ?? "content";
+
+  if (!DRAFT_EDITABLE_FIELDS.includes(field)) {
+    return { error: `Invalid field "${field}" for draft. Allowed: ${DRAFT_EDITABLE_FIELDS.join(", ")}` };
+  }
+
+  const doc = await db.collection("drafts").findOne({ _id: toObjectId(id), ...ownerClause(userId) });
+  if (!doc) return { error: `Draft not found: ${id}` };
+
+  // Tags are stored as string[] but exposed to the edit ops as a comma-joined
+  // string so the same find-replace / append / prepend operators apply.
+  const currentValue = field === "tags"
+    ? (Array.isArray(doc.tags) ? (doc.tags as string[]).join(",") : "")
+    : (typeof doc[field] === "string" ? doc[field] : "");
+
+  const edited = applyStringEdit({ currentValue, old_string, new_string, append, prepend, field });
+  if (typeof edited !== "string") return edited;
+
+  const writeValue: unknown = field === "tags"
+    ? edited.split(",").map((s) => s.trim()).filter(Boolean)
+    : edited;
+
+  const setFields: Record<string, unknown> = { [field]: writeValue, updatedAt: new Date() };
 
   const result = await db
     .collection("drafts")

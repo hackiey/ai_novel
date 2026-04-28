@@ -5,7 +5,6 @@ interface CharacterCardProps {
     _id: string;
     name: string;
     importance?: string;
-    aliases?: string[];
     content?: string;
   };
   onEdit: (id: string) => void;
@@ -33,11 +32,6 @@ export default function CharacterCard({ character, onEdit, onDelete }: Character
           </div>
           <div className="min-w-0">
             <h4 className="text-sm font-semibold text-gray-900 truncate">{character.name}</h4>
-            {character.aliases && character.aliases.length > 0 && (
-              <p className="text-xs text-gray-400 truncate">
-                {t("character.aka", { aliases: character.aliases.join(", ") })}
-              </p>
-            )}
           </div>
         </div>
         <span

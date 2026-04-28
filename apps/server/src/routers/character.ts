@@ -92,7 +92,6 @@ export const characterRouter = router({
         // Explicit null for world-level so Atlas Vector Search can use $in: [pid, null].
         projectId: scope === "project" ? new ObjectId(input.projectId!) : null,
         name: input.name,
-        aliases: input.aliases ?? [],
         tags: input.tags ?? [],
         importance: input.importance ?? "minor",
         summary: input.summary ?? "",
@@ -118,7 +117,6 @@ export const characterRouter = router({
         updatedAt: new Date(),
       };
       if (input.data.name !== undefined) updateFields.name = input.data.name;
-      if (input.data.aliases !== undefined) updateFields.aliases = input.data.aliases;
       if (input.data.tags !== undefined) updateFields.tags = input.data.tags;
       if (input.data.importance !== undefined) updateFields.importance = input.data.importance;
       if (input.data.summary !== undefined) updateFields.summary = input.data.summary;

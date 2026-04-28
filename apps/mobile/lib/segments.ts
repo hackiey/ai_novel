@@ -121,9 +121,6 @@ export function buildSegments(
 // Tools that mutate data — map tool names to tRPC query keys to invalidate
 export const MUTATION_TOOL_INVALIDATIONS: Record<string, string[][]> = {
   write: [["character"], ["worldSetting"], ["chapter"], ["draft"]],
-  update_character: [["character"]],
-  update_world_setting: [["worldSetting"]],
-  update_chapter: [["chapter"]],
-  update_draft: [["draft"]],
+  update: [["character"], ["worldSetting"], ["chapter"], ["draft"]],
   delete_entity: [["character"], ["worldSetting"], ["chapter"], ["draft"]],
 };

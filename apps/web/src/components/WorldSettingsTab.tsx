@@ -38,7 +38,6 @@ export default function WorldSettingsTab({
 }: WorldSettingsTabProps) {
   const { t } = useTranslation();
   const [showWorldForm, setShowWorldForm] = useState(false);
-  const [worldCategory, setWorldCategory] = useState("");
   const [worldTitle, setWorldTitle] = useState("");
   const [worldContent, setWorldContent] = useState("");
   const [newScopeChoice, setNewScopeChoice] = useState<"world" | string>("world");
@@ -46,7 +45,6 @@ export default function WorldSettingsTab({
 
   const [expandedWorldSettingId, setExpandedWorldSettingId] = useState<string | null>(null);
   const [editingWorldSettingId, setEditingWorldSettingId] = useState<string | null>(null);
-  const [editWorldCategory, setEditWorldCategory] = useState("");
   const [editWorldTitle, setEditWorldTitle] = useState("");
   const [editWorldContent, setEditWorldContent] = useState("");
   const [editTags, setEditTags] = useState<string[]>([]);
@@ -65,7 +63,7 @@ export default function WorldSettingsTab({
 
   const worldSettingsQuery = trpc.worldSetting.list.useQuery({ worldId, includeAllProjectsUnderWorld: true });
   const createWorldSettingMut = trpc.worldSetting.create.useMutation({
-    onSuccess: () => { worldSettingsQuery.refetch(); setShowWorldForm(false); setWorldCategory(""); setWorldTitle(""); setWorldContent(""); setNewScopeChoice("world"); },
+    onSuccess: () => { worldSettingsQuery.refetch(); setShowWorldForm(false); setWorldTitle(""); setWorldContent(""); setNewScopeChoice("world"); },
   });
   const updateWorldSettingMut = trpc.worldSetting.update.useMutation({
     onSuccess: () => { worldSettingsQuery.refetch(); setEditingWorldSettingId(null); },
@@ -98,7 +96,6 @@ export default function WorldSettingsTab({
   const openEditMode = useCallback((ws: any) => {
     setExpandedWorldSettingId(ws._id);
     setEditingWorldSettingId(ws._id);
-    setEditWorldCategory(ws.category || "");
     setEditWorldTitle(ws.title || "");
     setEditWorldContent(ws.content || "");
     setEditTags(Array.isArray(ws.tags) ? ws.tags : []);
@@ -145,13 +142,12 @@ export default function WorldSettingsTab({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (!worldCategory.trim() || !worldTitle.trim()) return;
+              if (!worldTitle.trim()) return;
               const isProject = newScopeChoice !== "world";
               createWorldSettingMut.mutate({
                 worldId,
                 ...(isProject ? { projectId: newScopeChoice } : {}),
                 scope: isProject ? "project" : "world",
-                category: worldCategory.trim(),
                 title: worldTitle.trim(),
                 content: worldContent.trim() || undefined,
               });
@@ -174,20 +170,12 @@ export default function WorldSettingsTab({
               </select>
               <p className="mt-1 text-[11px] text-white/40">{t("worldSetting.scopeHint")}</p>
             </div>
-            <div className="flex gap-3">
-              <input
-                value={worldCategory}
-                onChange={(e) => setWorldCategory(e.target.value)}
-                placeholder={t("worldSetting.categoryPlaceholder")}
-                className="flex-1 rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              />
-              <input
-                value={worldTitle}
-                onChange={(e) => setWorldTitle(e.target.value)}
-                placeholder={t("worldSetting.titlePlaceholder")}
-                className="flex-1 rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              />
-            </div>
+            <input
+              value={worldTitle}
+              onChange={(e) => setWorldTitle(e.target.value)}
+              placeholder={t("worldSetting.titlePlaceholder")}
+              className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            />
             <textarea
               value={worldContent}
               onChange={(e) => setWorldContent(e.target.value)}
@@ -198,7 +186,7 @@ export default function WorldSettingsTab({
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
-                onClick={() => { setShowWorldForm(false); setWorldCategory(""); setWorldTitle(""); setWorldContent(""); }}
+                onClick={() => { setShowWorldForm(false); setWorldTitle(""); setWorldContent(""); }}
                 className="px-3 py-2 text-sm rounded-lg border border-white/20 text-white/60 hover:bg-white/5 transition-colors"
               >
                 {t("worldSetting.cancel")}
@@ -253,9 +241,6 @@ export default function WorldSettingsTab({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-xs transition-transform inline-block ${isExpanded ? "rotate-90" : ""}`}>▶</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        {ws.category}
-                      </span>
                       <h4 className="text-sm font-medium text-white/80">{ws.title}</h4>
                       {ws.projectId ? (
                         <span className="text-[10px] px-1.5 py-0.5 rounded border border-amber-400/30 bg-amber-400/10 text-amber-300">
@@ -301,9 +286,8 @@ export default function WorldSettingsTab({
                       <form
                         onSubmit={(e) => {
                           e.preventDefault();
-                          if (!editWorldCategory.trim() || !editWorldTitle.trim()) return;
+                          if (!editWorldTitle.trim()) return;
                           const data: any = {
-                            category: editWorldCategory.trim(),
                             title: editWorldTitle.trim(),
                             content: editWorldContent.trim(),
                             tags: editTags,
@@ -331,18 +315,8 @@ export default function WorldSettingsTab({
                             ))}
                           </select>
                         </div>
-                        <div className="flex gap-3">
-                          <div className="flex-1">
-                            <label className="block text-xs font-medium text-white/50 mb-1.5">{t("worldSetting.category")}</label>
-                            <input
-                              value={editWorldCategory}
-                              onChange={(e) => setEditWorldCategory(e.target.value)}
-                              placeholder={t("worldSetting.editCategoryPlaceholder")}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full rounded-lg bg-white/5 border border-white/20 px-3 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            />
-                          </div>
-                          <div className="flex-1">
+                        <div>
+                          <div>
                             <label className="block text-xs font-medium text-white/50 mb-1.5">{t("worldSetting.title")}</label>
                             <input
                               value={editWorldTitle}

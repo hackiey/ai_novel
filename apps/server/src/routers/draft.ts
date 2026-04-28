@@ -88,8 +88,6 @@ export const draftRouter = router({
         title: input.title,
         content: input.content ?? "",
         tags: input.tags ?? [],
-        linkedCharacters: input.linkedCharacters ?? [],
-        linkedWorldSettings: input.linkedWorldSettings ?? [],
         worldId: new ObjectId(worldIdHex),
         projectId: scope === "project" ? new ObjectId(input.projectId!) : null,
         createdAt: now,
@@ -112,8 +110,6 @@ export const draftRouter = router({
       if (input.data.title !== undefined) updateFields.title = input.data.title;
       if (input.data.content !== undefined) updateFields.content = input.data.content;
       if (input.data.tags !== undefined) updateFields.tags = input.data.tags;
-      if (input.data.linkedCharacters !== undefined) updateFields.linkedCharacters = input.data.linkedCharacters;
-      if (input.data.linkedWorldSettings !== undefined) updateFields.linkedWorldSettings = input.data.linkedWorldSettings;
       if (input.data.projectId !== undefined) {
         updateFields.projectId = input.data.projectId === null ? null : new ObjectId(input.data.projectId);
       }

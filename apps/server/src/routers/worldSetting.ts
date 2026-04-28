@@ -17,7 +17,6 @@ export const worldSettingRouter = router({
       worldId: objectIdSchema,
       projectId: objectIdSchema.optional(),
       includeAllProjectsUnderWorld: z.boolean().optional(),
-      category: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
       const userFilter = { userId: userIdFilter(ctx.user.userId) };
@@ -26,9 +25,6 @@ export const worldSettingRouter = router({
         filter = { ...userFilter, worldId: { $in: [input.worldId, new ObjectId(input.worldId)] } };
       } else {
         filter = { ...userFilter, ...entityScopeFilter({ projectId: input.projectId, worldId: input.worldId }) };
-      }
-      if (input.category) {
-        filter.category = input.category;
       }
       const docs = await ctx.db
         .collection("world_settings")
@@ -75,7 +71,6 @@ export const worldSettingRouter = router({
         userId: ctx.user.userId,
         worldId: new ObjectId(worldIdHex),
         projectId: scope === "project" ? new ObjectId(input.projectId!) : null,
-        category: input.category,
         title: input.title,
         content: input.content ?? "",
         tags: input.tags ?? [],
@@ -99,7 +94,6 @@ export const worldSettingRouter = router({
       const updateFields: Record<string, any> = {
         updatedAt: new Date(),
       };
-      if (input.data.category !== undefined) updateFields.category = input.data.category;
       if (input.data.title !== undefined) updateFields.title = input.data.title;
       if (input.data.content !== undefined) updateFields.content = input.data.content;
       if (input.data.tags !== undefined) updateFields.tags = input.data.tags;
