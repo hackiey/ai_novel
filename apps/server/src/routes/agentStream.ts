@@ -6,6 +6,7 @@ import { getDb } from "../db.js";
 import { getEmbeddingService } from "../services/embeddingService.js";
 import { resolveEnabledSkillSlugs } from "../utils/enabledSkills.js";
 import { getStoredCompactionState, getUsageStateFromEvents, maybeCompactHistory } from "../services/agentCompactionService.js";
+import { getQuestionManager } from "../services/questionService.js";
 import { verifyToken, type JwtPayload } from "../auth/jwt.js";
 import { getUserAllowedModels } from "../auth/permissionGroups.js";
 
@@ -168,6 +169,8 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
               { $set: { summaryStale: true } }
             ).catch((err) => console.error("[WorldSummary] Failed to mark stale:", err));
           },
+          questionManager: getQuestionManager(),
+          sessionId,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -185,8 +188,27 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       "Access-Control-Allow-Origin": "*",
     });
 
+    // The client may close the SSE connection mid-turn (browser tab closed or
+    // refreshed). Do NOT cancel pending `question` tool calls — let them keep
+    // waiting in QuestionManager (bounded by its built-in timeout) so the user
+    // can answer after they reopen the session. We just stop writing to the
+    // dead socket and let the agent loop finish in the background; whatever it
+    // produces gets persisted to agent_messages at the end of the handler.
+    let clientGone = false;
+    request.raw.on("close", () => {
+      clientGone = true;
+    });
+    const safeWrite = (payload: string) => {
+      if (clientGone) return;
+      try {
+        reply.raw.write(payload);
+      } catch {
+        clientGone = true;
+      }
+    };
+
     // Send sessionId as first event
-    reply.raw.write(`data: ${JSON.stringify({ type: "session", sessionId })}\n\n`);
+    safeWrite(`data: ${JSON.stringify({ type: "session", sessionId })}\n\n`);
 
     const sessionDoc = await db.collection("agent_sessions").findOne({
       sessionId,
@@ -345,7 +367,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
     });
 
     if (compactionState.compactionEvent) {
-      reply.raw.write(`data: ${JSON.stringify(compactionState.compactionEvent)}\n\n`);
+      safeWrite(`data: ${JSON.stringify(compactionState.compactionEvent)}\n\n`);
       allEvents.push(compactionState.compactionEvent);
     }
 
@@ -366,7 +388,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
           continue;
         }
 
-        reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+        safeWrite(`data: ${JSON.stringify(event)}\n\n`);
         allEvents.push(event);
 
         if (event.type === "text") {
@@ -395,7 +417,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       });
       if (err instanceof Error && err.stack) console.error(err.stack);
       const errorMsg = err instanceof Error ? err.message : String(err);
-      reply.raw.write(`data: ${JSON.stringify({ type: "error", error: errorMsg })}\n\n`);
+      safeWrite(`data: ${JSON.stringify({ type: "error", error: errorMsg })}\n\n`);
     }
 
     // Save assistant message to DB with structured messages for history replay
@@ -444,8 +466,10 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       { upsert: true },
     );
 
-    // Send done signal and end
-    reply.raw.write(`data: [DONE]\n\n`);
-    reply.raw.end();
+    // Send done signal and end. Both are no-ops if the client already left.
+    safeWrite(`data: [DONE]\n\n`);
+    if (!clientGone) {
+      try { reply.raw.end(); } catch { /* socket already gone */ }
+    }
   });
 }

@@ -4,6 +4,7 @@ export interface AgentEvent {
   toolName?: string;
   toolInput?: any;
   result?: any;
+  toolCallId?: string;
   fullResponse?: string;
   error?: string;
   sessionId?: string;
@@ -29,6 +30,7 @@ export type Segment =
         toolInput?: any;
         result?: string;
         pending?: boolean;
+        toolCallId?: string;
       }>;
     };
 
@@ -50,6 +52,7 @@ export function buildSegments(
     toolInput?: any;
     result?: string;
     pending?: boolean;
+    toolCallId?: string;
   }> = [];
   let resultIdx = 0;
 
@@ -72,14 +75,25 @@ export function buildSegments(
         toolName: ev.toolName || "unknown",
         toolInput: ev.toolInput,
         pending: true,
+        toolCallId: ev.toolCallId,
       };
       currentToolGroup.calls.push(call);
       toolUseList.push(call);
     } else if (ev.type === "tool_result") {
-      if (resultIdx < toolUseList.length) {
-        toolUseList[resultIdx].result = ev.result;
-        toolUseList[resultIdx].pending = false;
+      let target: typeof toolUseList[number] | undefined;
+      if (ev.toolCallId) {
+        target = toolUseList.find((c) => c.toolCallId === ev.toolCallId && c.pending);
+      }
+      if (!target && resultIdx < toolUseList.length) {
+        target = toolUseList[resultIdx];
         resultIdx++;
+      } else if (target) {
+        const idx = toolUseList.indexOf(target);
+        if (idx >= resultIdx) resultIdx = idx + 1;
+      }
+      if (target) {
+        target.result = ev.result;
+        target.pending = false;
       }
     } else if (ev.type === "compaction") {
       if (currentToolGroup) {
@@ -96,14 +110,13 @@ export function buildSegments(
     }
   }
 
-  if (isStreaming) {
-    for (const call of toolUseList) {
-      if (call.pending && call.result === undefined) {
-        call.pending = true;
-      }
-    }
-  } else {
-    for (const call of toolUseList) {
+  for (const call of toolUseList) {
+    if (call.result !== undefined) {
+      call.pending = false;
+    } else if (!isStreaming && call.toolName !== "question") {
+      // No result, not streaming, not a resumable question — stop the spinner.
+      // `question` stays pending across reloads so the user can still answer
+      // (server-side it remains in QuestionManager up to the 24h timeout).
       call.pending = false;
     }
   }

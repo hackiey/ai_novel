@@ -13,6 +13,8 @@ export type { ModelInfo, TokenUsageInfo } from "./compaction.js";
 export { getModelContextWindowFromSpec, getModelInfoFromSpec, parseModelSpec } from "./modelSpec.js";
 export { createNovelTools } from "./tools/index.js";
 export type { VectorSearchFn, OnDocumentChangedFn, OnWorldSummaryStaleFn } from "./tools/index.js";
+export { QuestionManager, QuestionRejectedError, DEFAULT_QUESTION_TIMEOUT_MS } from "./questionManager.js";
+export type { QuestionInfo, QuestionRequest, QuestionOption, Answer, PendingQuestion } from "./questionManager.js";
 export { CreatorAgentSession } from "./session.js";
 export type { AgentEvent, SessionModelConfig } from "./session.js";
 export { buildWorldSummary, getOrRefreshWorldSummary } from "./worldSummary.js";

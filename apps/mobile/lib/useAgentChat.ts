@@ -116,25 +116,48 @@ export function useAgentChat(worldId: string) {
       try {
         const token = getTokenSync();
         const baseUrl = getApiBaseUrlSync();
-        const res = await fetch(
-          `${baseUrl}/trpc/agent.getHistory?input=${encodeURIComponent(
-            JSON.stringify({ sessionId: sid })
-          )}`,
-          {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }
-        );
-        const json = await res.json();
+        const headers: Record<string, string> = token
+          ? { Authorization: `Bearer ${token}` }
+          : {};
+        const [historyRes, pendingRes] = await Promise.all([
+          fetch(
+            `${baseUrl}/trpc/agent.getHistory?input=${encodeURIComponent(
+              JSON.stringify({ sessionId: sid })
+            )}`,
+            { headers }
+          ),
+          fetch(`${baseUrl}/api/agent/question?sessionId=${encodeURIComponent(sid)}`, {
+            headers,
+          }).catch(() => null),
+        ]);
+        const json = await historyRes.json();
         const history = json.result?.data;
-        if (history) {
-          const loaded: ChatMessage[] = history.map((doc: any) => ({
-            role: doc.role,
-            content: doc.content || "",
-            events: doc.events,
-            createdAt: doc.createdAt,
-          }));
-          setMessages(loaded);
+        const loaded: ChatMessage[] = Array.isArray(history)
+          ? history.map((doc: any) => ({
+              role: doc.role,
+              content: doc.content || "",
+              events: doc.events,
+              createdAt: doc.createdAt,
+            }))
+          : [];
+        // Surface any still-pending `question` tool calls that haven't yet been
+        // persisted (the assistant turn is still running on the server). The
+        // QuestionCard re-renders so the user can answer and unblock the agent.
+        if (pendingRes && pendingRes.ok) {
+          const pendingJson: any = await pendingRes.json().catch(() => null);
+          const pendingList: Array<{ callId: string; info: { questions: any[] } }> =
+            Array.isArray(pendingJson?.pending) ? pendingJson.pending : [];
+          if (pendingList.length > 0) {
+            const events = pendingList.map((p) => ({
+              type: "tool_use" as const,
+              toolName: "question",
+              toolCallId: p.callId,
+              toolInput: { questions: p.info.questions },
+            }));
+            loaded.push({ role: "assistant", content: "", events });
+          }
         }
+        setMessages(loaded);
       } catch {
         // silently fail
       } finally {

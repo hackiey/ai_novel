@@ -180,6 +180,14 @@ const zh = {
     propose_skills: "向用户推荐一组 Skill 供其勾选启用为常驻 Skill。仅在 search_skills 之后调用。用户会看到一张带勾选框的卡片，自行决定要启用哪些。一次推荐建议 3-10 个最相关、且不在已启用列表中的 Skill。",
     propose_skills_skill_slugs: "要推荐的 Skill slug 列表（来自 search_skills 结果），最多 20 个",
     propose_skills_reason: "一句话说明为什么推荐这批 Skill（结合用户描述的题材或上下文）",
+
+    question: "在执行过程中向用户提问、获取关键决策。适用场景：1) 关键的方向性选择（不同风格分支、删除/覆盖确认、走 A 路线还是 B 路线）；2) 用户的指令存在多种合理解读，需要澄清；3) 任务前需要确认偏好。每次最多 4 个问题，每个问题至少 2 个选项。回答以选项 label 数组形式返回。**不要用此工具做闲聊或开放式问题**，只在选项有限、用户一选即可继续推进时使用。",
+    question_questions: "要向用户提出的问题列表，最多 4 个。",
+    question_question: "完整的问题文本（清晰、具体、以问号结尾）。",
+    question_header: "极短的标签（≤12 字），用作此问题的标题/分类。",
+    question_option_label: "选项显示文本（1-5 字，简洁明确）。多选时返回的就是这些 label。",
+    question_option_description: "对该选项含义、后果或权衡的简短解释，帮助用户理解差异。",
+    question_multiple: "true 表示允许多选，默认 false（单选）。",
   },
 
   // ── Skill recommend (推荐 agent 单独使用) ──
@@ -467,6 +475,14 @@ const en: typeof zh = {
     propose_skills: "Recommend a set of Skills for the user to enable as persistent skills. Only call this AFTER search_skills. The user will see a card with checkboxes and decide what to enable. Recommend 3-10 of the most relevant Skills not already enabled.",
     propose_skills_skill_slugs: "List of Skill slugs to recommend (sourced from search_skills results), maximum 20",
     propose_skills_reason: "One sentence explaining why this batch of Skills is recommended, tied to the user's described genre or context",
+
+    question: "Ask the user a multiple-choice question mid-execution to get a critical decision. Use when: 1) a directional choice matters (style branches, delete/overwrite confirmation, route A vs B); 2) the user's instruction has multiple reasonable interpretations and needs clarification; 3) a preference must be confirmed before proceeding. Max 4 questions per call, each with at least 2 options. Answers are returned as arrays of option labels. **Do not use for chit-chat or open-ended questions** — only when the answer space is small and a single click lets you continue.",
+    question_questions: "List of questions to ask, max 4.",
+    question_question: "The complete question text (clear, specific, ending with a question mark).",
+    question_header: "Very short label (≤12 chars) used as the question's title/category.",
+    question_option_label: "Option display text (1-5 words, concise). These labels are what come back when the user answers.",
+    question_option_description: "Short explanation of what the option means or its trade-off, helping the user tell the options apart.",
+    question_multiple: "true to allow selecting multiple options; defaults to false (single-select).",
   },
 
   // ── Skill recommend (used by recommend agent only) ──

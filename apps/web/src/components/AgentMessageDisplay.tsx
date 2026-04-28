@@ -5,6 +5,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import SkillProposalCard, { type ProposedSkill } from "./SkillProposalCard.js";
+import QuestionCard, { type QuestionInfo } from "./QuestionCard.js";
 
 export interface SkillProposalContext {
   projectId?: string;
@@ -40,6 +41,7 @@ export interface AgentEvent {
   toolName?: string;
   toolInput?: any;
   result?: any;
+  toolCallId?: string;
   fullResponse?: string;
   error?: string;
   sessionId?: string;
@@ -61,7 +63,7 @@ export interface AgentEvent {
 type Segment =
   | { type: "text"; content: string }
   | { type: "status"; content: string }
-  | { type: "tools"; calls: Array<{ toolName: string; toolInput?: any; result?: string; pending?: boolean }> };
+  | { type: "tools"; calls: Array<{ toolName: string; toolInput?: any; result?: string; pending?: boolean; toolCallId?: string }> };
 
 /** Split flat event list into ordered text/tool segments */
 export function buildSegments(events: AgentEvent[] | undefined, content: string, isStreaming: boolean): Segment[] {
@@ -72,7 +74,7 @@ export function buildSegments(events: AgentEvent[] | undefined, content: string,
   const segments: Segment[] = [];
   let textAcc = "";
   let currentToolGroup: Segment & { type: "tools" } | null = null;
-  const toolUseList: Array<{ toolName: string; toolInput?: any; result?: string; pending?: boolean }> = [];
+  const toolUseList: Array<{ toolName: string; toolInput?: any; result?: string; pending?: boolean; toolCallId?: string }> = [];
   let resultIdx = 0;
 
   for (const ev of events) {
@@ -90,14 +92,28 @@ export function buildSegments(events: AgentEvent[] | undefined, content: string,
       if (!currentToolGroup) {
         currentToolGroup = { type: "tools", calls: [] };
       }
-      const call = { toolName: ev.toolName || "unknown", toolInput: ev.toolInput, pending: true };
+      const call = { toolName: ev.toolName || "unknown", toolInput: ev.toolInput, pending: true, toolCallId: ev.toolCallId };
       currentToolGroup.calls.push(call);
       toolUseList.push(call);
     } else if (ev.type === "tool_result") {
-      if (resultIdx < toolUseList.length) {
-        toolUseList[resultIdx].result = ev.result;
-        toolUseList[resultIdx].pending = false;
+      // Prefer matching by toolCallId when available; fall back to FIFO order
+      // for backwards compatibility with persisted history that was captured
+      // before toolCallId was streamed.
+      let target: typeof toolUseList[number] | undefined;
+      if (ev.toolCallId) {
+        target = toolUseList.find((c) => c.toolCallId === ev.toolCallId && c.pending);
+      }
+      if (!target && resultIdx < toolUseList.length) {
+        target = toolUseList[resultIdx];
         resultIdx++;
+      } else if (target) {
+        // advance the FIFO cursor past any earlier slot that's already been filled
+        const idx = toolUseList.indexOf(target);
+        if (idx >= resultIdx) resultIdx = idx + 1;
+      }
+      if (target) {
+        target.result = ev.result;
+        target.pending = false;
       }
     } else if (ev.type === "compaction") {
       if (currentToolGroup) {
@@ -114,16 +130,17 @@ export function buildSegments(events: AgentEvent[] | undefined, content: string,
     }
   }
 
-  if (isStreaming) {
-    for (const call of toolUseList) {
-      if (call.pending && call.result === undefined) {
-        call.pending = true;
-      }
-    }
-  } else {
-    for (const call of toolUseList) {
+  for (const call of toolUseList) {
+    if (call.result !== undefined) {
+      call.pending = false;
+    } else if (!isStreaming && call.toolName !== "question") {
+      // No result, not actively streaming, and not a resumable question:
+      // treat as completed-without-result so we don't show a stuck spinner.
+      // `question` is special — its tool_use can stay pending across reloads
+      // until the user clicks an answer (or the server-side timeout fires).
       call.pending = false;
     }
+    // otherwise: leave pending=true (active stream OR resumable question)
   }
 
   if (currentToolGroup) {
@@ -255,7 +272,7 @@ export function ToolCallBlock({ toolName, toolInput, result, pending, immersive 
   );
 }
 
-export function AssistantMessageContent({ events, content, isStreaming, immersive, skillProposalContext, thinkingLabel }: {
+export function AssistantMessageContent({ events, content, isStreaming, immersive, skillProposalContext, thinkingLabel, sessionId }: {
   events?: AgentEvent[];
   content: string;
   isStreaming: boolean;
@@ -264,6 +281,8 @@ export function AssistantMessageContent({ events, content, isStreaming, immersiv
   /** Override the spinner label (defaults to "thinking…"). Used to distinguish the
    * skill-recommend agent's progress from the main agent's. */
   thinkingLabel?: string;
+  /** Active chat sessionId — required to POST replies for the `question` tool. */
+  sessionId?: string;
 }) {
   const { t } = useTranslation();
   const segments = buildSegments(events, content, isStreaming);
@@ -328,6 +347,23 @@ export function AssistantMessageContent({ events, content, isStreaming, immersiv
                       reason={parsed.reason}
                       skills={parsed.skills}
                       alreadyEnabledSlugs={skillProposalContext.alreadyEnabledSlugs}
+                      immersive={immersive}
+                    />
+                  );
+                }
+              }
+              if (call.toolName === "question" && call.toolCallId && sessionId) {
+                const questions: QuestionInfo[] = Array.isArray(call.toolInput?.questions)
+                  ? call.toolInput.questions
+                  : [];
+                if (questions.length > 0) {
+                  return (
+                    <QuestionCard
+                      key={j}
+                      callId={call.toolCallId}
+                      sessionId={sessionId}
+                      questions={questions}
+                      pending={!!call.pending}
                       immersive={immersive}
                     />
                   );

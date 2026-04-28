@@ -7,6 +7,7 @@ import type { VectorSearchFn, OnDocumentChangedFn, OnWorldSummaryStaleFn } from 
 import type { Locale } from "./i18n.js";
 import type { SkillData } from "./skills.js";
 import { getAgentDefinition } from "./agents/index.js";
+import type { QuestionManager } from "./questionManager.js";
 
 function logLLMError(prefix: string, err: unknown): void {
   const e = err as any;
@@ -36,8 +37,8 @@ export interface TokenUsage {
 
 export type AgentEvent =
   | { type: "text"; text: string }
-  | { type: "tool_use"; toolName: string; toolInput: unknown }
-  | { type: "tool_result"; toolName?: string; result: unknown }
+  | { type: "tool_use"; toolName: string; toolInput: unknown; toolCallId?: string }
+  | { type: "tool_result"; toolName?: string; result: unknown; toolCallId?: string }
   | { type: "messages"; messages: Message[] }
   | { type: "usage"; usage: TokenUsage }
   | { type: "done"; fullResponse: string }
@@ -62,6 +63,8 @@ export class CreatorAgentSession {
   private onWorldSummaryStale?: OnWorldSummaryStaleFn;
   private agentType: string;
   private skillCollection: string;
+  private questionManager?: QuestionManager;
+  private sessionId?: string;
 
   constructor(options: {
     apiKey: string;
@@ -79,6 +82,8 @@ export class CreatorAgentSession {
     onWorldSummaryStale?: OnWorldSummaryStaleFn;
     agentType?: string;
     skillCollection?: string;
+    questionManager?: QuestionManager;
+    sessionId?: string;
   }) {
     this.apiKey = options.apiKey;
     let model: Model<any> | undefined;
@@ -115,6 +120,8 @@ export class CreatorAgentSession {
     this.onWorldSummaryStale = options.onWorldSummaryStale;
     this.agentType = options.agentType ?? "creator";
     this.skillCollection = options.skillCollection ?? "skills";
+    this.questionManager = options.questionManager;
+    this.sessionId = options.sessionId;
   }
 
   async *chat(userMessage: string, options: {
@@ -142,7 +149,7 @@ export class CreatorAgentSession {
       skills,
     });
 
-    const allTools = createNovelTools(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale, locale, this.worldId, this.projectId, skills, this.skillCollection);
+    const allTools = createNovelTools(this.db, this.vectorSearchFn, this.onDocumentChanged, this.userId, this.onWorldSummaryStale, locale, this.worldId, this.projectId, skills, this.skillCollection, this.questionManager, this.sessionId);
     let tools = agentDef.tools[0] === "*"
       ? allTools
       : allTools.filter(t => (agentDef.tools as string[]).includes(t.name));
@@ -295,12 +302,14 @@ export class CreatorAgentSession {
               type: "tool_use",
               toolName: event.toolName,
               toolInput: event.args,
+              toolCallId: (event as any).toolCallId,
             };
           } else if (event.type === "tool_execution_end") {
             yield {
               type: "tool_result",
               toolName: event.toolName,
               result: event.result,
+              toolCallId: (event as any).toolCallId,
             };
           } else if (event.type === "turn_end") {
             // Emit per-turn usage and accumulate for summary
@@ -373,6 +382,9 @@ export class CreatorAgentSession {
     if (this.abortController) {
       this.abortController.abort();
       this.abortController = undefined;
+    }
+    if (this.questionManager && this.sessionId) {
+      this.questionManager.cancelAllForSession(this.sessionId);
     }
   }
 

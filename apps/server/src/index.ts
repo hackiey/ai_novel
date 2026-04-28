@@ -12,6 +12,7 @@ import { ChapterSynopsisService } from "./services/chapterSynopsisService.js";
 import { registerAgentRoutes } from "./routes/agentStream.js";
 import { registerFileImportRoutes } from "./routes/fileImport.js";
 import { registerRecommendSkillsRoutes } from "./routes/recommendSkills.js";
+import { registerQuestionRoutes } from "./routes/agentQuestion.js";
 
 const PORT = Number(process.env.PORT) || 3001;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/ai_creator";
@@ -123,6 +124,7 @@ async function main() {
   // Register Agent SSE routes (outside tRPC)
   registerAgentRoutes(fastify);
   registerRecommendSkillsRoutes(fastify);
+  registerQuestionRoutes(fastify);
 
   // Register file import routes
   registerFileImportRoutes(fastify);

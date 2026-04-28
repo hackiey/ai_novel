@@ -277,32 +277,54 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
     }
   }, [messages, isLoading]);
 
-  // Load history for a session
+  // Load history for a session, then surface any still-pending `question` tool
+  // calls (the agent is blocked server-side waiting for the user to click an
+  // answer — the assistant message hasn't been written yet, so it isn't in the
+  // history). We render those as a synthetic assistant message at the bottom
+  // so the QuestionCard reappears and the user can resume.
   const loadSession = useCallback(async (sid: string) => {
     setSessionId(sid);
     setShowHistory(false);
     setIsLoading(true);
     try {
-      const history = await queryClient.fetchQuery({
-        queryKey: ["agent", "getHistory", { sessionId: sid }],
-        queryFn: () => {
-          const token = getToken();
-          return fetch(`${API_BASE}/trpc/agent.getHistory?input=${encodeURIComponent(JSON.stringify({ sessionId: sid }))}`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          })
-            .then((r) => r.json())
-            .then((r) => r.result?.data);
-        },
-      });
-      if (history) {
-        const loaded: ChatMessage[] = history.map((doc: any) => ({
-          role: doc.role,
-          content: doc.content || "",
-          events: doc.events,
-          createdAt: doc.createdAt,
+      const token = getToken();
+      const [history, pending] = await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: ["agent", "getHistory", { sessionId: sid }],
+          queryFn: () => {
+            return fetch(`${API_BASE}/trpc/agent.getHistory?input=${encodeURIComponent(JSON.stringify({ sessionId: sid }))}`, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            })
+              .then((r) => r.json())
+              .then((r) => r.result?.data);
+          },
+        }),
+        fetch(`${API_BASE}/api/agent/question?sessionId=${encodeURIComponent(sid)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+          .then((r) => (r.ok ? r.json() : { pending: [] }))
+          .catch(() => ({ pending: [] })),
+      ]);
+      const loaded: ChatMessage[] = Array.isArray(history)
+        ? history.map((doc: any) => ({
+            role: doc.role,
+            content: doc.content || "",
+            events: doc.events,
+            createdAt: doc.createdAt,
+          }))
+        : [];
+      const pendingList: Array<{ callId: string; info: { questions: any[] } }> =
+        Array.isArray(pending?.pending) ? pending.pending : [];
+      if (pendingList.length > 0) {
+        const events: AgentEvent[] = pendingList.map((p) => ({
+          type: "tool_use",
+          toolName: "question",
+          toolCallId: p.callId,
+          toolInput: { questions: p.info.questions },
         }));
-        setMessages(loaded);
+        loaded.push({ role: "assistant", content: "", events, source: "main" });
       }
+      setMessages(loaded);
     } catch {
       // silently fail
     } finally {
@@ -961,6 +983,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
                       immersive={imm}
                       skillProposalContext={skillProposalContext}
                       thinkingLabel={msg.source === "recommendation" ? "正在为你筛选 Skill…" : undefined}
+                      sessionId={sessionId}
                     />
                   </div>
                 )}

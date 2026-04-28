@@ -22,6 +22,7 @@ import Markdown from "react-native-markdown-display";
 import { useAgentChat } from "../../lib/useAgentChat";
 import { buildSegments, type ChatMessage } from "../../lib/segments";
 import ToolCallBlock from "../../components/ToolCallBlock";
+import QuestionCard, { type QuestionInfo } from "../../components/QuestionCard";
 import { getMarkdownStyles } from "../../lib/markdownStyles";
 import { trpc } from "../../lib/trpc";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -49,6 +50,7 @@ function AssistantMessageContent({
   chatStyles,
   mdStyles,
   tealColor,
+  sessionId,
 }: {
   events?: any[];
   content: string;
@@ -56,6 +58,7 @@ function AssistantMessageContent({
   chatStyles: ReturnType<typeof createStyles>;
   mdStyles: ReturnType<typeof getMarkdownStyles>;
   tealColor: string;
+  sessionId?: string;
 }) {
   const { t } = useTranslation();
   const segments = buildSegments(events, content, isStreaming);
@@ -96,9 +99,25 @@ function AssistantMessageContent({
 
         return (
           <View key={i} style={chatStyles.toolBlockWrap}>
-            {seg.calls.map((call, j) => (
-              <ToolCallBlock key={j} {...call} />
-            ))}
+            {seg.calls.map((call: any, j: number) => {
+              if (call.toolName === "question" && call.toolCallId && sessionId) {
+                const questions: QuestionInfo[] = Array.isArray(call.toolInput?.questions)
+                  ? call.toolInput.questions
+                  : [];
+                if (questions.length > 0) {
+                  return (
+                    <QuestionCard
+                      key={j}
+                      callId={call.toolCallId}
+                      sessionId={sessionId}
+                      questions={questions}
+                      pending={!!call.pending}
+                    />
+                  );
+                }
+              }
+              return <ToolCallBlock key={j} {...call} />;
+            })}
           </View>
         );
       })}
@@ -306,6 +325,7 @@ export default function ChatScreen() {
           chatStyles={s}
           mdStyles={mdStyles}
           tealColor={colors.teal}
+          sessionId={sessionId}
         />
       </View>
     );

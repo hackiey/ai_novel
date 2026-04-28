@@ -5,6 +5,7 @@ import { ObjectId, type Db } from "mongodb";
 import * as handlers from "./handlers.js";
 import { t, type Locale } from "../i18n.js";
 import { type SkillData } from "../skills.js";
+import { QuestionManager, QuestionRejectedError } from "../questionManager.js";
 
 export type VectorSearchFn = (args: {
   projectId?: string;
@@ -54,7 +55,7 @@ function rrfMerge(rankedLists: SearchResult[][], k = 60): SearchResult[] {
 
 const MAX_SEARCH_SKILLS_CALLS = 3;
 
-export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocumentChanged?: OnDocumentChangedFn, userId?: string, onWorldSummaryStale?: OnWorldSummaryStaleFn, locale: Locale = "zh", worldId?: string, projectId?: string, skills?: SkillData[], skillCollection: string = "skills"): AgentTool<any>[] {
+export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocumentChanged?: OnDocumentChangedFn, userId?: string, onWorldSummaryStale?: OnWorldSummaryStaleFn, locale: Locale = "zh", worldId?: string, projectId?: string, skills?: SkillData[], skillCollection: string = "skills", questionManager?: QuestionManager, sessionId?: string): AgentTool<any>[] {
   const d = t(locale).tools;
   const skillScope = skillCollection === "skill_drafts" ? "skill_draft" : "skill";
   let searchSkillsCallCount = 0;
@@ -577,6 +578,54 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
       async execute(_toolCallId, args) {
         const result = await handlers.deleteSkill(args, db, skillCollection, userId);
         return textResult(result);
+      },
+    },
+
+    {
+      name: "question",
+      label: "Question",
+      description: d.question,
+      parameters: Type.Object({
+        questions: Type.Array(
+          Type.Object({
+            question: Type.String({ description: d.question_question }),
+            header: Type.String({ description: d.question_header }),
+            options: Type.Array(
+              Type.Object({
+                label: Type.String({ description: d.question_option_label }),
+                description: Type.String({ description: d.question_option_description }),
+              }),
+              { minItems: 2 },
+            ),
+            multiple: Type.Optional(Type.Boolean({ description: d.question_multiple })),
+          }),
+          { minItems: 1, maxItems: 4, description: d.question_questions },
+        ),
+      }),
+      async execute(toolCallId, args) {
+        if (!questionManager || !sessionId) {
+          return textResult({ error: "question tool unavailable: no manager wired into this session" });
+        }
+        const questions = args.questions ?? [];
+        try {
+          const answers = await questionManager.ask(toolCallId, sessionId, { questions });
+          const fmt = (a: string[] | undefined) => (!a?.length ? "Unanswered" : a.join(", "));
+          const summary = questions
+            .map((q: any, i: number) => `"${q.question}" = "${fmt(answers[i])}"`)
+            .join("; ");
+          return textResult({
+            answers,
+            summary: `User answered: ${summary}. Continue with these choices in mind.`,
+          });
+        } catch (err) {
+          if (err instanceof QuestionRejectedError) {
+            return textResult({
+              rejected: true,
+              error: "User dismissed the question without answering. Do not re-ask the same question; either proceed with a sensible default and explain it, or ask in plain text for richer input.",
+            });
+          }
+          return textResult({ error: err instanceof Error ? err.message : String(err) });
+        }
       },
     },
   ];

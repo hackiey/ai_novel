@@ -16,7 +16,8 @@ export type ToolName =
   | "create_skill"
   | "update_skill"
   | "delete_skill"
-  | "invoke_skill";
+  | "invoke_skill"
+  | "question";
 
 /** Context available when building a system prompt */
 export interface SystemPromptContext {
