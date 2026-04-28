@@ -6,11 +6,10 @@ export const fileImportAgent: AgentDefinition = {
   label: "File Import Extractor",
   tools: [
     "semantic_search",
-    "create_character",
+    "write",
     "update_character",
     "get_entity",
     "delete_entity",
-    "create_world_setting",
     "update_world_setting",
   ],
   buildSystemPrompt(ctx) {

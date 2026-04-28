@@ -203,6 +203,31 @@ export async function createCharacter(
   return serialize({ ...doc, _id: result.insertedId });
 }
 
+export async function overwriteCharacter(
+  args: { id: string; name: string; aliases?: string[]; tags?: string[]; content?: string; importance?: string; summary?: string },
+  db: Db,
+  userId?: string,
+): Promise<unknown> {
+  const setFields: Record<string, unknown> = {
+    updatedAt: new Date(),
+    name: args.name,
+    importance: args.importance ?? "minor",
+    summary: args.summary ?? "",
+    aliases: args.aliases ?? [],
+    tags: args.tags ?? [],
+    content: args.content ?? "",
+  };
+  const result = await db
+    .collection("characters")
+    .findOneAndUpdate(
+      { _id: toObjectId(args.id), ...ownerClause(userId) },
+      { $set: setFields },
+      { returnDocument: "after" }
+    );
+  if (!result) return { error: `Character not found: ${args.id}` };
+  return serialize(result);
+}
+
 export async function updateCharacter(
   args: { id: string; name?: string; aliases?: string[]; tags?: string[]; content?: string; importance?: string; summary?: string },
   db: Db,
@@ -282,6 +307,31 @@ export async function createWorldSetting(
   if (userId) doc.userId = userId;
   const result = await db.collection("world_settings").insertOne(doc);
   return serialize({ ...doc, _id: result.insertedId });
+}
+
+export async function overwriteWorldSetting(
+  args: { id: string; category: string; title: string; content?: string; tags?: string[]; importance?: string; summary?: string },
+  db: Db,
+  userId?: string,
+): Promise<unknown> {
+  const setFields: Record<string, unknown> = {
+    updatedAt: new Date(),
+    category: args.category,
+    title: args.title,
+    content: args.content ?? "",
+    tags: args.tags ?? [],
+    importance: args.importance ?? "minor",
+    summary: args.summary ?? "",
+  };
+  const result = await db
+    .collection("world_settings")
+    .findOneAndUpdate(
+      { _id: toObjectId(args.id), ...ownerClause(userId) },
+      { $set: setFields },
+      { returnDocument: "after" }
+    );
+  if (!result) return { error: `World setting not found: ${args.id}` };
+  return serialize(result);
 }
 
 export async function updateWorldSetting(
@@ -572,6 +622,73 @@ export async function createChapter(
 }
 
 
+export async function overwriteChapter(
+  args: { id: string; title: string; content?: string; synopsis?: string; order?: number },
+  db: Db,
+  userId?: string,
+): Promise<unknown> {
+  const existing = await db
+    .collection("chapters")
+    .findOne({ _id: toObjectId(args.id), ...ownerClause(userId) });
+  if (!existing) return { error: `Chapter not found: ${args.id}` };
+
+  const now = new Date();
+  const title = args.title;
+  const content = args.content ?? "";
+  const synopsisProvided = args.synopsis !== undefined;
+  const synopsis = args.synopsis ?? "";
+  const order = args.order ?? (typeof existing.order === "number" ? existing.order : 0);
+  const sourceHash = computeChapterSynopsisSourceHash({ title, content });
+
+  const setFields: Record<string, unknown> = {
+    title,
+    content,
+    synopsis,
+    order,
+    wordCount: countChapterWords(content),
+    updatedAt: now,
+    ...(synopsisProvided || !content.trim()
+      ? {
+          synopsisSourceHash: sourceHash,
+          synopsisStatus: "ready",
+          synopsisUpdatedAt: now,
+        }
+      : {
+          synopsisStatus: "pending",
+        }),
+  };
+
+  const titleChanged = title !== existing.title;
+  const contentChanged = content !== existing.content;
+  const orderChanged = args.order !== undefined && args.order !== existing.order;
+
+  const unsetFields: Record<string, ""> = {};
+  if (titleChanged || contentChanged || synopsisProvided) {
+    unsetFields.synopsisJobLockedAt = "";
+    unsetFields.synopsisJobToken = "";
+    unsetFields.synopsisError = "";
+  }
+
+  const update: Record<string, unknown> =
+    Object.keys(unsetFields).length > 0 ? { $set: setFields, $unset: unsetFields } : { $set: setFields };
+
+  const result = await db.collection("chapters").findOneAndUpdate(
+    { _id: toObjectId(args.id), ...ownerClause(userId) },
+    update,
+    { returnDocument: "after" }
+  );
+  if (!result) return { error: `Chapter not found: ${args.id}` };
+
+  if (titleChanged || contentChanged || orderChanged) {
+    await markDependentChapterSynopsesPending(db, {
+      projectId: existing.projectId as ObjectId,
+      fromOrder: order,
+      excludeId: existing._id as ObjectId,
+    });
+  }
+  return serialize(result);
+}
+
 const CHAPTER_EDITABLE_FIELDS = ["title", "content", "synopsis"];
 
 export async function updateChapter(
@@ -727,6 +844,30 @@ export async function createDraft(
   if (args.worldId) doc.worldId = new ObjectId(args.worldId);
   const result = await db.collection("drafts").insertOne(doc);
   return serialize({ ...doc, _id: result.insertedId });
+}
+
+export async function overwriteDraft(
+  args: { id: string; title: string; content?: string; tags?: string[]; linkedCharacters?: string[]; linkedWorldSettings?: string[] },
+  db: Db,
+  userId?: string,
+): Promise<unknown> {
+  const setFields: Record<string, unknown> = {
+    updatedAt: new Date(),
+    title: args.title,
+    content: args.content ?? "",
+    tags: args.tags ?? [],
+    linkedCharacters: (args.linkedCharacters ?? []).map((cid) => new ObjectId(cid)),
+    linkedWorldSettings: (args.linkedWorldSettings ?? []).map((wid) => new ObjectId(wid)),
+  };
+  const result = await db
+    .collection("drafts")
+    .findOneAndUpdate(
+      { _id: toObjectId(args.id), ...ownerClause(userId) },
+      { $set: setFields },
+      { returnDocument: "after" }
+    );
+  if (!result) return { error: `Draft not found: ${args.id}` };
+  return serialize(result);
 }
 
 export async function updateDraft(

@@ -16,13 +16,10 @@ const API_BASE = "";
 // Tools that mutate data — map tool names to the tRPC query keys to invalidate
 // tRPC v11 query keys are double-nested: [["router", "procedure"], ...]
 const MUTATION_TOOL_INVALIDATIONS: Record<string, string[][]> = {
-  create_character: [["character"]],
+  write: [["character"], ["worldSetting"], ["chapter"], ["draft"]],
   update_character: [["character"]],
-  create_world_setting: [["worldSetting"]],
   update_world_setting: [["worldSetting"]],
-  create_chapter: [["chapter"]],
   update_chapter: [["chapter"]],
-  create_draft: [["draft"]],
   update_draft: [["draft"]],
   delete_entity: [["character"], ["worldSetting"], ["chapter"], ["draft"]],
 };

@@ -141,35 +141,134 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
     },
 
     {
-      name: "create_character",
-      label: "Create Character",
-      description: d.create_character,
-      parameters: Type.Object({
-        name: Type.String({ description: d.create_character_name }),
-        importance: Type.Optional(StringEnum(
-          ["core", "major", "minor"] as const,
-          { description: d.create_character_importance },
-        )),
-        summary: Type.Optional(Type.String({ description: d.create_character_summary })),
-        aliases: Type.Optional(Type.Array(Type.String(), { description: d.create_character_aliases })),
-        tags: Type.Optional(Type.Array(Type.String(), { description: d.create_character_tags })),
-        content: Type.Optional(Type.String({ description: d.create_character_content })),
-        scope: Type.Optional(StringEnum(["world", "project"] as const, { description: d.create_character_scope })),
-      }),
+      name: "write",
+      label: "Write",
+      description: d.write,
+      parameters: Type.Union([
+        Type.Object({
+          type: Type.Literal("character"),
+          id: Type.Optional(Type.String({ description: d.write_id })),
+          name: Type.String({ description: d.write_character_name }),
+          importance: Type.Optional(StringEnum(["core", "major", "minor"] as const, { description: d.write_character_importance })),
+          summary: Type.Optional(Type.String({ description: d.write_character_summary })),
+          aliases: Type.Optional(Type.Array(Type.String(), { description: d.write_character_aliases })),
+          tags: Type.Optional(Type.Array(Type.String(), { description: d.write_character_tags })),
+          content: Type.Optional(Type.String({ description: d.write_character_content })),
+          scope: Type.Optional(StringEnum(["world", "project"] as const, { description: d.write_character_scope })),
+        }),
+        Type.Object({
+          type: Type.Literal("world_setting"),
+          id: Type.Optional(Type.String({ description: d.write_id })),
+          category: Type.String({ description: d.write_world_setting_category }),
+          title: Type.String({ description: d.write_world_setting_title }),
+          content: Type.Optional(Type.String({ description: d.write_world_setting_content })),
+          tags: Type.Optional(Type.Array(Type.String(), { description: d.write_world_setting_tags })),
+          importance: Type.Optional(StringEnum(["core", "major", "minor"] as const, { description: d.write_world_setting_importance })),
+          summary: Type.Optional(Type.String({ description: d.write_world_setting_summary })),
+          scope: Type.Optional(StringEnum(["world", "project"] as const, { description: d.write_world_setting_scope })),
+        }),
+        Type.Object({
+          type: Type.Literal("chapter"),
+          id: Type.Optional(Type.String({ description: d.write_id })),
+          title: Type.String({ description: d.write_chapter_title }),
+          content: Type.Optional(Type.String({ description: d.write_chapter_content })),
+          synopsis: Type.Optional(Type.String({ description: d.write_chapter_synopsis })),
+          order: Type.Optional(Type.Number({ description: d.write_chapter_order })),
+        }),
+        Type.Object({
+          type: Type.Literal("draft"),
+          id: Type.Optional(Type.String({ description: d.write_id })),
+          title: Type.String({ description: d.write_draft_title }),
+          content: Type.Optional(Type.String({ description: d.write_draft_content })),
+          tags: Type.Optional(Type.Array(Type.String(), { description: d.write_draft_tags })),
+          linkedCharacters: Type.Optional(Type.Array(Type.String(), { description: d.write_draft_linkedCharacters })),
+          linkedWorldSettings: Type.Optional(Type.Array(Type.String(), { description: d.write_draft_linkedWorldSettings })),
+          scope: Type.Optional(StringEnum(["world", "project"] as const, { description: d.write_draft_scope })),
+        }),
+      ], { description: d.write_type }),
       async execute(_toolCallId, args) {
-        const scope = args.scope ?? "world";
-        if (!worldId) {
-          return textResult({ error: "Cannot create a character: no world context." });
+        switch (args.type) {
+          case "character": {
+            if (args.id) {
+              const { type: _type, id, scope: _scope, ...rest } = args;
+              const result = await handlers.overwriteCharacter({ id, ...rest }, db, userId);
+              if ((result as any)?._id) onDocumentChanged?.("characters", String((result as any)._id));
+              const charDoc = await db.collection("characters").findOne({ _id: new ObjectId(id) });
+              if (charDoc?.worldId) onWorldSummaryStale?.(charDoc.worldId.toHexString());
+              return textResult(result);
+            }
+            const scope = args.scope ?? "world";
+            if (!worldId) {
+              return textResult({ error: "Cannot create a character: no world context." });
+            }
+            if (scope === "project" && !projectId) {
+              return textResult({ error: "Cannot create a project-scoped character: no project context. Use scope=\"world\" or open the chat under a specific project." });
+            }
+            const { type: _type, id: _id, scope: _scope, ...rest } = args;
+            const ownerProjectId = scope === "project" ? projectId : undefined;
+            const result = await handlers.createCharacter({ ...rest, worldId, projectId: ownerProjectId }, db, userId);
+            if ((result as any)?._id) onDocumentChanged?.("characters", String((result as any)._id));
+            if (worldId) onWorldSummaryStale?.(worldId);
+            return textResult(result);
+          }
+          case "world_setting": {
+            if (args.id) {
+              const { type: _type, id, scope: _scope, ...rest } = args;
+              const result = await handlers.overwriteWorldSetting({ id, ...rest }, db, userId);
+              if ((result as any)?._id) onDocumentChanged?.("world_settings", String((result as any)._id));
+              const wsDoc = await db.collection("world_settings").findOne({ _id: new ObjectId(id) });
+              if (wsDoc?.worldId) onWorldSummaryStale?.(wsDoc.worldId.toHexString());
+              return textResult(result);
+            }
+            const scope = args.scope ?? "world";
+            if (!worldId) {
+              return textResult({ error: "Cannot create a world setting: no world context." });
+            }
+            if (scope === "project" && !projectId) {
+              return textResult({ error: "Cannot create a project-scoped world setting: no project context. Use scope=\"world\" or open the chat under a specific project." });
+            }
+            const { type: _type, id: _id, scope: _scope, ...rest } = args;
+            const ownerProjectId = scope === "project" ? projectId : undefined;
+            const result = await handlers.createWorldSetting({ ...rest, worldId, projectId: ownerProjectId }, db, userId);
+            if ((result as any)?._id) onDocumentChanged?.("world_settings", String((result as any)._id));
+            if (worldId) onWorldSummaryStale?.(worldId);
+            return textResult(result);
+          }
+          case "chapter": {
+            if (args.id) {
+              const { type: _type, id, ...rest } = args;
+              const result = await handlers.overwriteChapter({ id, ...rest }, db, userId);
+              if ((result as any)?._id) onDocumentChanged?.("chapters", String((result as any)._id));
+              return textResult(result);
+            }
+            const { type: _type, id: _id, ...rest } = args;
+            const result = await handlers.createChapter({ ...rest, projectId: projectId! }, db, userId);
+            if ((result as any)?._id) onDocumentChanged?.("chapters", String((result as any)._id));
+            return textResult(result);
+          }
+          case "draft": {
+            if (args.id) {
+              const { type: _type, id, scope: _scope, ...rest } = args;
+              const result = await handlers.overwriteDraft({ id, ...rest }, db, userId);
+              if ((result as any)?._id) onDocumentChanged?.("drafts", String((result as any)._id));
+              return textResult(result);
+            }
+            const scope = args.scope ?? "world";
+            if (!worldId) {
+              return textResult({ error: "Cannot create a draft: no world context." });
+            }
+            if (scope === "project" && !projectId) {
+              return textResult({ error: "Cannot create a project-scoped draft: no project context. Use scope=\"world\" or open the chat under a specific project." });
+            }
+            const { type: _type, id: _id, scope: _scope, ...rest } = args;
+            const ownerIds = scope === "project" ? { worldId, projectId } : { worldId };
+            const result = await handlers.createDraft({ ...rest, ...ownerIds }, db, userId);
+            if ((result as any)?._id) onDocumentChanged?.("drafts", String((result as any)._id));
+            return textResult(result);
+          }
+          default:
+            return textResult({ error: `Unknown write type: ${(args as any).type}` });
         }
-        if (scope === "project" && !projectId) {
-          return textResult({ error: "Cannot create a project-scoped character: no project context. Use scope=\"world\" or open the chat under a specific project." });
-        }
-        const { scope: _scope, ...rest } = args;
-        const ownerProjectId = scope === "project" ? projectId : undefined;
-        const result = await handlers.createCharacter({ ...rest, worldId, projectId: ownerProjectId }, db, userId);
-        if ((result as any)?._id) onDocumentChanged?.("characters", String((result as any)._id));
-        if (worldId) onWorldSummaryStale?.(worldId);
-        return textResult(result);
       },
     },
 
@@ -247,57 +346,6 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
     },
 
     {
-      name: "create_world_setting",
-      label: "Create World Setting",
-      description: d.create_world_setting,
-      parameters: Type.Object({
-        category: Type.String({ description: d.create_world_setting_category }),
-        title: Type.String({ description: d.create_world_setting_title }),
-        content: Type.Optional(Type.String({ description: d.create_world_setting_content })),
-        tags: Type.Optional(Type.Array(Type.String(), { description: d.create_world_setting_tags })),
-        importance: Type.Optional(StringEnum(
-          ["core", "major", "minor"] as const,
-          { description: d.create_world_setting_importance },
-        )),
-        summary: Type.Optional(Type.String({ description: d.create_world_setting_summary })),
-        scope: Type.Optional(StringEnum(["world", "project"] as const, { description: d.create_world_setting_scope })),
-      }),
-      async execute(_toolCallId, args) {
-        const scope = args.scope ?? "world";
-        if (!worldId) {
-          return textResult({ error: "Cannot create a world setting: no world context." });
-        }
-        if (scope === "project" && !projectId) {
-          return textResult({ error: "Cannot create a project-scoped world setting: no project context. Use scope=\"world\" or open the chat under a specific project." });
-        }
-        const { scope: _scope, ...rest } = args;
-        const ownerProjectId = scope === "project" ? projectId : undefined;
-        const result = await handlers.createWorldSetting({ ...rest, worldId, projectId: ownerProjectId }, db, userId);
-        if ((result as any)?._id) onDocumentChanged?.("world_settings", String((result as any)._id));
-        if (worldId) onWorldSummaryStale?.(worldId);
-        return textResult(result);
-      },
-    },
-
-
-    {
-      name: "create_chapter",
-      label: "Create Chapter",
-      description: d.create_chapter,
-      parameters: Type.Object({
-        title: Type.String({ description: d.create_chapter_title }),
-        content: Type.Optional(Type.String({ description: d.create_chapter_content })),
-        synopsis: Type.Optional(Type.String({ description: d.create_chapter_synopsis })),
-        order: Type.Optional(Type.Number({ description: d.create_chapter_order })),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await handlers.createChapter({ ...args, projectId: projectId! }, db, userId);
-        if ((result as any)?._id) onDocumentChanged?.("chapters", String((result as any)._id));
-        return textResult(result);
-      },
-    },
-
-    {
       name: "list",
       label: "List",
       description: d.list,
@@ -342,35 +390,6 @@ export function createNovelTools(db: Db, vectorSearchFn?: VectorSearchFn, onDocu
     },
 
 
-
-    {
-      name: "create_draft",
-      label: "Create Draft",
-      description: d.create_draft,
-      parameters: Type.Object({
-        title: Type.String({ description: d.create_draft_title }),
-        content: Type.Optional(Type.String({ description: d.create_draft_content })),
-        tags: Type.Optional(Type.Array(Type.String(), { description: d.create_draft_tags })),
-        linkedCharacters: Type.Optional(Type.Array(Type.String(), { description: d.create_draft_linkedCharacters })),
-        linkedWorldSettings: Type.Optional(Type.Array(Type.String(), { description: d.create_draft_linkedWorldSettings })),
-        scope: Type.Optional(StringEnum(["world", "project"] as const, { description: d.create_draft_scope })),
-      }),
-      async execute(_toolCallId, args) {
-        const scope = args.scope ?? "world";
-        if (!worldId) {
-          return textResult({ error: "Cannot create a draft: no world context." });
-        }
-        if (scope === "project" && !projectId) {
-          return textResult({ error: "Cannot create a project-scoped draft: no project context. Use scope=\"world\" or open the chat under a specific project." });
-        }
-        const { scope: _scope, ...rest } = args;
-        // Every draft carries worldId; projectId is set only for project-scoped drafts.
-        const ownerIds = scope === "project" ? { worldId, projectId } : { worldId };
-        const result = await handlers.createDraft({ ...rest, ...ownerIds }, db, userId);
-        if ((result as any)?._id) onDocumentChanged?.("drafts", String((result as any)._id));
-        return textResult(result);
-      },
-    },
 
     {
       name: "update_draft",

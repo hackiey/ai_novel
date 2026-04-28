@@ -4,16 +4,13 @@ import type { SkillData } from "../skills.js";
 /** Names of all tools that createNovelTools can produce */
 export type ToolName =
   | "semantic_search"
+  | "write"
   | "update_character"
-  | "create_character"
   | "get_entity"
   | "delete_entity"
   | "update_world_setting"
-  | "create_world_setting"
-  | "create_chapter"
   | "list"
   | "update_chapter"
-  | "create_draft"
   | "update_draft"
   | "update_memory"
   | "generate_synopsis"
