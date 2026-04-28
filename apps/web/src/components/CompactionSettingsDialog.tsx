@@ -87,7 +87,7 @@ export default function CompactionSettingsDialog({ open, onClose }: Props) {
                 type="number"
                 value={thresholdText}
                 onChange={(e) => setThresholdText(e.target.value)}
-                placeholder="80000"
+                placeholder="150000"
                 min={10000}
                 step={10000}
                 className={`w-full bg-white/5 border rounded-lg px-3 py-2 text-xs text-white/80 placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-teal-500 ${
