@@ -185,10 +185,41 @@ function ModelDropdown({
 export default function AgentChatPanel({ projectId, worldId, currentChapterId, onChapterEdit, variant = "default" }: Props) {
   const imm = variant === "immersive";
   const { t, i18n } = useTranslation();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Per-session state: messages and "is streaming" are tracked by sessionKey so that
+  // multiple sessions can stream concurrently without their UI bleeding into each other.
+  // sessionKey = real sessionId once the server returns one, or a "draft-N" placeholder
+  // before that.
+  const [messagesByKey, setMessagesByKey] = useState<Record<string, ChatMessage[]>>({});
+  const [loadingByKey, setLoadingByKey] = useState<Record<string, true>>({});
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | undefined>();
-  const [isLoading, setIsLoading] = useState(false);
+  const draftCounterRef = useRef(0);
+  const [draftKey, setDraftKey] = useState<string>(() => `draft-0`);
+  const viewKey = sessionId ?? draftKey;
+  const messages = messagesByKey[viewKey] ?? [];
+  const isLoading = !!loadingByKey[viewKey];
+  // Refs that mirror the latest view so async stream callbacks can decide whether
+  // the user has navigated away.
+  const sessionIdRef = useRef<string | undefined>(sessionId);
+  const draftKeyRef = useRef<string>(draftKey);
+  useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
+  useEffect(() => { draftKeyRef.current = draftKey; }, [draftKey]);
+
+  const updateMessages = useCallback((key: string, updater: (prev: ChatMessage[]) => ChatMessage[]) => {
+    setMessagesByKey((prev) => ({ ...prev, [key]: updater(prev[key] ?? []) }));
+  }, []);
+  const setLoading = useCallback((key: string, loading: boolean) => {
+    setLoadingByKey((prev) => {
+      if (loading) {
+        if (prev[key]) return prev;
+        return { ...prev, [key]: true };
+      }
+      if (!prev[key]) return prev;
+      const { [key]: _, ...rest } = prev;
+      return rest;
+    });
+  }, []);
+
   const [showHistory, setShowHistory] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
   const [memorySubTab, setMemorySubTab] = useState<"world" | "project">("world");
@@ -197,7 +228,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
   const [editText, setEditText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const userScrolledUp = useRef(false);
-  const abortRef = useRef<AbortController | null>(null);
+  const abortByKeyRef = useRef<Map<string, AbortController>>(new Map());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
@@ -285,7 +316,9 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
   const loadSession = useCallback(async (sid: string) => {
     setSessionId(sid);
     setShowHistory(false);
-    setIsLoading(true);
+    // If this session has an in-flight stream, its messages are already in the
+    // map — don't clobber them with a stale history snapshot.
+    if (loadingByKey[sid]) return;
     try {
       const token = getToken();
       const [history, pending] = await Promise.all([
@@ -324,23 +357,23 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
         }));
         loaded.push({ role: "assistant", content: "", events, source: "main" });
       }
-      setMessages(loaded);
+      // Race guard: if the stream started after we kicked off the fetch, prefer the live state.
+      if (loadingByKey[sid]) return;
+      setMessagesByKey((prev) => ({ ...prev, [sid]: loaded }));
     } catch {
       // silently fail
-    } finally {
-      setIsLoading(false);
     }
-  }, [queryClient]);
+  }, [queryClient, loadingByKey]);
 
   // Threshold below which we trigger automatic skill recommendations after each turn.
   const RECOMMEND_SKILLS_THRESHOLD = 50;
 
-  async function streamSkillRecommendation(precedingMessages: ChatMessage[]) {
+  async function streamSkillRecommendation(sessionKey: string, precedingMessages: ChatMessage[]) {
     if (!projectId) return;
     const recentMessages = precedingMessages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
     if (recentMessages.length === 0) return;
 
-    setMessages((prev) => [...prev, { role: "assistant", content: "", events: [], source: "recommendation" }]);
+    updateMessages(sessionKey, (prev) => [...prev, { role: "assistant", content: "", events: [], source: "recommendation" }]);
 
     try {
       const token = getToken();
@@ -385,7 +418,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
             if (event.type === "session") continue;
             allEvents.push(event);
             if (event.type === "text" && event.text) fullText += event.text;
-            setMessages((prev) => {
+            updateMessages(sessionKey, (prev) => {
               const updated = [...prev];
               const last = updated[updated.length - 1];
               if (last && last.role === "assistant") {
@@ -404,10 +437,17 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
   }
 
   async function sendMessage(text: string) {
-    if (!text || isLoading) return;
+    if (!text) return;
+    // Capture the session view at call time. The stream that follows is tied to
+    // this key — even if the user switches sessions mid-stream, message updates
+    // and the loading flag stay attached to the session that initiated the turn.
+    const startKey = viewKey;
+    let activeKey = startKey;
+    const startedFromDraft = sessionId === undefined;
+    if (loadingByKey[startKey]) return;
 
     userScrolledUp.current = false;
-    setIsLoading(true);
+    setLoading(startKey, true);
 
     // Snapshot recommend-eligibility BEFORE the turn so a mid-turn `addEnabledSkills`
     // (from clicking a previous propose_skills card) doesn't change the decision.
@@ -418,15 +458,12 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
       && enabledCount < RECOMMEND_SKILLS_THRESHOLD;
 
     const userMsg: ChatMessage = { role: "user", content: text };
-    setMessages((prev) => [...prev, userMsg]);
-
-    // Add a placeholder assistant message for streaming
-    setMessages((prev) => [...prev, { role: "assistant", content: "", events: [] }]);
+    updateMessages(startKey, (prev) => [...prev, userMsg, { role: "assistant", content: "", events: [] }]);
 
     try {
       const token = getToken();
       const controller = new AbortController();
-      abortRef.current = controller;
+      abortByKeyRef.current.set(activeKey, controller);
       const modelToUse = currentModelSpec;
       const byok = modelToUse ? getBYOKForModel(modelToUse) : null;
       const response = await fetch(`${API_BASE}/api/agent/chat`, {
@@ -484,7 +521,36 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
             const event: AgentEvent = JSON.parse(payload);
 
             if (event.type === "session" && event.sessionId) {
-              setSessionId(event.sessionId);
+              const realId = event.sessionId;
+              if (realId !== activeKey) {
+                // Move messages/loading from the draft key to the real session id.
+                setMessagesByKey((prev) => {
+                  if (!(activeKey in prev) && !(realId in prev)) return prev;
+                  const buf = prev[activeKey] ?? [];
+                  const { [activeKey]: _, ...rest } = prev;
+                  return { ...rest, [realId]: buf };
+                });
+                setLoadingByKey((prev) => {
+                  const next: Record<string, true> = { ...prev };
+                  delete next[activeKey];
+                  next[realId] = true;
+                  return next;
+                });
+                const ctrl = abortByKeyRef.current.get(activeKey);
+                abortByKeyRef.current.delete(activeKey);
+                if (ctrl) abortByKeyRef.current.set(realId, ctrl);
+                // Only steer the visible view if the user is still parked on the
+                // draft we started from. If they navigated to another session, leave
+                // them where they are.
+                if (
+                  startedFromDraft &&
+                  sessionIdRef.current === undefined &&
+                  draftKeyRef.current === activeKey
+                ) {
+                  setSessionId(realId);
+                }
+                activeKey = realId;
+              }
               continue;
             }
 
@@ -493,7 +559,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
             if (event.type === "text" && event.text) {
               fullText += event.text;
               // Update assistant message content in-place
-              setMessages((prev) => {
+              updateMessages(activeKey, (prev) => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
                 if (last && last.role === "assistant") {
@@ -510,7 +576,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
             if (event.type === "tool_use" || event.type === "tool_result" || event.type === "compaction") {
               if (event.type === "tool_use" && event.toolName) mutatedTools.push(event.toolName);
               // Update events list in real-time
-              setMessages((prev) => {
+              updateMessages(activeKey, (prev) => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
                 if (last && last.role === "assistant") {
@@ -551,7 +617,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
       }
 
       // Final update with all events
-      setMessages((prev) => {
+      updateMessages(activeKey, (prev) => {
         const updated = [...prev];
         const last = updated[updated.length - 1];
         if (last && last.role === "assistant") {
@@ -604,13 +670,13 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
           { role: "user", content: text },
           { role: "assistant", content: fullText },
         ];
-        await streamSkillRecommendation(preceding);
+        await streamSkillRecommendation(activeKey, preceding);
       }
     } catch (err: any) {
       if (err.name === "AbortError") {
         // User stopped generation — keep partial content as-is
       } else {
-        setMessages((prev) => {
+        updateMessages(activeKey, (prev) => {
           const updated = [...prev];
           const last = updated[updated.length - 1];
           if (last && last.role === "assistant") {
@@ -623,13 +689,15 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
         });
       }
     } finally {
-      abortRef.current = null;
-      setIsLoading(false);
+      if (abortByKeyRef.current.get(activeKey)) {
+        abortByKeyRef.current.delete(activeKey);
+      }
+      setLoading(activeKey, false);
     }
   }
 
   function handleStop() {
-    abortRef.current?.abort();
+    abortByKeyRef.current.get(viewKey)?.abort();
   }
 
   async function handleSend() {
@@ -642,6 +710,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
   async function handleEditRetry(index: number, newContent: string) {
     if (isLoading) return;
 
+    const editKey = viewKey;
     const msg = messages[index];
 
     // If message has createdAt (loaded from history), truncate DB records
@@ -657,7 +726,7 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
     }
 
     // Truncate frontend messages to before this message
-    setMessages((prev) => prev.slice(0, index));
+    updateMessages(editKey, (prev) => prev.slice(0, index));
     setEditingIndex(null);
 
     // Send with new content
@@ -672,8 +741,11 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
   }
 
   function handleNewSession() {
+    // Mint a fresh draft key so the new view is empty even if a previous draft
+    // (or any other session) is still streaming in the background.
+    draftCounterRef.current += 1;
+    setDraftKey(`draft-${draftCounterRef.current}`);
     setSessionId(undefined);
-    setMessages([]);
   }
 
   const suggestions = [

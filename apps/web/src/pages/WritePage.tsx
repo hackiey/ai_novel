@@ -277,7 +277,11 @@ export default function WritePage() {
                       </button>
                     </div>
                   </div>
-                  <DiffViewer oldContent={pendingEdit.oldContent} newContent={pendingEdit.newContent} />
+                  <DiffViewer
+                    oldContent={pendingEdit.oldContent}
+                    newContent={pendingEdit.newContent}
+                    fontClass={font !== "default" ? `tiptap-font-${font}` : undefined}
+                  />
                 </div>
               ) : (
                 <CreatorEditor
