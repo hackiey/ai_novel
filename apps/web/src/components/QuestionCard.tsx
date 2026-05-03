@@ -1,7 +1,8 @@
-import { useState, useMemo } from "react";
+import { useContext, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, Check, X } from "lucide-react";
 import { getToken } from "../lib/auth.js";
+import { QuestionActionContext } from "./QuestionActionContext.js";
 
 const API_BASE = "";
 
@@ -33,6 +34,7 @@ export default function QuestionCard({
   immersive?: boolean;
 }) {
   const { t } = useTranslation();
+  const actionCtx = useContext(QuestionActionContext);
   const initial = useMemo(() => questions.map(() => new Set<string>()), [questions]);
   const [selections, setSelections] = useState<Set<string>[]>(initial);
   const [submitting, setSubmitting] = useState<"reply" | "reject" | null>(null);
@@ -74,13 +76,17 @@ export default function QuestionCard({
     setError(null);
     try {
       const answers: string[][] = selections.map((s) => Array.from(s));
-      const res = await post(`/api/agent/question/${encodeURIComponent(callId)}/reply`, {
-        sessionId,
-        answers,
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error || `HTTP ${res.status}`);
+      if (actionCtx) {
+        await actionCtx.submitAnswers(callId, answers);
+      } else {
+        const res = await post(`/api/agent/question/${encodeURIComponent(callId)}/reply`, {
+          sessionId,
+          answers,
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body?.error || `HTTP ${res.status}`);
+        }
       }
       setSubmitted("replied");
     } catch (e) {
@@ -95,12 +101,16 @@ export default function QuestionCard({
     setSubmitting("reject");
     setError(null);
     try {
-      const res = await post(`/api/agent/question/${encodeURIComponent(callId)}/reject`, {
-        sessionId,
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error || `HTTP ${res.status}`);
+      if (actionCtx) {
+        await actionCtx.rejectQuestion(callId);
+      } else {
+        const res = await post(`/api/agent/question/${encodeURIComponent(callId)}/reject`, {
+          sessionId,
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body?.error || `HTTP ${res.status}`);
+        }
       }
       setSubmitted("rejected");
     } catch (e) {

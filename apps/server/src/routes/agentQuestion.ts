@@ -1,6 +1,7 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getDb } from "../db.js";
 import { getQuestionManager } from "../services/questionService.js";
+import { getSessionHub } from "../services/sessionEventHub.js";
 import { verifyToken, type JwtPayload } from "../auth/jwt.js";
 
 function extractUser(request: { headers: { authorization?: string } }): JwtPayload | null {
@@ -47,7 +48,11 @@ export function registerQuestionRoutes(fastify: FastifyInstance) {
     return reply.send({ pending });
   });
 
-  // Submit answers for a pending question.
+  // Submit answers for a pending question. After resolving the QuestionManager
+  // promise, the agent loop continues — its next events (the question's
+  // tool_result and the assistant's continuation) are streamed back as SSE so
+  // the UI keeps updating even when the original /chat connection is gone
+  // (e.g. the user reloaded the page during the question).
   fastify.post("/api/agent/question/:callId/reply", async (request, reply) => {
     const user = extractUser(request);
     if (!user) return reply.status(401).send({ error: "Unauthorized" });
@@ -75,9 +80,9 @@ export function registerQuestionRoutes(fastify: FastifyInstance) {
       return reply.status(404).send({ error: "Session not found" });
     }
 
-    const ok = getQuestionManager().reply(callId, normalized, sessionId);
-    if (!ok) return reply.status(404).send({ error: "Question not found or already answered" });
-    return reply.send({ ok: true });
+    return streamResolution(request, reply, sessionId, () =>
+      getQuestionManager().reply(callId, normalized, sessionId),
+    );
   });
 
   // Reject a pending question (user dismissed it).
@@ -95,8 +100,75 @@ export function registerQuestionRoutes(fastify: FastifyInstance) {
       return reply.status(404).send({ error: "Session not found" });
     }
 
-    const ok = getQuestionManager().reject(callId, sessionId);
-    if (!ok) return reply.status(404).send({ error: "Question not found or already answered" });
-    return reply.send({ ok: true });
+    return streamResolution(request, reply, sessionId, () =>
+      getQuestionManager().reject(callId, sessionId),
+    );
   });
+}
+
+/**
+ * Shared SSE pipeline for /reply and /reject. Subscribes to the session hub
+ * BEFORE invoking the QuestionManager so we don't miss the tool_result that
+ * the agent loop emits the instant the promise resolves.
+ */
+async function streamResolution(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  sessionId: string,
+  resolveQuestion: () => boolean,
+): Promise<void> {
+  const hub = getSessionHub(sessionId);
+
+  // No live agent loop for this session: the question can't be resumed even
+  // if it once existed. Return JSON so the client can surface the error.
+  if (!hub) {
+    const ok = resolveQuestion();
+    if (!ok) {
+      return reply.status(404).send({ error: "Question not found or already answered" });
+    }
+    return reply.send({ ok: true });
+  }
+
+  reply.raw.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+  });
+
+  let clientGone = false;
+  request.raw.on("close", () => {
+    clientGone = true;
+  });
+  const safeWrite = (payload: string) => {
+    if (clientGone) return;
+    try {
+      reply.raw.write(payload);
+    } catch {
+      clientGone = true;
+    }
+  };
+
+  const unsubscribe = hub.subscribe((event) => {
+    if (event.type === "_done") return; // handled via waitForTermination
+    safeWrite(`data: ${JSON.stringify(event)}\n\n`);
+  });
+
+  const ok = resolveQuestion();
+  if (!ok) {
+    safeWrite(`data: ${JSON.stringify({ type: "error", error: "Question not found or already answered" })}\n\n`);
+    safeWrite(`data: [DONE]\n\n`);
+    unsubscribe();
+    if (!clientGone) {
+      try { reply.raw.end(); } catch { /* socket already gone */ }
+    }
+    return;
+  }
+
+  await hub.waitForTermination();
+  unsubscribe();
+  safeWrite(`data: [DONE]\n\n`);
+  if (!clientGone) {
+    try { reply.raw.end(); } catch { /* socket already gone */ }
+  }
 }

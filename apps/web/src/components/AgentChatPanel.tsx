@@ -10,6 +10,7 @@ import { AgentEvent, AssistantMessageContent, type SkillProposalContext } from "
 import { useSkillsRecommend } from "../lib/skillsRecommendPref.js";
 import CompactionSettingsDialog from "./CompactionSettingsDialog.js";
 import SkillSettingsDialog from "./SkillSettingsDialog.js";
+import { QuestionActionContext, type QuestionActionContextValue } from "./QuestionActionContext.js";
 
 const API_BASE = "";
 
@@ -229,6 +230,12 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
   const scrollRef = useRef<HTMLDivElement>(null);
   const userScrolledUp = useRef(false);
   const abortByKeyRef = useRef<Map<string, AbortController>>(new Map());
+  // Disambiguates which stream "owns" the loading flag for a given session.
+  // When QuestionCard's submit aborts the live /chat fetch and opens /reply,
+  // the aborted /chat's finally would otherwise clear loading just as /reply is
+  // starting up. Ownership tokens let the late finally tell "still me" from
+  // "someone else has taken over" so it knows whether to clear the flag.
+  const streamOwnerByKeyRef = useRef<Map<string, symbol>>(new Map());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
@@ -436,6 +443,204 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
     }
   }
 
+  /**
+   * Read SSE events from a fetched response and merge them into the messages
+   * map. Used by sendMessage (kicks off /api/agent/chat) and by
+   * submitQuestionAnswers / rejectQuestion (POST /api/agent/question/.../reply
+   * which streams the loop's continuation events).
+   */
+  async function consumeStream(
+    response: Response,
+    initialActiveKey: string,
+    opts: { startedFromDraft: boolean },
+  ): Promise<{ activeKey: string; fullText: string; allEvents: AgentEvent[]; mutatedTools: string[] }> {
+    if (!response.body) throw new Error("Response body is empty");
+
+    let activeKey = initialActiveKey;
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let fullText = "";
+    const allEvents: AgentEvent[] = [];
+    const mutatedTools: string[] = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6);
+
+        if (payload === "[DONE]") continue;
+
+        try {
+          const event: AgentEvent = JSON.parse(payload);
+
+          if (event.type === "session" && event.sessionId) {
+            const realId = event.sessionId;
+            if (realId !== activeKey) {
+              // Move messages/loading from the draft key to the real session id.
+              setMessagesByKey((prev) => {
+                if (!(activeKey in prev) && !(realId in prev)) return prev;
+                const buf = prev[activeKey] ?? [];
+                const { [activeKey]: _, ...rest } = prev;
+                return { ...rest, [realId]: buf };
+              });
+              setLoadingByKey((prev) => {
+                const next: Record<string, true> = { ...prev };
+                delete next[activeKey];
+                next[realId] = true;
+                return next;
+              });
+              const ctrl = abortByKeyRef.current.get(activeKey);
+              abortByKeyRef.current.delete(activeKey);
+              if (ctrl) abortByKeyRef.current.set(realId, ctrl);
+              const owner = streamOwnerByKeyRef.current.get(activeKey);
+              if (owner) {
+                streamOwnerByKeyRef.current.delete(activeKey);
+                streamOwnerByKeyRef.current.set(realId, owner);
+              }
+              // Only steer the visible view if the user is still parked on the
+              // draft we started from. If they navigated to another session, leave
+              // them where they are.
+              if (
+                opts.startedFromDraft &&
+                sessionIdRef.current === undefined &&
+                draftKeyRef.current === activeKey
+              ) {
+                setSessionId(realId);
+              }
+              activeKey = realId;
+            }
+            continue;
+          }
+
+          allEvents.push(event);
+
+          if (event.type === "text" && event.text) {
+            fullText += event.text;
+            updateMessages(activeKey, (prev) => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last && last.role === "assistant") {
+                updated[updated.length - 1] = {
+                  ...last,
+                  content: (last.content ?? "") + event.text!,
+                  events: [...(last.events ?? []), event],
+                };
+              }
+              return updated;
+            });
+          }
+
+          if (event.type === "tool_use" || event.type === "tool_result" || event.type === "compaction") {
+            if (event.type === "tool_use" && event.toolName) mutatedTools.push(event.toolName);
+            updateMessages(activeKey, (prev) => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last && last.role === "assistant") {
+                updated[updated.length - 1] = {
+                  ...last,
+                  events: [...(last.events ?? []), event],
+                };
+              }
+              return updated;
+            });
+          }
+
+          if (event.type === "done" && event.fullResponse) {
+            fullText = event.fullResponse;
+            const finalText = event.fullResponse;
+            updateMessages(activeKey, (prev) => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last && last.role === "assistant") {
+                updated[updated.length - 1] = { ...last, content: finalText };
+              }
+              return updated;
+            });
+          }
+
+          if (event.type === "usage" && event.usage) {
+            const u = event.usage;
+            const label = u.isSummary ? "[Token Usage Summary]" : "[Token Usage]";
+            const style = u.isSummary
+              ? "color: #f59e0b; font-weight: bold"
+              : "color: #2dd4bf; font-weight: bold";
+            console.log(
+              `%c${label}%c ${u.model} | input: ${u.input} | output: ${u.output} | cache_read: ${u.cacheRead} | cache_write: ${u.cacheWrite} | total: ${u.totalTokens} | cost: $${u.cost.total.toFixed(4)}`,
+              style,
+              "color: inherit",
+            );
+          }
+
+          if (event.type === "error") {
+            fullText = fullText || `Error: ${event.error}`;
+          }
+        } catch {
+          // skip malformed JSON
+        }
+      }
+    }
+
+    return { activeKey, fullText, allEvents, mutatedTools };
+  }
+
+  /**
+   * Run the post-stream side-effects shared by sendMessage and the question
+   * resolution path: chapter-edit review routing, query invalidation, session
+   * list refresh, optional skill recommendation.
+   */
+  async function finalizeStream(
+    activeKey: string,
+    fullText: string,
+    allEvents: AgentEvent[],
+    mutatedTools: string[],
+    opts: { recommendUserText?: string },
+  ): Promise<void> {
+    let chapterEditHandled = false;
+    if (onChapterEdit) {
+      for (const e of allEvents) {
+        if (e.type === "tool_use" && isChapterEditCall(e.toolName, e.toolInput)) {
+          const input = (e.toolInput ?? {}) as Record<string, unknown>;
+          const chapterId = (input.chapter_id ?? input.id) as string | undefined;
+          if (chapterId) {
+            onChapterEdit(chapterId);
+            chapterEditHandled = true;
+          }
+        }
+      }
+    }
+
+    const keysToInvalidate = new Set<string>();
+    for (const toolName of mutatedTools) {
+      const keys = MUTATION_TOOL_INVALIDATIONS[toolName];
+      if (!keys) continue;
+      for (const key of keys) {
+        if (chapterEditHandled && key[0] === "chapter") continue;
+        keysToInvalidate.add(JSON.stringify(key));
+      }
+    }
+    for (const keyStr of keysToInvalidate) {
+      queryClient.invalidateQueries({ queryKey: [JSON.parse(keyStr)] });
+    }
+
+    sessionsQuery.refetch();
+
+    if (opts.recommendUserText !== undefined) {
+      const preceding: ChatMessage[] = [
+        { role: "user", content: opts.recommendUserText },
+        { role: "assistant", content: fullText },
+      ];
+      await streamSkillRecommendation(activeKey, preceding);
+    }
+  }
+
   async function sendMessage(text: string) {
     if (!text) return;
     // Capture the session view at call time. The stream that follows is tied to
@@ -448,9 +653,9 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
 
     userScrolledUp.current = false;
     setLoading(startKey, true);
+    const ownerToken = Symbol("send");
+    streamOwnerByKeyRef.current.set(startKey, ownerToken);
 
-    // Snapshot recommend-eligibility BEFORE the turn so a mid-turn `addEnabledSkills`
-    // (from clicking a previous propose_skills card) doesn't change the decision.
     const recommendEnabled = recommendChecked;
     const enabledCount = project?.enabledSkillSlugs?.length ?? Number.POSITIVE_INFINITY;
     const shouldRecommendAfter = !!projectId
@@ -496,182 +701,11 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
         throw new Error(errorMessage);
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullText = "";
-      const allEvents: AgentEvent[] = [];
-      const mutatedTools: string[] = [];
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const payload = line.slice(6);
-
-          if (payload === "[DONE]") continue;
-
-          try {
-            const event: AgentEvent = JSON.parse(payload);
-
-            if (event.type === "session" && event.sessionId) {
-              const realId = event.sessionId;
-              if (realId !== activeKey) {
-                // Move messages/loading from the draft key to the real session id.
-                setMessagesByKey((prev) => {
-                  if (!(activeKey in prev) && !(realId in prev)) return prev;
-                  const buf = prev[activeKey] ?? [];
-                  const { [activeKey]: _, ...rest } = prev;
-                  return { ...rest, [realId]: buf };
-                });
-                setLoadingByKey((prev) => {
-                  const next: Record<string, true> = { ...prev };
-                  delete next[activeKey];
-                  next[realId] = true;
-                  return next;
-                });
-                const ctrl = abortByKeyRef.current.get(activeKey);
-                abortByKeyRef.current.delete(activeKey);
-                if (ctrl) abortByKeyRef.current.set(realId, ctrl);
-                // Only steer the visible view if the user is still parked on the
-                // draft we started from. If they navigated to another session, leave
-                // them where they are.
-                if (
-                  startedFromDraft &&
-                  sessionIdRef.current === undefined &&
-                  draftKeyRef.current === activeKey
-                ) {
-                  setSessionId(realId);
-                }
-                activeKey = realId;
-              }
-              continue;
-            }
-
-            allEvents.push(event);
-
-            if (event.type === "text" && event.text) {
-              fullText += event.text;
-              // Update assistant message content in-place
-              updateMessages(activeKey, (prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1];
-                if (last && last.role === "assistant") {
-                  updated[updated.length - 1] = {
-                    ...last,
-                    content: fullText,
-                    events: [...allEvents],
-                  };
-                }
-                return updated;
-              });
-            }
-
-            if (event.type === "tool_use" || event.type === "tool_result" || event.type === "compaction") {
-              if (event.type === "tool_use" && event.toolName) mutatedTools.push(event.toolName);
-              // Update events list in real-time
-              updateMessages(activeKey, (prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1];
-                if (last && last.role === "assistant") {
-                  updated[updated.length - 1] = {
-                    ...last,
-                    content: fullText,
-                    events: [...allEvents],
-                  };
-                }
-                return updated;
-              });
-            }
-
-            if (event.type === "done" && event.fullResponse) {
-              fullText = event.fullResponse;
-            }
-
-            if (event.type === "usage" && event.usage) {
-              const u = event.usage;
-              const label = u.isSummary ? "[Token Usage Summary]" : "[Token Usage]";
-              const style = u.isSummary
-                ? "color: #f59e0b; font-weight: bold"
-                : "color: #2dd4bf; font-weight: bold";
-              console.log(
-                `%c${label}%c ${u.model} | input: ${u.input} | output: ${u.output} | cache_read: ${u.cacheRead} | cache_write: ${u.cacheWrite} | total: ${u.totalTokens} | cost: $${u.cost.total.toFixed(4)}`,
-                style,
-                "color: inherit",
-              );
-            }
-
-            if (event.type === "error") {
-              fullText = fullText || `Error: ${event.error}`;
-            }
-          } catch {
-            // skip malformed JSON
-          }
-        }
-      }
-
-      // Final update with all events
-      updateMessages(activeKey, (prev) => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last && last.role === "assistant") {
-          updated[updated.length - 1] = {
-            ...last,
-            content: fullText,
-            events: allEvents,
-          };
-        }
-        return updated;
+      const result = await consumeStream(response, activeKey, { startedFromDraft });
+      activeKey = result.activeKey;
+      await finalizeStream(activeKey, result.fullText, result.allEvents, result.mutatedTools, {
+        recommendUserText: shouldRecommendAfter ? text : undefined,
       });
-
-      // Check if any chapter-edit tools were used; if so, trigger review flow
-      let chapterEditHandled = false;
-      if (onChapterEdit) {
-        for (const e of allEvents) {
-          if (e.type === "tool_use" && isChapterEditCall(e.toolName, e.toolInput)) {
-            const input = (e.toolInput ?? {}) as Record<string, unknown>;
-            const chapterId = (input.chapter_id ?? input.id) as string | undefined;
-            if (chapterId) {
-              onChapterEdit(chapterId);
-              chapterEditHandled = true;
-            }
-          }
-        }
-      }
-
-      // Invalidate queries for any data the agent mutated.
-      // Skip chapter invalidation if we're routing the edit through the review flow.
-      const keysToInvalidate = new Set<string>();
-      for (const toolName of mutatedTools) {
-        const keys = MUTATION_TOOL_INVALIDATIONS[toolName];
-        if (!keys) continue;
-        for (const key of keys) {
-          if (chapterEditHandled && key[0] === "chapter") continue;
-          keysToInvalidate.add(JSON.stringify(key));
-        }
-      }
-      for (const keyStr of keysToInvalidate) {
-        queryClient.invalidateQueries({ queryKey: [JSON.parse(keyStr)] });
-      }
-
-      // Refresh session list
-      sessionsQuery.refetch();
-
-      // Opportunistic skill recommendation: after a normal turn (project already initialized)
-      // and below the threshold, ask the recommend agent to surface 3-8 relevant skills.
-      if (shouldRecommendAfter) {
-        const preceding: ChatMessage[] = [
-          { role: "user", content: text },
-          { role: "assistant", content: fullText },
-        ];
-        await streamSkillRecommendation(activeKey, preceding);
-      }
     } catch (err: any) {
       if (err.name === "AbortError") {
         // User stopped generation — keep partial content as-is
@@ -692,7 +726,104 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
       if (abortByKeyRef.current.get(activeKey)) {
         abortByKeyRef.current.delete(activeKey);
       }
-      setLoading(activeKey, false);
+      // Only clear loading if we still own the stream; otherwise another flow
+      // (typically /reply taking over after a question answer) is now driving it.
+      if (streamOwnerByKeyRef.current.get(activeKey) === ownerToken) {
+        streamOwnerByKeyRef.current.delete(activeKey);
+        setLoading(activeKey, false);
+      }
+    }
+  }
+
+  async function submitQuestionAnswers(callId: string, answers: string[][]): Promise<void> {
+    const sid = sessionIdRef.current;
+    if (!sid) throw new Error("No session for question reply");
+    return resolveQuestion(sid, async (signal) => {
+      const token = getToken();
+      return fetch(`${API_BASE}/api/agent/question/${encodeURIComponent(callId)}/reply`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ sessionId: sid, answers }),
+        signal,
+      });
+    });
+  }
+
+  async function rejectQuestion(callId: string): Promise<void> {
+    const sid = sessionIdRef.current;
+    if (!sid) throw new Error("No session for question reject");
+    return resolveQuestion(sid, async (signal) => {
+      const token = getToken();
+      return fetch(`${API_BASE}/api/agent/question/${encodeURIComponent(callId)}/reject`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ sessionId: sid }),
+        signal,
+      });
+    });
+  }
+
+  /**
+   * Shared submit/reject pipeline. Aborts whatever stream is currently feeding
+   * this session (typically the original /chat SSE that's parked on the
+   * question), takes ownership of the loading flag so the aborted flow's
+   * finally won't clear it, then consumes the SSE stream from /reply or
+   * /reject and merges its events back into the conversation.
+   */
+  async function resolveQuestion(
+    sid: string,
+    fetchFn: (signal: AbortSignal) => Promise<Response>,
+  ): Promise<void> {
+    const ownerToken = Symbol("resolveQuestion");
+    // Take ownership BEFORE aborting so the racing finally of the aborted
+    // /chat flow sees a different owner and leaves loading=true alone.
+    streamOwnerByKeyRef.current.set(sid, ownerToken);
+    abortByKeyRef.current.get(sid)?.abort();
+    abortByKeyRef.current.delete(sid);
+    setLoading(sid, true);
+
+    const controller = new AbortController();
+    abortByKeyRef.current.set(sid, controller);
+
+    try {
+      const response = await fetchFn(controller.signal);
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorBody = await response.json();
+          if (typeof errorBody?.error === "string" && errorBody.error) {
+            errorMessage = errorBody.error;
+          }
+        } catch {
+          // ignore
+        }
+        throw new Error(errorMessage);
+      }
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType.includes("text/event-stream") && response.body) {
+        const result = await consumeStream(response, sid, { startedFromDraft: false });
+        await finalizeStream(result.activeKey, result.fullText, result.allEvents, result.mutatedTools, {});
+      }
+      // For non-SSE JSON responses (no live agent loop on the server), there's
+      // nothing to stream — the loop has already finished and persisted, and
+      // loadSession will surface its result the next time the user opens it.
+    } catch (err: any) {
+      if (err.name === "AbortError") return;
+      throw err;
+    } finally {
+      if (abortByKeyRef.current.get(sid) === controller) {
+        abortByKeyRef.current.delete(sid);
+      }
+      if (streamOwnerByKeyRef.current.get(sid) === ownerToken) {
+        streamOwnerByKeyRef.current.delete(sid);
+        setLoading(sid, false);
+      }
     }
   }
 
@@ -753,8 +884,23 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
     t("chat.suggestion.plotTwist"),
   ];
 
+  // Keep the latest submit/reject closures in a ref so the context value can be
+  // a stable identity. Without this, every AgentChatPanel re-render would push
+  // a new context value and force every QuestionCard in the conversation to
+  // re-render even when nothing about the question changed.
+  const questionActionsRef = useRef({
+    submitAnswers: submitQuestionAnswers,
+    rejectQuestion: rejectQuestion,
+  });
+  questionActionsRef.current.submitAnswers = submitQuestionAnswers;
+  questionActionsRef.current.rejectQuestion = rejectQuestion;
+  const questionActions: QuestionActionContextValue = useMemo(() => ({
+    submitAnswers: (callId, answers) => questionActionsRef.current.submitAnswers(callId, answers),
+    rejectQuestion: (callId) => questionActionsRef.current.rejectQuestion(callId),
+  }), []);
 
   return (
+    <QuestionActionContext.Provider value={questionActions}>
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className={`flex items-center justify-between px-4 py-1.5 border-b shrink-0 ${imm ? "border-white/10" : "border-gray-200"}`}>
@@ -1242,5 +1388,6 @@ export default function AgentChatPanel({ projectId, worldId, currentChapterId, o
         />
       )}
     </div>
+    </QuestionActionContext.Provider>
   );
 }

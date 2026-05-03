@@ -7,6 +7,7 @@ import { getEmbeddingService } from "../services/embeddingService.js";
 import { resolveEnabledSkillSlugs } from "../utils/enabledSkills.js";
 import { getStoredCompactionState, getUsageStateFromEvents, maybeCompactHistory } from "../services/agentCompactionService.js";
 import { getQuestionManager } from "../services/questionService.js";
+import { deleteSessionHub, getOrCreateSessionHub } from "../services/sessionEventHub.js";
 import { verifyToken, type JwtPayload } from "../auth/jwt.js";
 import { getUserAllowedModels } from "../auth/permissionGroups.js";
 
@@ -207,8 +208,15 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       }
     };
 
+    // The hub mirrors every event the agent emits so that the
+    // /api/agent/question/:callId/reply handler can take over delivery once
+    // the user answers a `question` tool call. The frontend aborts this /chat
+    // fetch before opening /reply, so events aren't double-delivered.
+    const hub = getOrCreateSessionHub(sessionId);
+
     // Send sessionId as first event
     safeWrite(`data: ${JSON.stringify({ type: "session", sessionId })}\n\n`);
+    hub.emit({ type: "session", sessionId });
 
     const sessionDoc = await db.collection("agent_sessions").findOne({
       sessionId,
@@ -368,6 +376,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
 
     if (compactionState.compactionEvent) {
       safeWrite(`data: ${JSON.stringify(compactionState.compactionEvent)}\n\n`);
+      hub.emit(compactionState.compactionEvent);
       allEvents.push(compactionState.compactionEvent);
     }
 
@@ -389,6 +398,7 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
         }
 
         safeWrite(`data: ${JSON.stringify(event)}\n\n`);
+        hub.emit(event as any);
         allEvents.push(event);
 
         if (event.type === "text") {
@@ -417,7 +427,9 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
       });
       if (err instanceof Error && err.stack) console.error(err.stack);
       const errorMsg = err instanceof Error ? err.message : String(err);
-      safeWrite(`data: ${JSON.stringify({ type: "error", error: errorMsg })}\n\n`);
+      const errEvent = { type: "error" as const, error: errorMsg };
+      safeWrite(`data: ${JSON.stringify(errEvent)}\n\n`);
+      hub.emit(errEvent);
     }
 
     // Save assistant message to DB with structured messages for history replay
@@ -468,6 +480,10 @@ export function registerAgentRoutes(fastify: FastifyInstance) {
 
     // Send done signal and end. Both are no-ops if the client already left.
     safeWrite(`data: [DONE]\n\n`);
+    // Tell any /reply or /reject SSE subscribed to this session that the loop
+    // is finished, then drop the hub.
+    hub.emit({ type: "_done" });
+    deleteSessionHub(sessionId);
     if (!clientGone) {
       try { reply.raw.end(); } catch { /* socket already gone */ }
     }
